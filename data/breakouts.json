@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T09:46:11+00:00",
+  "generated_at": "2026-07-03T12:24:21+00:00",
   "as_of_date": "2026-07-03",
   "source": "yfinance",
   "count": 6,
@@ -10,8 +10,8 @@
       "name": "Eternal Ltd.",
       "sector": "Consumer Services · Internet Retail",
       "as_of": "2026-07-03",
-      "price": 281.35,
-      "change_pct": 0.59,
+      "price": 281.65,
+      "change_pct": 0.7,
       "ema_stack": {
         "ema10": "ABOVE",
         "ema20": "ABOVE",
@@ -24,7 +24,7 @@
       },
       "resistance": {
         "level": 285.95,
-        "distance_pct": 1.63,
+        "distance_pct": 1.53,
         "touches": 3
       },
       "base_depth_pct": -18.8,
@@ -52,8 +52,8 @@
       "name": "Tata Consultancy Services Ltd.",
       "sector": "Technology Services · IT Consulting",
       "as_of": "2026-07-03",
-      "price": 2093.2,
-      "change_pct": 1.21,
+      "price": 2093.5,
+      "change_pct": 1.23,
       "ema_stack": {
         "ema10": "ABOVE",
         "ema20": "BELOW",
@@ -66,7 +66,7 @@
       },
       "resistance": {
         "level": 2471.49,
-        "distance_pct": 18.07,
+        "distance_pct": 18.06,
         "touches": 9
       },
       "base_depth_pct": -19.8,
@@ -94,8 +94,8 @@
       "name": "Reliance Industries Ltd.",
       "sector": "Energy · Oil & Gas Refining",
       "as_of": "2026-07-03",
-      "price": 1303.9,
-      "change_pct": 0.03,
+      "price": 1304.0,
+      "change_pct": 0.04,
       "ema_stack": {
         "ema10": "BELOW",
         "ema20": "BELOW",
@@ -108,7 +108,7 @@
       },
       "resistance": {
         "level": 1466.62,
-        "distance_pct": 12.48,
+        "distance_pct": 12.47,
         "touches": 4
       },
       "base_depth_pct": -14.6,
@@ -136,8 +136,8 @@
       "name": "Infosys Ltd.",
       "sector": "Technology Services · IT Consulting",
       "as_of": "2026-07-03",
-      "price": 1046.9,
-      "change_pct": 0.58,
+      "price": 1047.2,
+      "change_pct": 0.61,
       "ema_stack": {
         "ema10": "ABOVE",
         "ema20": "BELOW",
@@ -150,7 +150,7 @@
       },
       "resistance": {
         "level": 1251.81,
-        "distance_pct": 19.57,
+        "distance_pct": 19.54,
         "touches": 1
       },
       "base_depth_pct": -21.5,
@@ -178,8 +178,8 @@
       "name": "MOIL Ltd.",
       "sector": "Materials · Mining",
       "as_of": "2026-07-03",
-      "price": 282.1,
-      "change_pct": 1.8,
+      "price": 282.2,
+      "change_pct": 1.84,
       "ema_stack": {
         "ema10": "ABOVE",
         "ema20": "BELOW",
@@ -192,7 +192,7 @@
       },
       "resistance": {
         "level": 337.4,
-        "distance_pct": 19.6,
+        "distance_pct": 19.56,
         "touches": 2
       },
       "base_depth_pct": -18.2,
@@ -220,8 +220,8 @@
       "name": "Tata Steel Ltd.",
       "sector": "Materials · Steel",
       "as_of": "2026-07-03",
-      "price": 189.7,
-      "change_pct": 1.08,
+      "price": 189.8,
+      "change_pct": 1.13,
       "ema_stack": {
         "ema10": "BELOW",
         "ema20": "BELOW",
@@ -234,7 +234,7 @@
       },
       "resistance": {
         "level": 219.87,
-        "distance_pct": 15.9,
+        "distance_pct": 15.84,
         "touches": 3
       },
       "base_depth_pct": -16.0,
