@@ -15,8 +15,12 @@ dist/
 .env
 .env.local
 
-# Python (future backend)
+# Python backend
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Local research DB (regenerable by running backend/pipeline.py) — but keep breakouts.json
+*.duckdb
+*.duckdb.wal

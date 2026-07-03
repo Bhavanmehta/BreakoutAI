@@ -1,0 +1,261 @@
+{
+  "generated_at": "2026-07-03T09:46:11+00:00",
+  "as_of_date": "2026-07-03",
+  "source": "yfinance",
+  "count": 6,
+  "disclaimer": "Educational content only, not investment advice. Patterns can fail. Always use a stop-loss and consult a SEBI-registered advisor before trading.",
+  "stocks": [
+    {
+      "symbol": "ETERNAL",
+      "name": "Eternal Ltd.",
+      "sector": "Consumer Services · Internet Retail",
+      "as_of": "2026-07-03",
+      "price": 281.35,
+      "change_pct": 0.59,
+      "ema_stack": {
+        "ema10": "ABOVE",
+        "ema20": "ABOVE",
+        "ema50": "ABOVE",
+        "ema200": "ABOVE"
+      },
+      "adx": {
+        "value": 21.8,
+        "label": "ACTIVE"
+      },
+      "resistance": {
+        "level": 285.95,
+        "distance_pct": 1.63,
+        "touches": 3
+      },
+      "base_depth_pct": -18.8,
+      "volatility": {
+        "contraction_ratio": 1.0,
+        "state": "Coiling (squeeze)"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bullish"
+      },
+      "history": {
+        "past_breakouts": 14,
+        "winrate_20d": 0.714,
+        "avg_fwd_return_20d_pct": 2.8
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹285.95 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹285.95+ (breakout close on volume)",
+        "stop_loss": "₹268.79 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "TCS",
+      "name": "Tata Consultancy Services Ltd.",
+      "sector": "Technology Services · IT Consulting",
+      "as_of": "2026-07-03",
+      "price": 2093.2,
+      "change_pct": 1.21,
+      "ema_stack": {
+        "ema10": "ABOVE",
+        "ema20": "BELOW",
+        "ema50": "BELOW",
+        "ema200": "BELOW"
+      },
+      "adx": {
+        "value": 23.3,
+        "label": "ACTIVE"
+      },
+      "resistance": {
+        "level": 2471.49,
+        "distance_pct": 18.07,
+        "touches": 9
+      },
+      "base_depth_pct": -19.8,
+      "volatility": {
+        "contraction_ratio": 1.07,
+        "state": "Expanding"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bearish"
+      },
+      "history": {
+        "past_breakouts": 10,
+        "winrate_20d": 0.4,
+        "avg_fwd_return_20d_pct": -2.16
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹2,471.49 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹2,471.49+ (breakout close on volume)",
+        "stop_loss": "₹2,323.20 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "RELIANCE",
+      "name": "Reliance Industries Ltd.",
+      "sector": "Energy · Oil & Gas Refining",
+      "as_of": "2026-07-03",
+      "price": 1303.9,
+      "change_pct": 0.03,
+      "ema_stack": {
+        "ema10": "BELOW",
+        "ema20": "BELOW",
+        "ema50": "BELOW",
+        "ema200": "BELOW"
+      },
+      "adx": {
+        "value": 15.8,
+        "label": "CHOP"
+      },
+      "resistance": {
+        "level": 1466.62,
+        "distance_pct": 12.48,
+        "touches": 4
+      },
+      "base_depth_pct": -14.6,
+      "volatility": {
+        "contraction_ratio": 0.94,
+        "state": "Coiling (squeeze)"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bearish"
+      },
+      "history": {
+        "past_breakouts": 10,
+        "winrate_20d": 0.7,
+        "avg_fwd_return_20d_pct": 2.24
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹1,466.62 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹1,466.62+ (breakout close on volume)",
+        "stop_loss": "₹1,378.62 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "INFY",
+      "name": "Infosys Ltd.",
+      "sector": "Technology Services · IT Consulting",
+      "as_of": "2026-07-03",
+      "price": 1046.9,
+      "change_pct": 0.58,
+      "ema_stack": {
+        "ema10": "ABOVE",
+        "ema20": "BELOW",
+        "ema50": "BELOW",
+        "ema200": "BELOW"
+      },
+      "adx": {
+        "value": 23.0,
+        "label": "ACTIVE"
+      },
+      "resistance": {
+        "level": 1251.81,
+        "distance_pct": 19.57,
+        "touches": 1
+      },
+      "base_depth_pct": -21.5,
+      "volatility": {
+        "contraction_ratio": 1.16,
+        "state": "Expanding"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bearish"
+      },
+      "history": {
+        "past_breakouts": 11,
+        "winrate_20d": 0.818,
+        "avg_fwd_return_20d_pct": 2.46
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹1,251.81 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹1,251.81+ (breakout close on volume)",
+        "stop_loss": "₹1,176.70 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "MOIL",
+      "name": "MOIL Ltd.",
+      "sector": "Materials · Mining",
+      "as_of": "2026-07-03",
+      "price": 282.1,
+      "change_pct": 1.8,
+      "ema_stack": {
+        "ema10": "ABOVE",
+        "ema20": "BELOW",
+        "ema50": "BELOW",
+        "ema200": "BELOW"
+      },
+      "adx": {
+        "value": 13.2,
+        "label": "CHOP"
+      },
+      "resistance": {
+        "level": 337.4,
+        "distance_pct": 19.6,
+        "touches": 2
+      },
+      "base_depth_pct": -18.2,
+      "volatility": {
+        "contraction_ratio": 0.77,
+        "state": "Coiling (squeeze)"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bearish"
+      },
+      "history": {
+        "past_breakouts": 9,
+        "winrate_20d": 0.556,
+        "avg_fwd_return_20d_pct": 5.2
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹337.40 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹337.40+ (breakout close on volume)",
+        "stop_loss": "₹317.16 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "TATASTEEL",
+      "name": "Tata Steel Ltd.",
+      "sector": "Materials · Steel",
+      "as_of": "2026-07-03",
+      "price": 189.7,
+      "change_pct": 1.08,
+      "ema_stack": {
+        "ema10": "BELOW",
+        "ema20": "BELOW",
+        "ema50": "BELOW",
+        "ema200": "ABOVE"
+      },
+      "adx": {
+        "value": 23.2,
+        "label": "ACTIVE"
+      },
+      "resistance": {
+        "level": 219.87,
+        "distance_pct": 15.9,
+        "touches": 3
+      },
+      "base_depth_pct": -16.0,
+      "volatility": {
+        "contraction_ratio": 0.83,
+        "state": "Coiling (squeeze)"
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Neutral"
+      },
+      "history": {
+        "past_breakouts": 18,
+        "winrate_20d": 0.444,
+        "avg_fwd_return_20d_pct": -0.87
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹219.87 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹219.87+ (breakout close on volume)",
+        "stop_loss": "₹206.67 (~-6% below the trigger)"
+      }
+    }
+  ]
+}
