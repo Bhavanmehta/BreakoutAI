@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakoutAI | Advanced Indian Market Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a', /* slate-900 */
+                        cardBg: '#1e293b', /* slate-800 */
+                        borderCl: '#334155', /* slate-700 */
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen text-gray-200 bg-darkBg font-sans selection:bg-blue-500 selection:text-white">
+
+    <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+        <div class="px-6 py-4 max-w-[1600px] mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-6">
+            <div class="flex items-center justify-between w-full md:w-auto">
+                <h1 class="text-xl font-bold text-white tracking-tight">
+                    <span class="text-blue-500">⚡</span> Breakout<span class="text-blue-400">AI</span>
+                </h1>
+                <span class="md:hidden px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md">Live Terminal</span>
+            </div>
+            
+            <div class="relative w-full max-w-2xl">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="text" 
+                    id="aiSearch"
+                    class="w-full py-2.5 pl-10 pr-4 text-sm text-white transition-all border rounded-lg bg-slate-800 border-borderCl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-400" 
+                    placeholder="Ask anything (e.g., 'Find NSE stocks with 10/20/50 EMA stacked and heavy delivery volume')">
+            </div>
+            
+            <div class="hidden md:flex items-center gap-4 ml-auto">
+                <span class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md">NSE Live Feed</span>
+                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto p-4 md:p-6">
+        
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-4 border-b border-borderCl">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm text-slate-400 mr-2">Watchlist Focus:</span>
+                <button onclick="selectStock('TCS')" id="chip-TCS" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-blue-600/20 border-blue-500 text-white">
+                    TCS
+                </button>
+                <button onclick="selectStock('SBIN')" id="chip-SBIN" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500">
+                    SBIN
+                </button>
+                <button onclick="selectStock('ICICIBANK')" id="chip-ICICIBANK" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500">
+                    ICICI Bank
+                </button>
+            </div>
+
+            <div class="flex items-center gap-1 p-1 rounded-lg bg-slate-800 border border-borderCl self-start lg:self-auto">
+                <button onclick="switchPage('technical')" id="tab-technical" class="px-5 py-2 text-sm font-medium transition-all rounded-md bg-blue-600 text-white shadow-lg">
+                    Page 1: Technical Breakouts
+                </button>
+                <button onclick="switchPage('fundamental')" id="tab-fundamental" class="px-5 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white">
+                    Page 2: Fundamental Deep-Dive
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4 mb-6 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-6 items-center">
+            <div>
+                <h2 id="metaTitle" class="text-xl font-bold text-white">Tata Consultancy Services Ltd.</h2>
+                <div id="metaSector" class="text-xs text-slate-400 mt-0.5">Sector: Technology Services | Industry: IT Consulting</div>
+            </div>
+            <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
+            <div class="grid grid-cols-2 sm:flex gap-4 sm:gap-6">
+                <div><span class="text-xs text-slate-400 block">Market Cap</span><span id="metaMcap" class="text-sm font-semibold text-slate-200">₹832,395 Cr</span></div>
+                <div><span class="text-xs text-slate-400 block">Current Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">₹2,151.40</span></div>
+                <div><span class="text-xs text-slate-400 block">P/E Ratio</span><span id="metaPE" class="text-sm font-semibold text-slate-200">16.0</span></div>
+                <div><span class="text-xs text-slate-400 block">Trend Rank</span><span id="metaRank" class="text-sm font-bold text-emerald-400">RS #1</span></div>
+            </div>
+        </div>
+
+        <div id="page-technical" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Sidebar -->
+            <div class="flex flex-col gap-4 lg:col-span-3">
+                
+                <!-- 1. Strategy Signals Card (NEW) -->
+                <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                    <h3 class="mb-4 text-sm font-bold tracking-wider text-slate-400 uppercase">Custom Strategy Signals</h3>
+                    <div class="space-y-3.5">
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">ADX (Trend Strength)</span>
+                            <span id="valADX" class="px-2.5 py-1 text-xs font-black text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">> 20 (ACTIVE)</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">Zero Lag Trend</span>
+                            <span id="valZeroLag" class="px-2.5 py-1 text-xs font-black text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">🟢 BUY SIGNAL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Moving Average Stack -->
+                <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold tracking-wider text-slate-400 uppercase">Moving Average Stack</h3>
+                    </div>
+                    <div class="space-y-3.5">
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">10 EMA (Momentum)</span>
+                            <span id="ema10" class="px-2.5 py-1 text-xs font-black text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">ABOVE</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">20 EMA (Trend)</span>
+                            <span id="ema20" class="px-2.5 py-1 text-xs font-black text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">ABOVE</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">50 EMA (Structural)</span>
+                            <span id="ema50" class="px-2.5 py-1 text-xs font-black text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">ABOVE</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <span class="text-sm font-medium text-slate-300">200 EMA (Macro Baseline)</span>
+                            <span id="ema200" class="px-2.5 py-1 text-xs font-black text-rose-400 rounded bg-rose-500/10 border border-rose-500/20">BELOW</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Breakout Triggers Card -->
+                <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                    <h3 class="mb-4 text-sm font-bold tracking-wider text-slate-400 uppercase">General Momentum</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between mb-1.5 text-sm">
+                                <span class="text-slate-400 font-medium">RS vs Nifty 50</span>
+                                <span id="valRS" class="font-bold text-emerald-400">72</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-900">
+                                <div id="barRS" class="h-2 rounded-full bg-emerald-500 transition-all duration-500" style="width: 72%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1.5 text-sm">
+                                <span class="text-slate-400 font-medium">RSI (14 Period)</span>
+                                <span id="valRSI" class="font-bold text-blue-400">58.4</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-900">
+                                <div id="barRSI" class="h-2 rounded-full bg-blue-500 transition-all duration-500" style="width: 58.4%"></div>
+                            </div>
+                        </div>
+                        <div class="pt-3 mt-3 border-t border-slate-700 grid grid-cols-2 gap-3 text-center">
+                            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="text-xs text-slate-400 block mb-0.5">Vol Shock</span>
+                                <span id="valVolume" class="text-base font-bold text-yellow-400">2.4x</span>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="text-xs text-slate-400 block mb-0.5">Squeeze</span>
+                                <span id="valSqueeze" class="text-base font-bold text-emerald-400">Yes</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Main Area: TradingView Chart -->
+            <div class="lg:col-span-9 min-h-[500px] lg:min-h-[750px] border border-borderCl rounded-xl overflow-hidden bg-cardBg shadow-2xl relative">
+                <div class="tradingview-widget-container w-full h-full">
+                    <div id="tv-chart-frame" class="w-full h-full min-h-[500px] lg:min-h-[750px]"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 2: FUNDAMENTAL DEEP-DIVE LAYOUT -->
+        <div id="page-fundamental" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-4 rounded-xl bg-cardBg border border-borderCl">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Return on Equity (ROE)</span>
+                    <div id="fundRoe" class="text-2xl font-bold text-white">51.8%</div>
+                    <div class="text-xs text-emerald-400 mt-1">▲ Industry Top 5% Tier</div>
+                </div>
+                <div class="p-4 rounded-xl bg-cardBg border border-borderCl">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Return on Capital Employed (ROCE)</span>
+                    <div id="fundRoce" class="text-2xl font-bold text-white">63.0%</div>
+                    <div class="text-xs text-emerald-400 mt-1">▲ Capital Allocation Masterclass</div>
+                </div>
+                <div class="p-4 rounded-xl bg-cardBg border border-borderCl">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Debt to Equity (D/E)</span>
+                    <div id="fundDe" class="text-2xl font-bold text-emerald-400">0.00 (Debt Free)</div>
+                    <div class="text-xs text-slate-400 mt-1">Prudent Balance Sheet Management</div>
+                </div>
+            </div>
+
+            <div class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                <h3 class="text-base font-bold text-white mb-6 flex items-center gap-2">
+                    <span>📊</span> Historical Performance & Growth Engine Breakdown
+                </h3>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <h4 class="text-sm font-semibold text-slate-300 mb-4 text-center">QoQ Sales Growth Trends</h4>
+                        <div class="h-32 flex items-end justify-between gap-1.5 px-2 pt-4">
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 65%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+6%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 75%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+7%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 85%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+9%</span></div>
+                            <div class="w-full bg-rose-500 rounded-t" style="height: 35%"><span class="text-[9px] text-slate-300 block text-center -mt-5">-2%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 70%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+6%</span></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-2 px-1">
+                            <span>Jun 25</span><span>Sep 25</span><span>Dec 25</span><span>Mar 26</span><span>Jun 26</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <h4 class="text-sm font-semibold text-slate-300 mb-4 text-center">YoY Net Profit Engine</h4>
+                        <div class="h-32 flex items-end justify-between gap-1.5 px-2 pt-4">
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 45%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+12%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 55%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+14%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 70%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+18%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 80%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+22%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 95%"><span class="text-[9px] text-slate-300 block text-center -mt-5">+26%</span></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-2 px-1">
+                            <span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <h4 class="text-sm font-semibold text-slate-300 mb-4 text-center">Operating Profit Margin %</h4>
+                        <div class="h-32 flex items-end justify-between gap-1.5 px-2 pt-4">
+                            <div class="w-full bg-blue-500/80 rounded-t" style="height: 80%"><span class="text-[9px] text-slate-300 block text-center -mt-5">24%</span></div>
+                            <div class="w-full bg-blue-500/80 rounded-t" style="height: 82%"><span class="text-[9px] text-slate-300 block text-center -mt-5">25%</span></div>
+                            <div class="w-full bg-blue-500/80 rounded-t" style="height: 82%"><span class="text-[9px] text-slate-300 block text-center -mt-5">25%</span></div>
+                            <div class="w-full bg-blue-500/80 rounded-t" style="height: 85%"><span class="text-[9px] text-slate-300 block text-center -mt-5">26%</span></div>
+                            <div class="w-full bg-blue-500/80 rounded-t" style="height: 88%"><span class="text-[9px] text-slate-300 block text-center -mt-5">27%</span></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-2 px-1">
+                            <span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script>
+        const dataset = {
+            TCS: {
+                title: "Tata Consultancy Services Ltd.",
+                sector: "Sector: Technology Services | Industry: IT Consulting",
+                mcap: "₹832,395 Cr", price: "₹2,151.40", pe: "16.0", rank: "RS #2", symbol: "BSE:TCS",
+                adx: "24.5 (ACTIVE)", adxCls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                zeroLag: "🟢 BUY SIGNAL", zeroLagCls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema10: "ABOVE", ema10Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema20: "ABOVE", ema20Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema50: "ABOVE", ema50Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema200: "BELOW", ema200Cls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                rs: 72, rsi: 58.4, volume: "2.4x", squeeze: "Yes",
+                roe: "51.8%", roce: "63.0%", de: "0.00 (Debt Free)"
+            },
+            SBIN: {
+                title: "State Bank of India",
+                sector: "Sector: Finance | Industry: Regional Banks",
+                mcap: "₹899,708 Cr", price: "₹981.95", pe: "11.1", rank: "RS #36", symbol: "BSE:SBIN",
+                adx: "15.2 (CHOPPY)", adxCls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                zeroLag: "⚪ HOLD", zeroLagCls: "text-slate-400 bg-slate-800 border-slate-700",
+                ema10: "ABOVE", ema10Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema20: "ABOVE", ema20Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema50: "BELOW", ema50Cls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                ema200: "ABOVE", ema200Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                rs: 36, rsi: 49.2, volume: "0.9x", squeeze: "No",
+                roe: "15.0%", roce: "6.1%", de: "N/A (Banking)"
+            },
+            ICICIBANK: {
+                title: "ICICI Bank Ltd.",
+                sector: "Sector: Finance | Industry: Regional Banks",
+                mcap: "₹906,675 Cr", price: "₹1,250.20", pe: "16.7", rank: "RS #22", symbol: "BSE:ICICIBANK",
+                adx: "31.0 (ACTIVE)", adxCls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                zeroLag: "🔴 SELL SIGNAL", zeroLagCls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                ema10: "BELOW", ema10Cls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                ema20: "BELOW", ema20Cls: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                ema50: "ABOVE", ema50Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                ema200: "ABOVE", ema200Cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                rs: 22, rsi: 41.5, volume: "4.1x", squeeze: "Yes",
+                roe: "16.1%", roce: "7.2%", de: "N/A (Banking)"
+            }
+        };
+
+        let activeStock = "TCS";
+
+        function loadTradingViewChart(symbol) {
+            document.getElementById('tv-chart-frame').innerHTML = '';
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": symbol,
+                "interval": "D",
+                "timezone": "Asia/Kolkata",
+                "theme": "dark",
+                "style": "1",
+                "locale": "in",
+                "enable_publishing": false,
+                "backgroundColor": "#1e293b",
+                "gridColor": "#334155",
+                "hide_top_toolbar": false,
+                "hide_legend": false,
+                "save_image": false,
+                "container_id": "tv-chart-frame",
+                "studies": [
+                    "RSI@tv-basicstudies",
+                    "MAExp@tv-basicstudies"
+                ]
+            });
+        }
+
+        function selectStock(ticker) {
+            activeStock = ticker;
+            const data = dataset[ticker];
+            
+            document.getElementById('metaTitle').innerText = data.title;
+            document.getElementById('metaSector').innerText = data.sector;
+            document.getElementById('metaMcap').innerText = data.mcap;
+            document.getElementById('metaPrice').innerText = data.price;
+            document.getElementById('metaPE').innerText = data.pe;
+            document.getElementById('metaRank').innerText = data.rank;
+
+            const updatePill = (id, text, cls) => {
+                const el = document.getElementById(id);
+                el.innerText = text;
+                el.className = `px-2.5 py-1 text-xs font-black rounded ${cls}`;
+            };
+            
+            updatePill('valADX', data.adx, data.adxCls);
+            updatePill('valZeroLag', data.zeroLag, data.zeroLagCls);
+            
+            updatePill('ema10', data.ema10, data.ema10Cls);
+            updatePill('ema20', data.ema20, data.ema20Cls);
+            updatePill('ema50', data.ema50, data.ema50Cls);
+            updatePill('ema200', data.ema200, data.ema200Cls);
+
+            document.getElementById('valRS').innerText = data.rs;
+            document.getElementById('barRS').style.width = data.rs + '%';
+            document.getElementById('valRSI').innerText = data.rsi;
+            document.getElementById('barRSI').style.width = data.rsi + '%';
+            document.getElementById('valVolume').innerText = data.volume;
+            document.getElementById('valSqueeze').innerText = data.squeeze;
+
+            document.getElementById('fundRoe').innerText = data.roe;
+            document.getElementById('fundRoce').innerText = data.roce;
+            document.getElementById('fundDe').innerText = data.de;
+
+            document.querySelectorAll('.stock-chip').forEach(btn => {
+                btn.className = "stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500";
+            });
+            document.getElementById(`chip-${ticker}`).className = "stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-blue-600/20 border-blue-500 text-white";
+
+            loadTradingViewChart(data.symbol);
+        }
+
+        function switchPage(page) {
+            if (page === 'technical') {
+                document.getElementById('page-technical').classList.remove('hidden');
+                document.getElementById('page-fundamental').classList.add('hidden');
+                document.getElementById('tab-technical').className = "px-5 py-2 text-sm font-medium transition-all rounded-md bg-blue-600 text-white shadow-lg";
+                document.getElementById('tab-fundamental').className = "px-5 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white";
+                loadTradingViewChart(dataset[activeStock].symbol);
+            } else {
+                document.getElementById('page-technical').classList.add('hidden');
+                document.getElementById('page-fundamental').classList.remove('hidden');
+                document.getElementById('tab-technical').className = "px-5 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white";
+                document.getElementById('tab-fundamental').className = "px-5 py-2 text-sm font-medium transition-all rounded-md bg-blue-600 text-white shadow-lg";
+            }
+        }
+
+        window.onload = function() {
+            loadTradingViewChart('BSE:TCS');
+        };
+    </script>
+</body>
+</html>
