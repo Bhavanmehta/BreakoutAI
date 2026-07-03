@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakoutAI | Unified Market Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0b1120',
+                        cardBg: '#1e293b',
+                        borderCl: '#334155',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen text-gray-200 bg-darkBg font-sans selection:bg-purple-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+        <div class="px-6 py-4 max-w-[1600px] mx-auto flex items-center justify-between">
+            <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span class="text-purple-500 text-2xl">⌖</span> Breakout<span class="text-purple-400">AI</span>
+            </h1>
+            
+            <div class="relative w-full max-w-2xl hidden md:block">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="text" class="w-full py-2.5 pl-10 pr-4 text-sm text-white transition-all border rounded-lg bg-slate-800 border-borderCl focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder-slate-400" placeholder="Ask AI: 'Show me stocks forming a Cup & Handle with ADX > 20 and rising QoQ sales...'">
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <span class="px-2.5 py-1 text-xs font-semibold text-purple-400 bg-purple-900/30 border border-purple-500/20 rounded-md animate-pulse">Live Scanner Active</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto p-4 md:p-6">
+        
+        <!-- Top Control Bar: Stocks and Tabs -->
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6 pb-4 border-b border-borderCl">
+            
+            <!-- Stock Watchlist Chips -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-bold tracking-wider text-slate-400 uppercase mr-2">Watchlist:</span>
+                <button onclick="selectStock('ZOMATO')" id="chip-ZOMATO" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-purple-600/20 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                    ZOMATO
+                </button>
+                <button onclick="selectStock('TCS')" id="chip-TCS" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500">
+                    TCS
+                </button>
+                <button onclick="selectStock('RELIANCE')" id="chip-RELIANCE" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500">
+                    RELIANCE
+                </button>
+            </div>
+
+            <!-- Page Navigation Tabs -->
+            <div class="flex items-center p-1 rounded-lg bg-slate-800 border border-borderCl overflow-x-auto">
+                <button onclick="switchTab('technical')" id="tab-technical" class="px-4 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white whitespace-nowrap">
+                    Technical Indicators
+                </button>
+                <button onclick="switchTab('patterns')" id="tab-patterns" class="px-4 py-2 text-sm font-medium transition-all rounded-md bg-purple-600 text-white shadow-lg whitespace-nowrap">
+                    Pre-Breakout Radar
+                </button>
+                <button onclick="switchTab('fundamental')" id="tab-fundamental" class="px-4 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white whitespace-nowrap">
+                    Fundamentals
+                </button>
+            </div>
+        </div>
+
+        <!-- Meta Overview Panel (Always Visible) -->
+        <div class="p-4 mb-6 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-6 items-center">
+            <div>
+                <h2 id="metaTitle" class="text-xl font-bold text-white">Zomato Ltd.</h2>
+                <div id="metaSector" class="text-xs text-slate-400 mt-0.5">Sector: Consumer Services | Industry: Internet Retail</div>
+            </div>
+            <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
+            <div class="grid grid-cols-2 sm:flex gap-4 sm:gap-8">
+                <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Market Cap</span><span id="metaMcap" class="text-sm font-semibold text-slate-200">₹142,500 Cr</span></div>
+                <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Current Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">₹162.50</span></div>
+                <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">P/E Ratio</span><span id="metaPE" class="text-sm font-semibold text-slate-200">112.5</span></div>
+                <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">RS Rating</span><span id="metaRank" class="text-sm font-bold text-emerald-400">92</span></div>
+            </div>
+        </div>
+
+        <!-- SHARED LAYOUT FOR TECHNICALS & PATTERNS (Sidebar + Chart) -->
+        <div id="layout-sidebar-chart" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Dynamic Left Sidebar -->
+            <div class="flex flex-col gap-5 lg:col-span-4" id="sidebar-content">
+                
+                <!-- CONTENT FOR TAB 1: TECHNICALS -->
+                <div id="content-technical" class="hidden space-y-5">
+                    <!-- Advanced Strategies -->
+                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Custom Strategy Signals</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
+                                <div>
+                                    <span class="text-sm font-medium text-slate-200 block">ADX (Trend Strength)</span>
+                                </div>
+                                <span id="valADX" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">> 20 (ACTIVE)</span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
+                                <div>
+                                    <span class="text-sm font-medium text-slate-200 block">Zero Lag Trend</span>
+                                </div>
+                                <span id="valZLag" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">BUY SIGNAL</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- EMA Stack -->
+                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">Moving Average Stack</h3>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-300">10 EMA (Momentum)</span>
+                                <span id="ema10" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-300">20 EMA (Trend)</span>
+                                <span id="ema20" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-300">50 EMA (Structural)</span>
+                                <span id="ema50" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-300">200 EMA (Macro)</span>
+                                <span id="ema200" class="text-xs font-bold text-rose-400">BELOW</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENT FOR TAB 2: PRE-BREAKOUT PATTERNS -->
+                <div id="content-patterns" class="space-y-5">
+                    <!-- Pattern AI Analysis -->
+                    <div class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">AI Pattern Analysis</h3>
+                        <div class="mb-4">
+                            <div class="text-2xl font-black text-white tracking-tight mb-1" id="patternName">Cup & Handle</div>
+                            <div class="text-xs text-purple-400 font-medium" id="patternStatus">High Probability Setup</div>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50" id="patternDescription">
+                            A large rounded accumulation phase completed. Forming a tight handle below major resistance on declining volume.
+                        </p>
+                    </div>
+
+                    <!-- Resistance Physics -->
+                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Level Proximity Physics</h3>
+                        <div class="flex justify-between items-end mb-2">
+                            <div>
+                                <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Calculated Resistance</span>
+                                <span class="text-lg font-bold text-white" id="resLine">₹164.50</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Distance</span>
+                                <span class="text-sm font-bold text-rose-400" id="resDistance">1.2% Away</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-1.5 rounded-full bg-slate-900 relative mb-4">
+                            <div class="absolute right-0 top-0 bottom-0 w-1 bg-rose-500 rounded-r-full shadow-[0_0_8px_#f43f5e]"></div>
+                            <div id="distBar" class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-700" style="right: 1.2%"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50">
+                            <div><span class="text-[10px] text-slate-400 uppercase block">Touches</span><span class="text-sm font-semibold text-slate-200" id="resTouches">3 Times</span></div>
+                            <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth</span><span class="text-sm font-semibold text-slate-200" id="baseDepth">-18.4%</span></div>
+                        </div>
+                    </div>
+
+                    <!-- VCP -->
+                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Volatility Contraction</h3>
+                        <div class="flex justify-between mb-2">
+                            <span class="text-sm text-slate-300">Volume Exhaustion</span>
+                            <span class="text-sm font-bold text-emerald-400" id="volStatus">-65%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-slate-300">Daily Range (ATR)</span>
+                            <span class="text-sm font-bold text-purple-400" id="atrStatus">Shrinking</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Area: Persistent TradingView Chart -->
+            <div class="lg:col-span-8 min-h-[500px] lg:min-h-[700px] border border-borderCl rounded-xl overflow-hidden bg-cardBg shadow-2xl relative" id="chart-container">
+                <div class="tradingview-widget-container w-full h-full">
+                    <div id="tv-chart-frame" class="w-full h-full min-h-[500px] lg:min-h-[700px]"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FULL WIDTH LAYOUT FOR TAB 3: FUNDAMENTALS -->
+        <div id="layout-fundamentals" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="p-5 rounded-xl bg-cardBg border border-borderCl shadow-lg">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Return on Equity (ROE)</span>
+                    <div id="fundRoe" class="text-3xl font-bold text-white">4.8%</div>
+                    <div class="text-xs text-emerald-400 mt-2">Improving Trajectory</div>
+                </div>
+                <div class="p-5 rounded-xl bg-cardBg border border-borderCl shadow-lg">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Return on Capital (ROCE)</span>
+                    <div id="fundRoce" class="text-3xl font-bold text-white">5.1%</div>
+                </div>
+                <div class="p-5 rounded-xl bg-cardBg border border-borderCl shadow-lg">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider block mb-1">Debt to Equity</span>
+                    <div id="fundDe" class="text-3xl font-bold text-emerald-400">0.02</div>
+                    <div class="text-xs text-slate-400 mt-2">Virtually Debt Free</div>
+                </div>
+            </div>
+
+            <div class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                <h3 class="text-base font-bold text-white mb-6 flex items-center gap-2">
+                    <span>📊</span> Historical Growth Engine
+                </h3>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- QoQ Sales Chart -->
+                    <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <h4 class="text-sm font-semibold text-slate-300 mb-4 text-center">QoQ Sales Growth</h4>
+                        <div class="h-40 flex items-end justify-between gap-2 px-2 pt-4">
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 50%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+50%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 60%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+60%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 71%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+71%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 68%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+68%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 73%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+73%</span></div>
+                        </div>
+                    </div>
+                    <!-- YoY Profit Chart -->
+                    <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <h4 class="text-sm font-semibold text-slate-300 mb-4 text-center">YoY Net Profit</h4>
+                        <div class="h-40 flex items-end justify-between gap-2 px-2 pt-4">
+                            <div class="w-full bg-rose-500 rounded-t" style="height: 30%"><span class="text-[10px] text-slate-300 block text-center -mt-5">Loss</span></div>
+                            <div class="w-full bg-rose-500 rounded-t" style="height: 10%"><span class="text-[10px] text-slate-300 block text-center -mt-5">Loss</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 50%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+200%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 70%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+300%</span></div>
+                            <div class="w-full bg-emerald-500 rounded-t" style="height: 90%"><span class="text-[10px] text-slate-300 block text-center -mt-5">+400%</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script>
+        // Consolidated Data Store (Tech + Patterns + Fundamentals)
+        const dataset = {
+            ZOMATO: {
+                // Meta
+                title: "Zomato Ltd.", sector: "Sector: Consumer Services | Industry: Internet Retail",
+                mcap: "₹142,500 Cr", price: "₹162.50", pe: "112.5", rank: "92", symbol: "BSE:ZOMATO",
+                // Tech
+                ema10: "ABOVE", ema20: "ABOVE", ema50: "ABOVE", ema200: "ABOVE",
+                adx: "> 25 (STRONG)", zlag: "BUY SIGNAL",
+                // Patterns
+                pattern: "Cup & Handle", pStatus: "High Probability Setup", 
+                pDesc: "A large 3-month rounded accumulation phase has completed. The stock is currently forming a tight 2-week handle just below major resistance.",
+                resLine: "₹164.50", distStr: "1.2% Away", distNum: "1.2%", touches: "3 Times", depth: "-18.4%", vol: "-65%", atr: "Shrinking (Coiled)",
+                // Fund
+                roe: "4.8%", roce: "5.1%", de: "0.02"
+            },
+            TCS: {
+                title: "Tata Consultancy Services Ltd.", sector: "Sector: Technology Services | Industry: IT Consulting",
+                mcap: "₹832,395 Cr", price: "₹4,151.40", pe: "30.0", rank: "72", symbol: "BSE:TCS",
+                ema10: "BELOW", ema20: "BELOW", ema50: "ABOVE", ema200: "ABOVE",
+                adx: "< 20 (CHOP)", zlag: "SELL SIGNAL",
+                pattern: "Consolidation Base", pStatus: "Neutral", 
+                pDesc: "Trading in a sideways range above the 200 EMA. No clear breakout geometry defined yet.",
+                resLine: "₹4,250.00", distStr: "2.3% Away", distNum: "2.3%", touches: "2 Times", depth: "-8.0%", vol: "-10%", atr: "Expanding",
+                roe: "51.8%", roce: "63.0%", de: "0.00"
+            },
+            RELIANCE: {
+                title: "Reliance Industries Ltd.", sector: "Sector: Energy | Industry: Oil & Gas Refining",
+                mcap: "₹1,950,000 Cr", price: "₹2,950.00", pe: "28.5", rank: "85", symbol: "BSE:RELIANCE",
+                ema10: "ABOVE", ema20: "ABOVE", ema50: "ABOVE", ema200: "ABOVE",
+                adx: "> 30 (EXPLOSIVE)", zlag: "BUY SIGNAL",
+                pattern: "Ascending Triangle", pStatus: "Apex Imminent", 
+                pDesc: "Price is making higher lows while repeatedly hitting a flat horizontal resistance level. The coil is extremely tight.",
+                resLine: "₹2,980.00", distStr: "1.0% Away", distNum: "1.0%", touches: "5 Times", depth: "-6.5%", vol: "-40%", atr: "Maximum Squeeze",
+                roe: "9.5%", roce: "10.2%", de: "0.45"
+            }
+        };
+
+        let currentTab = 'patterns';
+        let currentStock = 'ZOMATO';
+
+        function loadTradingViewChart(symbol) {
+            document.getElementById('tv-chart-frame').innerHTML = '';
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": symbol,
+                "interval": "D",
+                "timezone": "Asia/Kolkata",
+                "theme": "dark",
+                "style": "1",
+                "locale": "in",
+                "enable_publishing": false,
+                "backgroundColor": "#1e293b",
+                "gridColor": "#334155",
+                "hide_top_toolbar": false,
+                "hide_legend": false,
+                "save_image": false,
+                "container_id": "tv-chart-frame",
+                "studies": ["RSI@tv-basicstudies", "MAExp@tv-basicstudies"]
+            });
+        }
+
+        function selectStock(ticker) {
+            currentStock = ticker;
+            const data = dataset[ticker];
+            
+            // Meta
+            document.getElementById('metaTitle').innerText = data.title;
+            document.getElementById('metaSector').innerText = data.sector;
+            document.getElementById('metaMcap').innerText = data.mcap;
+            document.getElementById('metaPrice').innerText = data.price;
+            document.getElementById('metaPE').innerText = data.pe;
+            document.getElementById('metaRank').innerText = data.rank;
+
+            // Tech
+            const setEma = (id, val) => {
+                let el = document.getElementById(id);
+                el.innerText = val;
+                el.className = val === "ABOVE" ? "text-xs font-bold text-emerald-400" : "text-xs font-bold text-rose-400";
+            };
+            setEma('ema10', data.ema10); setEma('ema20', data.ema20);
+            setEma('ema50', data.ema50); setEma('ema200', data.ema200);
+            document.getElementById('valADX').innerText = data.adx;
+            document.getElementById('valZLag').innerText = data.zlag;
+            
+            if(data.zlag === "BUY SIGNAL") {
+                document.getElementById('valZLag').className = "px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20";
+            } else {
+                document.getElementById('valZLag').className = "px-2.5 py-1 text-xs font-bold text-rose-400 rounded bg-rose-500/10 border border-rose-500/20";
+            }
+
+            // Patterns
+            document.getElementById('patternName').innerText = data.pattern;
+            document.getElementById('patternStatus').innerText = data.pStatus;
+            document.getElementById('patternDescription').innerText = data.pDesc;
+            document.getElementById('resLine').innerText = data.resLine;
+            document.getElementById('resDistance').innerText = data.distStr;
+            document.getElementById('distBar').style.right = data.distNum;
+            document.getElementById('resTouches').innerText = data.touches;
+            document.getElementById('baseDepth').innerText = data.depth;
+            document.getElementById('volStatus').innerText = data.vol;
+            document.getElementById('atrStatus').innerText = data.atr;
+
+            // Fundamentals
+            document.getElementById('fundRoe').innerText = data.roe;
+            document.getElementById('fundRoce').innerText = data.roce;
+            document.getElementById('fundDe').innerText = data.de;
+
+            // Chip Styles
+            document.querySelectorAll('.stock-chip').forEach(btn => {
+                btn.className = "stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500";
+            });
+            document.getElementById(`chip-${ticker}`).className = "stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-purple-600/20 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]";
+
+            // Only reload chart if we are on a tab that shows it (Tech or Patterns)
+            if(currentTab !== 'fundamental') {
+                loadTradingViewChart(data.symbol);
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Reset Tab Buttons
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.className = "px-4 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white whitespace-nowrap";
+            });
+
+            // Active Tab Styling
+            if(tab === 'technical') document.getElementById('tab-technical').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-blue-600 text-white shadow-lg whitespace-nowrap";
+            if(tab === 'patterns') document.getElementById('tab-patterns').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-purple-600 text-white shadow-lg whitespace-nowrap";
+            if(tab === 'fundamental') document.getElementById('tab-fundamental').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-emerald-600 text-white shadow-lg whitespace-nowrap";
+
+            // Layout Toggling
+            if(tab === 'fundamental') {
+                document.getElementById('layout-sidebar-chart').classList.add('hidden');
+                document.getElementById('layout-fundamentals').classList.remove('hidden');
+            } else {
+                document.getElementById('layout-fundamentals').classList.add('hidden');
+                document.getElementById('layout-sidebar-chart').classList.remove('hidden');
+                
+                // Toggle Sidebar Content based on sub-tab
+                if(tab === 'technical') {
+                    document.getElementById('content-patterns').classList.add('hidden');
+                    document.getElementById('content-technical').classList.remove('hidden');
+                } else {
+                    document.getElementById('content-technical').classList.add('hidden');
+                    document.getElementById('content-patterns').classList.remove('hidden');
+                }
+                
+                // Re-render chart to ensure dimensions are correct after un-hiding
+                loadTradingViewChart(dataset[currentStock].symbol);
+            }
+        }
+
+        window.onload = function() {
+            selectStock('ZOMATO');
+        };
+    </script>
+</body>
+</html>
