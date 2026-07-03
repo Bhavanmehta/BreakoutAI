@@ -18,6 +18,7 @@ import pandas as pd
 
 import settings
 from patterns import detect_pattern
+from analogs import detect_analog
 
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -77,18 +78,43 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     for w in settings.FORWARD_WINDOWS:
         df[f"fwd_ret_{w}d"] = df["close"].shift(-w) / df["close"] - 1
 
-    # --- Follow-through: did the HIGH reach +TARGET% within the next WINDOW days? ---
+    # --- Follow-through: did price hit +1R before -1R (stop) within WINDOW days? ---
+    # R = entry - stop, where stop = resistance * STOP_LOSS_FRACTION — the same stop the
+    # entry guidance shows. This scales per-stock/event automatically (unlike a fixed %
+    # target) and checks which level is hit FIRST, so a trade that drops through the stop
+    # and later recovers past the old target no longer counts as "worked".
     highs = df["high"].values
+    lows = df["low"].values
     closes = df["close"].values
+    resistances = df["resistance"].values
     n = len(df)
     W = settings.FOLLOWTHROUGH_WINDOW
-    target = 1 + settings.FOLLOWTHROUGH_TARGET_PCT / 100
     worked = np.full(n, np.nan, dtype=object)
+    r_multiple = np.full(n, np.nan)
     for i in range(n):
-        if i + W < n:  # need a full forward window to judge fairly
-            fwd_max = highs[i + 1:i + 1 + W].max()
-            worked[i] = bool(fwd_max >= closes[i] * target)
+        if i + W >= n:  # need a full forward window to judge fairly
+            continue
+        res = resistances[i]
+        if not res or np.isnan(res):
+            continue
+        entry = closes[i]
+        stop = res * settings.STOP_LOSS_FRACTION
+        risk = entry - stop
+        if risk <= 0:
+            continue
+        target = entry + risk
+        outcome = False  # neither level hit within the window -> target not reached
+        for j in range(i + 1, i + 1 + W):
+            if lows[j] <= stop:
+                outcome = False
+                break
+            if highs[j] >= target:
+                outcome = True
+                break
+        worked[i] = outcome
+        r_multiple[i] = risk
     df["followthrough"] = worked
+    df["r_multiple"] = r_multiple
     return df
 
 
@@ -130,8 +156,7 @@ def _sentiment(latest, adx_val) -> str:
 
 def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     """Roll a fully-indicated frame into the compact record the website consumes."""
-    df = df.dropna(subset=["ema200"])  # need enough history for the slowest EMA
-    if len(df) < 2:
+    if len(df) < settings.MIN_HISTORY_BARS:
         return None
     latest = df.iloc[-1]
     prev = df.iloc[-2]
@@ -163,7 +188,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     base_depth = round((recent["low"].min() / recent["high"].max() - 1) * 100, 1)
 
     # Historical breakout scoring for THIS stock. "Worked" = followed through:
-    # the price gained at least FOLLOWTHROUGH_TARGET_PCT within FOLLOWTHROUGH_WINDOW days.
+    # price hit +1R before -1R (stop) within FOLLOWTHROUGH_WINDOW days (see add_indicators).
     events = df[(df["is_breakout"] == True) & (df["followthrough"].notna())]
     if len(events) > 0:
         followthrough_rate = round(float(events["followthrough"].astype(bool).mean()), 3)
@@ -171,8 +196,8 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     else:
         followthrough_rate = None
         avg_fwd_20d = None
-    followthrough_label = (f"gained +{settings.FOLLOWTHROUGH_TARGET_PCT:g}% within "
-                           f"{settings.FOLLOWTHROUGH_WINDOW} trading days")
+    followthrough_label = (f"hit +1R (a risk-defined target, not a fixed %) before the stop, "
+                           f"within {settings.FOLLOWTHROUGH_WINDOW} trading days")
 
     # Concrete "last time this happened" examples — the most recent past breakouts
     # on THIS stock and how the price moved in the days after each.
@@ -230,12 +255,16 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     # Named chart pattern (real geometry — see patterns.py)
     pattern = detect_pattern(df)
 
+    # Historical analog: the past bar on this stock most similar to today, and what
+    # happened next — the evidence behind "The Read" (see analogs.py).
+    analog = detect_analog(df)
+
     # Plain-English guidance derived from the computed state
     if resistance:
         trigger = (f"Watch for a close above ₹{resistance:,.2f} on above-average volume "
                    f"to confirm a breakout.")
         suggested_entry = f"₹{resistance:,.2f}+ (breakout close on volume)"
-        stop = round(resistance * 0.94, 2)
+        stop = round(resistance * settings.STOP_LOSS_FRACTION, 2)
         stop_loss = f"₹{stop:,.2f} (~-6% below the trigger)"
     else:
         trigger = "Not enough history to define a clear resistance level yet."
@@ -246,6 +275,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "symbol": symbol,
         "name": meta.get("name", symbol),
         "sector": meta.get("sector", ""),
+        "industry": meta.get("industry", ""),
         "as_of": latest["date"].strftime("%Y-%m-%d"),
         "price": price,
         "change_pct": change_pct,
@@ -257,6 +287,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "volatility": {"contraction_ratio": round(vc, 2) if vc else None, "state": vol_state},
         "trend": trend,
         "pattern": pattern,
+        "analog": analog,
         "breakout": {"today": broke_out_today, "sentiment": sentiment},
         "readiness": readiness,
         "history": {"past_breakouts": int(len(events)),

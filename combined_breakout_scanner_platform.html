@@ -16,9 +16,23 @@
     <style>
         .fade-in { animation: fade 0.35s ease; }
         @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        /* A single body-level floating tooltip (portal-style) so it's never clipped by a
+           card's overflow-hidden and always clamps inside the viewport. Positioned by JS. */
+        #floatTip {
+            position: fixed; z-index: 100; max-width: 240px; padding: 8px 10px; border-radius: 8px;
+            background: #0f172a; border: 1px solid #334155; color: #cbd5e1;
+            font-size: 11px; line-height: 1.4; font-weight: 400; text-transform: none;
+            letter-spacing: normal; box-shadow: 0 8px 24px rgba(0,0,0,.55); pointer-events: none;
+        }
+        [data-tip] { cursor: help; }
+        .wl-scroll::-webkit-scrollbar { width: 6px; }
+        .wl-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
 <body class="min-h-screen text-gray-200 bg-darkBg font-sans selection:bg-purple-500 selection:text-white">
+
+    <!-- Floating tooltip (positioned by JS; never clipped by a card) -->
+    <div id="floatTip" class="hidden"></div>
 
     <!-- Header -->
     <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
@@ -49,48 +63,78 @@
         <!-- App (hidden until data loads) -->
         <div id="app" class="hidden">
 
-            <!-- Track record banner -->
-            <div id="trackBanner" class="mb-6 p-4 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-x-6 gap-y-2">
-                <div class="flex items-center gap-2">
-                    <span class="text-lg">📈</span>
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Our Track Record</span>
-                </div>
-                <div id="trackBody" class="text-sm text-slate-300">Loading…</div>
+            <!-- Filter / sort bar (replaces the old watchlist strip) -->
+            <div class="mb-5 p-3 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-3">
+                <input id="fltSearch" type="text" placeholder="Search symbol or name…"
+                       class="flex-1 min-w-[180px] max-w-xs px-3 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500">
+                <label class="flex items-center gap-2 text-xs text-slate-400">
+                    <span class="uppercase tracking-wider">Sector</span>
+                    <select id="fltSector" class="px-2.5 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500 max-w-[200px]">
+                        <option value="">All sectors</option>
+                    </select>
+                </label>
+                <label class="flex items-center gap-2 text-xs text-slate-400">
+                    <span class="uppercase tracking-wider">Sort</span>
+                    <select id="fltSort" class="px-2.5 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="readiness">Breakout readiness</option>
+                        <option value="proximity">Closest to resistance</option>
+                        <option value="change">Biggest day move</option>
+                        <option value="adx">Trend strength (ADX)</option>
+                        <option value="alpha">A → Z</option>
+                    </select>
+                </label>
+                <button id="fltPrimed" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
+                    ◎ Primed only
+                </button>
+                <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
             </div>
 
-            <!-- Watchlist -->
-            <div class="mb-6 pb-4 border-b border-borderCl">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-bold tracking-wider text-slate-400 uppercase">Watchlist</span>
-                    <span class="text-[11px] text-slate-500">Sorted by breakout readiness · click to inspect</span>
-                </div>
-                <div id="watchlist" class="flex flex-wrap items-center gap-2"></div>
-            </div>
-
-            <!-- Meta Overview -->
-            <div class="p-4 mb-6 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-x-8 gap-y-4 items-center">
-                <div>
-                    <h2 id="metaTitle" class="text-xl font-bold text-white">—</h2>
-                    <div id="metaSector" class="text-xs text-slate-400 mt-0.5">—</div>
-                </div>
-                <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
-                <div class="grid grid-cols-2 sm:flex gap-4 sm:gap-8">
-                    <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
-                    <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
-                    <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Trend (ADX)</span><span id="metaAdx" class="text-sm font-semibold text-slate-200">—</span></div>
-                    <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
-                </div>
-            </div>
-
-            <!-- Sidebar + Chart -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- Sidebar -->
-                <div class="flex flex-col gap-5 lg:col-span-4">
+                <!-- LEFT: sector radar + vertical watchlist -->
+                <div class="lg:col-span-3 flex flex-col gap-5">
 
-                    <!-- 1. Verdict / readiness (the 3-second answer) -->
+                    <!-- Sector radar -->
+                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
+                        <button id="radarToggle" type="button" class="w-full flex items-center justify-between mb-1">
+                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Sector Radar</span>
+                            <span class="text-slate-500 text-xs" id="radarChevron">▾</span>
+                        </button>
+                        <p class="text-[11px] text-slate-500 mb-3 leading-snug">Where setups are clustering — sectors with the most primed names first.</p>
+                        <div id="sectorRadar" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Watchlist (vertical overview list) -->
+                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl flex flex-col min-h-0">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Watchlist</span>
+                            <span id="watchlistCount" class="text-[10px] text-slate-500"></span>
+                        </div>
+                        <div id="watchlist" class="wl-scroll flex flex-col gap-1.5 max-h-[70vh] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: detail pane for the selected stock -->
+                <div class="lg:col-span-9 flex flex-col gap-5">
+
+                    <!-- Detail header -->
+                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-x-8 gap-y-3 items-center">
+                        <div class="min-w-0">
+                            <h2 id="metaTitle" class="text-xl font-bold text-white truncate">—</h2>
+                            <div id="metaSector" class="text-xs text-slate-400 mt-0.5">—</div>
+                        </div>
+                        <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
+                        <div class="flex gap-6 sm:gap-8">
+                            <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
+                            <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
+                            <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
+                        </div>
+                    </div>
+
+                    <!-- The Read (readiness + historical analog hero) -->
                     <div id="verdictCard" class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
-                        <div id="verdictGlow" class="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                        <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10"></div>
                         <div class="flex items-start justify-between gap-3 mb-3">
                             <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">The Read</h3>
                             <div class="flex items-center gap-2 flex-wrap justify-end">
@@ -99,79 +143,116 @@
                             </div>
                         </div>
                         <div id="readinessLabel" class="text-2xl font-black text-white tracking-tight mb-1">—</div>
-                        <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-2">—</div>
-                        <div id="patternLine" class="text-xs text-slate-400 mb-3">—</div>
+                        <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-3">—</div>
+
+                        <!-- Historical analog hero -->
+                        <div id="analogBox" class="hidden mb-3 p-3.5 rounded-lg bg-slate-900/60 border border-purple-500/25">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="text-base">🕰️</span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300">This setup has happened before</span>
+                            </div>
+                            <p id="analogHeadline" class="text-sm text-slate-200 leading-relaxed"></p>
+                            <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
+                        </div>
+
                         <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"></p>
+                        <p id="patternLine" class="text-xs text-slate-500 mt-2">—</p>
                         <p id="reliabilityLine" class="text-xs mt-2 hidden"></p>
                     </div>
 
-                    <!-- 2. Historical precedents (the star feature) -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-1">Historical Precedents</h3>
-                        <p id="precedentHeadline" class="text-xs text-slate-400 mb-3">—</p>
-                        <div id="precedentList" class="space-y-2"></div>
-                        <p class="text-[11px] text-slate-500 mt-3 leading-snug">Past performance doesn't guarantee future results — these are this stock's own prior breakouts, shown for context.</p>
+                    <!-- Chart + indicator strip -->
+                    <div class="flex flex-col border border-borderCl rounded-xl overflow-hidden bg-cardBg shadow-2xl">
+                        <div class="border-b border-borderCl bg-slate-900/40 p-3">
+                            <div id="indicatorStrip" class="flex flex-wrap items-stretch gap-2"></div>
+                        </div>
+                        <div id="tv-chart-frame" class="w-full min-h-[460px] lg:min-h-[560px]"></div>
                     </div>
 
-                    <!-- 3. Level proximity -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Resistance Proximity</h3>
-                        <div class="flex justify-between items-end mb-2">
-                            <div>
-                                <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Calculated Resistance</span>
-                                <span class="text-lg font-bold text-white" id="resLine">—</span>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Distance</span>
-                                <span class="text-sm font-bold text-rose-400" id="resDistance">—</span>
-                            </div>
-                        </div>
-                        <div class="w-full h-1.5 rounded-full bg-slate-900 relative mb-4">
-                            <div class="absolute right-0 top-0 bottom-0 w-1 bg-rose-500 rounded-r-full shadow-[0_0_8px_#f43f5e]"></div>
-                            <div id="distBar" class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-700" style="right: 50%"></div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50">
-                            <div><span class="text-[10px] text-slate-400 uppercase block">Times Tested</span><span class="text-sm font-semibold text-slate-200" id="resTouches">—</span></div>
-                            <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth</span><span class="text-sm font-semibold text-slate-200" id="baseDepth">—</span></div>
-                        </div>
-                    </div>
+                    <!-- Detail cards grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                    <!-- 4. Volatility contraction -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">Volatility Contraction (VCP)</h3>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-slate-300">Daily range vs. baseline</span>
-                            <span class="text-sm font-bold text-purple-400" id="vcpState">—</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-2 leading-snug">A tightening range ("coiling") often precedes a strong move as the stock builds energy.</p>
-                    </div>
-
-                    <!-- 5. Entry guidance -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">What To Watch For</h3>
-                        <p class="text-sm text-slate-300 leading-relaxed mb-3" id="entryTrigger">—</p>
-                        <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50">
-                            <div>
-                                <span class="text-xs text-slate-400 block">Suggested entry</span>
-                                <span class="text-xs font-semibold text-emerald-400" id="entryPoint">—</span>
+                        <!-- Ownership (snapshot + over-time trend) -->
+                        <div id="holdingsCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl hidden">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                                    Ownership
+                                    <span class="text-slate-500" data-tip="Who owns the stock, from quarterly shareholding filings. Rising promoter / FII / DII holding = accumulation behind the setup.">ⓘ</span>
+                                </h3>
+                                <span id="holdingsAsOf" class="text-[10px] text-slate-500"></span>
                             </div>
-                            <div>
-                                <span class="text-xs text-slate-400 block">Suggested risk cutoff</span>
-                                <span class="text-xs font-semibold text-rose-400" id="stopLoss">—</span>
+                            <div id="holdingsBody"></div>
+
+                            <!-- Ownership over time (tabbed by category, FII by default) -->
+                            <div id="ownTrendWrap" class="mt-3 pt-3 border-t border-slate-700/50 hidden">
+                                <div class="flex items-center justify-between gap-2 mb-2">
+                                    <span class="text-[10px] uppercase tracking-wider text-slate-500">Who's accumulating over time</span>
+                                    <div id="ownTabs" class="flex items-center gap-1"></div>
+                                </div>
+                                <div id="ownChart"></div>
+                                <p id="ownTrendNote" class="text-[11px] text-slate-500 mt-2 leading-snug"></p>
                             </div>
                         </div>
-                    </div>
 
-                </div>
+                        <!-- Historical precedents -->
+                        <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-1">Historical Precedents</h3>
+                            <p id="precedentHeadline" class="text-xs text-slate-400 mb-3">—</p>
+                            <div id="precedentList" class="space-y-2"></div>
+                            <p class="text-[11px] text-slate-500 mt-3 leading-snug">Past performance doesn't guarantee future results — these are this stock's own prior breakouts, shown for context.</p>
+                        </div>
 
-                <!-- Chart + indicator strip -->
-                <div class="lg:col-span-8 flex flex-col border border-borderCl rounded-xl overflow-hidden bg-cardBg shadow-2xl">
-                    <!-- Indicator strip (on top of the chart) -->
-                    <div class="border-b border-borderCl bg-slate-900/40 p-3">
-                        <div id="indicatorStrip" class="flex flex-wrap items-stretch gap-2"></div>
+                        <!-- Resistance proximity -->
+                        <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Resistance Proximity</h3>
+                            <div class="flex justify-between items-end mb-2">
+                                <div>
+                                    <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Calculated Resistance</span>
+                                    <span class="text-lg font-bold text-white" id="resLine">—</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Distance</span>
+                                    <span class="text-sm font-bold text-rose-400" id="resDistance">—</span>
+                                </div>
+                            </div>
+                            <div class="w-full h-1.5 rounded-full bg-slate-900 relative mb-4">
+                                <div class="absolute right-0 top-0 bottom-0 w-1 bg-rose-500 rounded-r-full shadow-[0_0_8px_#f43f5e]"></div>
+                                <div id="distBar" class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-700" style="right: 50%"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50">
+                                <div><span class="text-[10px] text-slate-400 uppercase block">Times Tested</span><span class="text-sm font-semibold text-slate-200" id="resTouches">—</span></div>
+                                <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth</span><span class="text-sm font-semibold text-slate-200" id="baseDepth">—</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Volatility contraction -->
+                        <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 flex items-center gap-1.5">
+                                Volatility Contraction (VCP)
+                                <span class="text-slate-500" data-tip="Compares the recent daily range to its longer baseline. A tightening range (coiling) stores energy that often precedes a strong move.">ⓘ</span>
+                            </h3>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-slate-300">Daily range vs. baseline</span>
+                                <span class="text-sm font-bold text-purple-400" id="vcpState">—</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-2 leading-snug">A tightening range ("coiling") often precedes a strong move as the stock builds energy.</p>
+                        </div>
+
+                        <!-- Entry guidance (full width) -->
+                        <div class="md:col-span-2 p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">What To Watch For</h3>
+                            <p class="text-sm text-slate-300 leading-relaxed mb-3" id="entryTrigger">—</p>
+                            <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50 max-w-md">
+                                <div>
+                                    <span class="text-xs text-slate-400 block">Suggested entry</span>
+                                    <span class="text-xs font-semibold text-emerald-400" id="entryPoint">—</span>
+                                </div>
+                                <div>
+                                    <span class="text-xs text-slate-400 block">Suggested risk cutoff</span>
+                                    <span class="text-xs font-semibold text-rose-400" id="stopLoss">—</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <!-- Chart -->
-                    <div id="tv-chart-frame" class="w-full flex-1 min-h-[460px] lg:min-h-[640px]"></div>
                 </div>
             </div>
 
@@ -196,6 +277,19 @@
             Bearish: { text: "▼ Bearish", cls: "text-rose-400 bg-rose-500/10 border-rose-500/30" },
             Neutral: { text: "● Neutral", cls: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
         };
+        const RANK = { high: 0, medium: 1, low: 2 };
+
+        // Filter/sort state, driven by the top bar.
+        const filters = { query: "", sector: "", sort: "readiness", primedOnly: false };
+
+        // The broad sector "group" (before the " · industry" part) — used for the
+        // filter dropdown and the sector radar so we group by e.g. "Financial Services"
+        // rather than every fine-grained industry.
+        function sectorGroup(s) {
+            const sec = (s.sector || "").trim();
+            if (!sec) return "Unclassified";
+            return sec.split(" · ")[0].trim() || "Unclassified";
+        }
 
         async function loadData() {
             showStatus("Loading latest scan…");
@@ -209,15 +303,16 @@
                 $("disclaimer").innerText = "⚠️ " + (data.disclaimer || "");
                 if (!STOCKS.length) throw new Error("No stocks in data file.");
 
-                // Sort so the most breakout-ready stocks surface first
-                const rank = { high: 0, medium: 1, low: 2 };
-                STOCKS.sort((a, b) => rank[a.readiness.score] - rank[b.readiness.score]);
+                STOCKS.sort((a, b) => RANK[a.readiness.score] - RANK[b.readiness.score]);
 
-                renderWatchlist();
+                buildSectorOptions();
+                renderSectorRadar();
+                wireControls();
+                initTooltips();
+                applyFilters();
                 selectStock(STOCKS[0].symbol);
                 $("statusPane").classList.add("hidden");
                 $("app").classList.remove("hidden");
-                renderTrackRecord();
             } catch (err) {
                 showStatus(
                     `<div class="text-lg font-semibold text-white mb-2">Couldn't load the data file</div>
@@ -237,51 +332,332 @@
             $("statusMsg").innerHTML = html;
         }
 
-        function renderWatchlist() {
+        function wireControls() {
+            $("fltSearch").oninput = (e) => { filters.query = e.target.value; applyFilters(); };
+            $("fltSector").onchange = (e) => { filters.sector = e.target.value; applyFilters(); };
+            $("fltSort").onchange = (e) => { filters.sort = e.target.value; applyFilters(); };
+            $("fltPrimed").onclick = () => {
+                filters.primedOnly = !filters.primedOnly;
+                const b = $("fltPrimed");
+                b.className = "px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
+                    (filters.primedOnly
+                        ? "bg-purple-600/20 border-purple-500 text-white"
+                        : "bg-slate-800 border-borderCl text-slate-300");
+                applyFilters();
+            };
+            $("radarToggle").onclick = () => {
+                const r = $("sectorRadar");
+                r.classList.toggle("hidden");
+                $("radarChevron").innerText = r.classList.contains("hidden") ? "▸" : "▾";
+            };
+        }
+
+        function buildSectorOptions() {
+            const all = new Set(STOCKS.map(sectorGroup));
+            const groups = [...all].filter(g => g !== "Unclassified").sort();
+            if (all.has("Unclassified")) groups.push("Unclassified");
+            const sel = $("fltSector");
+            groups.forEach(g => {
+                const o = document.createElement("option");
+                o.value = g; o.innerText = g;
+                sel.appendChild(o);
+            });
+        }
+
+        const SORTERS = {
+            readiness: (a, b) => RANK[a.readiness.score] - RANK[b.readiness.score],
+            proximity: (a, b) => distAbs(a) - distAbs(b),
+            change:    (a, b) => (b.change_pct ?? -999) - (a.change_pct ?? -999),
+            adx:       (a, b) => (b.adx.value ?? 0) - (a.adx.value ?? 0),
+            alpha:     (a, b) => a.symbol.localeCompare(b.symbol),
+        };
+        // distance to resistance for sorting: below-resistance names first, tiebreak readiness
+        function distAbs(s) {
+            const d = s.resistance && s.resistance.distance_pct;
+            return d == null ? 9999 : Math.abs(d);
+        }
+
+        const MAX_RESULTS = 80;
+
+        function currentVisible() {
+            const q = filters.query.trim().toLowerCase();
+            let list = STOCKS.filter(s => {
+                if (filters.primedOnly && !(s.readiness && s.readiness.watch)) return false;
+                if (filters.sector && sectorGroup(s) !== filters.sector) return false;
+                if (q && !(s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q))) return false;
+                return true;
+            });
+            list.sort(SORTERS[filters.sort] || SORTERS.readiness);
+            return list;
+        }
+
+        function applyFilters() {
+            const list = currentVisible();
+            renderWatchlist(list);
+            const shown = Math.min(list.length, MAX_RESULTS);
+            $("fltCount").innerText = list.length
+                ? `${list.length} match${list.length === 1 ? "" : "es"}` +
+                  (list.length > MAX_RESULTS ? ` · showing top ${MAX_RESULTS}` : "")
+                : "no matches";
+            $("watchlistCount").innerText = `${shown} of ${STOCKS.length}`;
+        }
+
+        function renderWatchlist(list) {
             const wl = $("watchlist");
             wl.innerHTML = "";
-            STOCKS.forEach(s => {
+            if (!list.length) {
+                wl.innerHTML = `<span class="text-sm text-slate-500 py-2">No stock matches these filters.</span>`;
+                return;
+            }
+            list.slice(0, MAX_RESULTS).forEach(s => {
                 const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
-                const btn = document.createElement("button");
-                btn.id = "chip-" + s.symbol;
-                btn.onclick = () => selectStock(s.symbol);
-                btn.className = "stock-chip flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500";
-                btn.innerHTML = `<span class="w-2 h-2 rounded-full ${rs.dot}"></span>${s.symbol}`;
-                wl.appendChild(btn);
+                const dist = s.resistance && s.resistance.distance_pct;
+                const distTxt = dist != null
+                    ? `${Math.abs(dist)}% ${dist >= 0 ? "below" : "above"} res`
+                    : "—";
+                const chg = s.change_pct ?? 0;
+                const chgCls = chg >= 0 ? "text-emerald-400" : "text-rose-400";
+                const sent = (s.breakout && s.breakout.sentiment) || "Neutral";
+                const sentCls = sent === "Bullish" ? "text-emerald-400" : sent === "Bearish" ? "text-rose-400" : "text-slate-400";
+                const row = document.createElement("button");
+                row.id = "wl-" + s.symbol;
+                row.onclick = () => selectStock(s.symbol);
+                row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+                row.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-2 min-w-0">
+                            <span class="w-2 h-2 rounded-full flex-none ${rs.dot}"></span>
+                            <span class="text-sm font-bold text-slate-100 truncate">${s.symbol}</span>
+                        </span>
+                        <span class="text-xs font-semibold ${chgCls} flex-none">${chg >= 0 ? "+" : ""}${chg}%</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
+                    <div class="flex items-center justify-between gap-2 mt-1">
+                        <span class="text-[11px] text-slate-400">₹${(s.price ?? 0).toLocaleString("en-IN")}</span>
+                        <span class="text-[10px] ${rs.text}">${distTxt}</span>
+                        <span class="text-[10px] ${sentCls}">${sent}</span>
+                    </div>`;
+                wl.appendChild(row);
             });
+            highlightActive();
+        }
+
+        function highlightActive() {
+            document.querySelectorAll(".wl-row").forEach(b => {
+                b.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+            });
+            if (current) {
+                const a = $("wl-" + current.symbol);
+                if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)]";
+            }
+        }
+
+        function renderSectorRadar() {
+            const byGroup = {};
+            STOCKS.forEach(s => {
+                const g = sectorGroup(s);
+                if (g === "Unclassified") return;
+                const b = byGroup[g] || (byGroup[g] = { total: 0, primed: 0, breaking: 0 });
+                b.total++;
+                if (s.readiness && s.readiness.watch) b.primed++;
+                if (s.breakout && s.breakout.today) b.breaking++;
+            });
+            const rows = Object.entries(byGroup)
+                .sort((a, b) => b[1].primed - a[1].primed || b[1].total - a[1].total)
+                .slice(0, 9);
+            const maxPrimed = Math.max(1, ...rows.map(r => r[1].primed));
+            const host = $("sectorRadar");
+            host.innerHTML = "";
+            rows.forEach(([g, b]) => {
+                const w = Math.round((b.primed / maxPrimed) * 100);
+                const active = filters.sector === g;
+                const btn = document.createElement("button");
+                btn.onclick = () => {
+                    filters.sector = active ? "" : g;
+                    $("fltSector").value = filters.sector;
+                    renderSectorRadar();
+                    applyFilters();
+                };
+                btn.className = "w-full text-left group";
+                btn.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="text-[11px] font-semibold truncate ${active ? "text-purple-300" : "text-slate-300"}">${g}</span>
+                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-900">
+                        <div class="h-full rounded-full ${active ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-400"}" style="width:${w}%"></div>
+                    </div>`;
+                host.appendChild(btn);
+            });
+            if (!rows.length) host.innerHTML = `<p class="text-[11px] text-slate-500">No sector data yet — run fetch_sectors.py.</p>`;
         }
 
         function selectStock(symbol) {
             current = STOCKS.find(s => s.symbol === symbol);
             if (!current) return;
             const s = current;
+            highlightActive();
 
-            // chips
-            document.querySelectorAll(".stock-chip").forEach(b => {
-                b.className = "stock-chip flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500";
-            });
-            const active = $("chip-" + symbol);
-            if (active) active.className = "stock-chip flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-purple-600/20 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]";
-
-            // meta
             $("metaTitle").innerText = s.name;
-            $("metaSector").innerText = s.sector;
+            $("metaSector").innerText = s.sector || "Unclassified";
             $("metaPrice").innerText = "₹" + s.price.toLocaleString("en-IN");
             const chg = s.change_pct;
             const chgEl = $("metaChange");
             chgEl.innerText = (chg >= 0 ? "+" : "") + chg + "%";
             chgEl.className = "text-sm font-semibold " + (chg >= 0 ? "text-emerald-400" : "text-rose-400");
-            $("metaAdx").innerText = (s.adx.value ?? "—") + " · " + s.adx.label;
             $("metaReadiness").innerText = s.readiness.label;
 
             renderVerdict(s);
             renderPrecedents(s);
+            renderHoldings(s);
             renderLevels(s);
             renderVCP(s);
             renderEntry(s);
             renderIndicatorStrip(s);
-
             loadChart(s.symbol);
+        }
+
+        function renderAnalog(s) {
+            const box = $("analogBox");
+            const a = s.analog;
+            if (!a) { box.classList.add("hidden"); return; }
+            box.classList.remove("hidden");
+            const fmt = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+            const sim = Math.round((a.similarity || 0) * 100);
+            // headline forward move: prefer 20d, else 10d, else 5d
+            const horizon = a.fwd_20d_pct != null ? [a.fwd_20d_pct, 20]
+                          : a.fwd_10d_pct != null ? [a.fwd_10d_pct, 10]
+                          : a.fwd_5d_pct != null ? [a.fwd_5d_pct, 5] : null;
+            let moveTxt = "";
+            if (horizon) {
+                const [v, d] = horizon;
+                const cls = v >= 0 ? "text-emerald-400" : "text-rose-400";
+                moveTxt = ` — it then moved <b class="${cls}">${v >= 0 ? "+" : ""}${v}%</b> over the next ${d} trading days`;
+            }
+            $("analogHeadline").innerHTML =
+                `Today's shape most resembles <b class="text-slate-100">${fmt(a.date)}</b> ` +
+                `<span class="text-slate-500">(${sim}% similar)</span>${moveTxt}.`;
+
+            const stats = $("analogStats");
+            stats.innerHTML = "";
+            [["5d", a.fwd_5d_pct], ["10d", a.fwd_10d_pct], ["20d", a.fwd_20d_pct]].forEach(([lbl, v]) => {
+                stats.insertAdjacentHTML("beforeend",
+                    `<div class="text-center"><div class="text-[9px] text-slate-500 uppercase">${lbl}</div>${pill(v)}</div>`);
+            });
+            if (a.worked === true)
+                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-bold text-emerald-400 ml-1">✓ followed through</span>`);
+            else if (a.worked === false)
+                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-bold text-rose-400 ml-1">✗ faded</span>`);
+        }
+
+        function holdingsRow(label, val, colorCls, indent) {
+            if (val == null) return "";
+            const w = Math.max(0, Math.min(100, val)).toFixed(1);
+            return `<div class="mb-2">
+                <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-slate-400${indent ? ' pl-3' : ''}">${label}</span>
+                    <span class="font-semibold text-slate-200">${val}%</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-slate-900"><div class="h-full rounded-full ${colorCls}" style="width:${w}%"></div></div>
+            </div>`;
+        }
+
+        // --- Ownership over-time chart (tabbed by category) -------------------------
+        const OWN_CATS = [
+            { key: "fii",      label: "FII",      bar: "bg-sky-500",     txt: "text-sky-400" },
+            { key: "promoter", label: "Promoter", bar: "bg-purple-500",  txt: "text-purple-400" },
+            { key: "dii",      label: "DII",      bar: "bg-emerald-500", txt: "text-emerald-400" },
+            { key: "public",   label: "Public",   bar: "bg-slate-400",   txt: "text-slate-300" },
+        ];
+        const OWN_FULL = { fii: "FII (foreign inst.)", promoter: "Promoter", dii: "DII (domestic inst.)", public: "Public" };
+        const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        let ownTab = "fii";  // default view = who foreign institutions are doing over time
+
+        // Accepts screener "YYYY-MM" or NSE "DD-MON-YYYY"; returns a short axis label "Mar'26".
+        function fmtQtr(d) {
+            let m = /^(\d{4})-(\d{2})$/.exec(d);
+            if (m) return `${MON[+m[2] - 1]}'${m[1].slice(2)}`;
+            m = /^\d{2}-([A-Za-z]{3})-(\d{4})$/.exec(d);
+            if (m) return `${m[1][0].toUpperCase() + m[1].slice(1).toLowerCase()}'${m[2].slice(2)}`;
+            return d;
+        }
+
+        // Normalize either the quarterly `history` (multi-category) or the annual
+        // `promoter_trend` (promoter-only) into a common points array + available cats.
+        function ownSeries(h) {
+            if (Array.isArray(h.history) && h.history.length >= 2)
+                return { points: h.history, quarterly: true };
+            if (Array.isArray(h.promoter_trend) && h.promoter_trend.length >= 2)
+                return { points: h.promoter_trend, quarterly: false };
+            return null;
+        }
+        function catHasData(points, key) {
+            return points.filter(p => p[key] != null).length >= 2;
+        }
+
+        function ownChartHTML(points, key) {
+            const color = (OWN_CATS.find(c => c.key === key) || {}).bar || "bg-slate-400";
+            // most-recent 8, oldest -> newest for left-to-right reading
+            const recent = points.slice(0, 8).reverse()
+                .map(p => ({ date: p.date, v: p[key] })).filter(p => p.v != null);
+            if (recent.length < 2) return `<p class="text-[11px] text-slate-500 py-4">No trend data for this category.</p>`;
+            const vals = recent.map(p => p.v);
+            const min = Math.min(...vals), max = Math.max(...vals), span = Math.max(0.4, max - min);
+            const bars = recent.map(p => {
+                const hpx = 10 + Math.round(((p.v - min) / span) * 42);  // compressed baseline; values labelled so it stays honest
+                return `<div class="flex-1 flex flex-col items-center justify-end gap-1 min-w-0" data-tip="${p.date}: ${p.v}%">
+                    <span class="text-[9px] font-semibold text-slate-300">${p.v}</span>
+                    <div class="w-full max-w-[26px] ${color} rounded-t" style="height:${hpx}px"></div>
+                    <span class="text-[8px] text-slate-500 whitespace-nowrap">${fmtQtr(p.date)}</span>
+                </div>`;
+            }).join("");
+            const delta = +(vals[vals.length - 1] - vals[0]).toFixed(2);
+            const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "▬";
+            const dCls = delta > 0 ? "text-emerald-400" : delta < 0 ? "text-rose-400" : "text-slate-400";
+            return `<div class="flex items-end gap-1.5 pt-1">${bars}</div>
+                <div class="text-[11px] mt-2 ${dCls}">${OWN_FULL[key] || key} ${arrow} ${delta > 0 ? "+" : ""}${delta}% over ${recent.length} ${points.length && /\d{4}-\d{2}/.test(points[0].date) ? "quarters" : "filings"}</div>`;
+        }
+
+        function renderOwnTrend() {
+            const s = current; if (!s || !s.holdings) return;
+            const ser = ownSeries(s.holdings);
+            if (!ser) { $("ownTrendWrap").classList.add("hidden"); return; }
+            $("ownTrendWrap").classList.remove("hidden");
+            const avail = OWN_CATS.filter(c => catHasData(ser.points, c.key));
+            if (!avail.some(c => c.key === ownTab)) ownTab = (avail[0] || {}).key;
+
+            // tabs
+            $("ownTabs").innerHTML = avail.map(c => {
+                const active = c.key === ownTab;
+                return `<button onclick="setOwnTab('${c.key}')" class="px-2.5 py-1 text-[11px] font-semibold rounded-md border transition-all ${
+                    active ? "bg-slate-700 border-slate-500 text-white" : "bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200"}">${c.label}</button>`;
+            }).join("");
+            $("ownChart").innerHTML = ownTab ? ownChartHTML(ser.points, ownTab) : "";
+            $("ownTrendNote").innerText = ser.quarterly
+                ? "Quarterly shareholding filings (screener.in). Rising promoter / FII / DII = accumulation behind the setup."
+                : "Only annual promoter data cached — run fetch_holdings.py for the full quarterly FII/DII trend.";
+        }
+        function setOwnTab(cat) { ownTab = cat; renderOwnTrend(); }
+
+        function renderHoldings(s) {
+            const card = $("holdingsCard");
+            const h = s.holdings;
+            if (!h || (h.promoter == null && h.fii == null && h.dii == null && h.public == null)) {
+                card.classList.add("hidden");
+                return;
+            }
+            card.classList.remove("hidden");
+            $("holdingsAsOf").innerText = h.as_of ? "as of " + h.as_of : "";
+
+            // Snapshot bars (current split)
+            $("holdingsBody").innerHTML =
+                holdingsRow("Promoter", h.promoter, "bg-purple-500", false) +
+                holdingsRow("FII (foreign inst.)", h.fii, "bg-sky-500", false) +
+                holdingsRow("DII (domestic inst.)", h.dii, "bg-emerald-500", false) +
+                holdingsRow("of which mutual funds", h.mf, "bg-emerald-400/50", true) +
+                holdingsRow("Public", h.public, "bg-slate-500", false);
+
+            renderOwnTrend();
         }
 
         function renderVerdict(s) {
@@ -299,23 +675,25 @@
                     : "text-slate-400 bg-slate-500/10 border-slate-500/30");
 
             const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
-            $("verdictGlow").className = "absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 " + rs.glow;
+            $("verdictGlow").className = "absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10 " + rs.glow;
             $("readinessLabel").innerText = s.readiness.label;
             $("readinessLabel").className = "text-2xl font-black tracking-tight mb-1 fade-in " + (s.readiness.score === "low" ? "text-slate-300" : "text-white");
             $("readinessSub").innerText = s.readiness.watch ? "On watch — conditions are lining up" : "Not actionable yet — keep monitoring";
             $("readinessSub").className = "text-xs font-medium mb-3 " + rs.text;
 
-            // Detected chart pattern
+            renderAnalog(s);
+
+            // Detected chart pattern (decorative context, not a signal — see reliability study)
             const pat = s.pattern;
             const patEl = $("patternLine");
             if (pat && pat.name && pat.name !== "No clear pattern") {
                 const dirColor = pat.direction === "bullish" ? "text-emerald-400"
                     : pat.direction === "bearish" ? "text-rose-400" : "text-slate-300";
-                patEl.innerHTML = `Pattern: <b class="${dirColor}">${pat.name}</b>` +
+                patEl.innerHTML = `Chart pattern: <b class="${dirColor}">${pat.name}</b>` +
                     (pat.confidence ? ` <span class="text-slate-500">(${Math.round(pat.confidence * 100)}% match)</span>` : "");
                 patEl.title = pat.description || "";
             } else {
-                patEl.innerHTML = `Pattern: <span class="text-slate-500">none detected yet</span>`;
+                patEl.innerHTML = `Chart pattern: <span class="text-slate-500">none detected yet</span>`;
                 patEl.title = "";
             }
 
@@ -331,7 +709,6 @@
             }
             $("verdictExplainer").innerText = explain;
 
-            // Reliability caveat (folds in the historical follow-through rate)
             const rel = $("reliabilityLine");
             if (s.readiness.reliability) {
                 rel.innerText = s.readiness.reliability;
@@ -339,25 +716,6 @@
                 rel.classList.remove("hidden");
             } else {
                 rel.classList.add("hidden");
-            }
-        }
-
-        async function renderTrackRecord() {
-            try {
-                const res = await fetch("data/track_record.json", { cache: "no-store" });
-                if (!res.ok) throw new Error();
-                const t = await res.json();
-                if (t.hit_rate == null) {
-                    $("trackBody").innerText = `Collecting — first graded outcomes appear ~${t.horizon_days} trading days after calls begin. ${t.live_calls_logged} logged today.`;
-                    return;
-                }
-                $("trackBody").innerHTML =
-                    `<b class="text-emerald-300">${Math.round(t.hit_rate * 100)}%</b> of ` +
-                    `<b class="text-slate-100">${t.actionable_evaluated}</b> on-watch calls ${t.criterion} · ` +
-                    `<span class="text-slate-400">${t.pending} pending, ${t.live_calls_logged} logged live</span> ` +
-                    `<span class="text-slate-500 text-xs">(recent history is walk-forward simulated; live tracking grows daily)</span>`;
-            } catch {
-                $("trackBanner").classList.add("hidden");
             }
         }
 
@@ -385,8 +743,7 @@
             }
             const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
             h.examples.forEach(ex => {
-                const worked = ex.worked;
-                const tag = worked
+                const tag = ex.worked
                     ? `<span class="text-[10px] font-bold text-emerald-400">✓ followed through</span>`
                     : `<span class="text-[10px] font-bold text-rose-400">✗ faded</span>`;
                 const row = document.createElement("div");
@@ -411,7 +768,6 @@
             $("resLine").innerText = r.level != null ? "₹" + r.level.toLocaleString("en-IN") : "—";
             const dist = r.distance_pct;
             $("resDistance").innerText = dist != null ? Math.abs(dist) + "% " + (dist >= 0 ? "away" : "above") : "—";
-            // position the marker: clamp distance to a 0–20% visual scale
             const pct = dist != null ? Math.min(Math.max(Math.abs(dist), 0.5), 20) : 50;
             $("distBar").style.right = pct + "%";
             $("resTouches").innerText = (r.touches ?? "—") + " times";
@@ -431,32 +787,66 @@
             $("stopLoss").innerText = s.entry.stop_loss;
         }
 
+        // Reusable ⓘ marker — the actual tooltip is the single body-level #floatTip,
+        // positioned by initTooltips() so no card overflow can clip it.
+        function infoTip(text) {
+            const safe = text.replace(/"/g, "&quot;");
+            return `<span class="text-slate-500 ml-1" data-tip="${safe}">ⓘ</span>`;
+        }
+        const ADX_TIP = "ADX measures trend <b>strength</b> (0–100), not direction. Above 25 = a strong, sustained trend worth trading; below 20 = choppy / directionless.";
+        const EMA_TIP = "EMA = exponential moving average, the stock's average price over a window (weighted to recent days). Price <b>above</b> the line = uptrend on that timeframe; the 200-EMA is the long-term 'macro' trend.";
+
+        // Floating tooltip engine: show #floatTip near any [data-tip] element, clamped
+        // to the viewport (flips below the element when there isn't room above).
+        function initTooltips() {
+            const tip = $("floatTip");
+            const place = (el) => {
+                tip.innerHTML = el.getAttribute("data-tip") || "";
+                tip.classList.remove("hidden");
+                const r = el.getBoundingClientRect();
+                const tw = tip.offsetWidth, th = tip.offsetHeight, pad = 8;
+                let left = r.left + r.width / 2 - tw / 2;
+                left = Math.max(pad, Math.min(left, window.innerWidth - tw - pad));
+                let top = r.top - th - 6;
+                if (top < pad) top = r.bottom + 6;   // flip below if no room above
+                tip.style.left = left + "px";
+                tip.style.top = top + "px";
+            };
+            document.body.addEventListener("mouseover", (e) => {
+                const el = e.target.closest("[data-tip]");
+                if (el) place(el);
+            });
+            document.body.addEventListener("mouseout", (e) => {
+                if (e.target.closest("[data-tip]")) tip.classList.add("hidden");
+            });
+        }
+
         function renderIndicatorStrip(s) {
             const strip = $("indicatorStrip");
             strip.innerHTML = "";
 
-            // ADX tile
+            // ADX tile (shown ONCE here — removed from the header to avoid duplication)
             const strong = ["STRONG", "EXPLOSIVE", "ACTIVE"].includes(s.adx.label);
             const adxCls = strong ? "text-emerald-400" : "text-slate-400";
             strip.insertAdjacentHTML("beforeend", `
-                <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[92px]">
-                    <span class="text-[9px] text-slate-400 uppercase tracking-wider">Trend · ADX</span>
+                <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[100px]">
+                    <span class="text-[9px] text-slate-400 uppercase tracking-wider flex items-center">Trend · ADX ${infoTip(ADX_TIP)}</span>
                     <span class="text-sm font-bold ${adxCls}">${s.adx.value ?? "—"} <span class="text-[10px] font-semibold">${s.adx.label}</span></span>
                 </div>`);
 
-            // EMA tiles (value + above/below)
-            Object.values(s.ema_stack)
-                .sort((a, b) => a.period - b.period)
-                .forEach(e => {
-                    const above = e.position === "ABOVE";
-                    const col = above ? "text-emerald-400" : "text-rose-400";
-                    const arrow = above ? "▲" : "▼";
-                    strip.insertAdjacentHTML("beforeend", `
-                        <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[92px]" title="${e.label} · price is ${e.position} this average">
-                            <span class="text-[9px] text-slate-400 uppercase tracking-wider">${e.period} EMA · ${e.label}</span>
-                            <span class="text-sm font-bold text-slate-200">₹${e.value.toLocaleString("en-IN")} <span class="${col} text-[11px]">${arrow}</span></span>
-                        </div>`);
-                });
+            const emas = Object.values(s.ema_stack).sort((a, b) => a.period - b.period);
+            emas.forEach((e, i) => {
+                const above = e.position === "ABOVE";
+                const col = above ? "text-emerald-400" : "text-rose-400";
+                const arrow = above ? "▲" : "▼";
+                // only the first EMA tile carries the ⓘ (explains EMAs generally) to keep the strip clean
+                const tip = i === 0 ? infoTip(EMA_TIP) : "";
+                strip.insertAdjacentHTML("beforeend", `
+                    <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[100px]" title="${e.label} · price is ${e.position} this average">
+                        <span class="text-[9px] text-slate-400 uppercase tracking-wider flex items-center">${e.period} EMA · ${e.label} ${tip}</span>
+                        <span class="text-sm font-bold text-slate-200">₹${e.value.toLocaleString("en-IN")} <span class="${col} text-[11px]">${arrow}</span></span>
+                    </div>`);
+            });
         }
 
         function loadChart(symbol) {

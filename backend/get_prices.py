@@ -42,6 +42,65 @@ def fetch_prices_yfinance(symbol: str, years: int = settings.HISTORY_YEARS) -> p
     return df[keep].sort_values("date").reset_index(drop=True)
 
 
+def _tidy_one(sub: pd.DataFrame, symbol: str) -> pd.DataFrame | None:
+    """Turn a single ticker's OHLCV frame (from a batch download) into our tidy
+    schema. Returns None if it's empty after dropping non-trading rows."""
+    sub = sub.dropna(how="all").reset_index()
+    sub.columns = [c[0] if isinstance(c, tuple) else c for c in sub.columns]
+    sub = sub.rename(columns={
+        "Date": "date", "Open": "open", "High": "high",
+        "Low": "low", "Close": "close", "Volume": "volume",
+    })
+    if "close" not in sub.columns or sub["close"].dropna().empty:
+        return None
+    sub = sub.dropna(subset=["close"])
+    sub["date"] = pd.to_datetime(sub["date"]).dt.tz_localize(None).dt.normalize()
+    sub["symbol"] = symbol
+    keep = ["date", "open", "high", "low", "close", "volume", "symbol"]
+    return sub[keep].sort_values("date").reset_index(drop=True)
+
+
+def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTORY_YEARS,
+                                chunk_size: int = 100) -> dict[str, pd.DataFrame]:
+    """Fetch many symbols in one shot per chunk. `yf.download` with a ticker list
+    is ~30x faster and far fewer HTTP requests than looping one symbol at a time,
+    which matters at whole-market scale (~2000 stocks) where per-symbol calls both
+    drag and invite rate-limiting.
+
+    Returns {symbol: tidy_df} for the symbols that came back with usable data;
+    symbols that failed or returned nothing are simply absent from the dict.
+    """
+    import yfinance as yf
+    start = (date.today() - timedelta(days=int(years * 365.25) + 5)).isoformat()
+    out: dict[str, pd.DataFrame] = {}
+
+    for i in range(0, len(symbols), chunk_size):
+        chunk = symbols[i:i + chunk_size]
+        tickers = [f"{s}.NS" for s in chunk]
+        try:
+            data = yf.download(tickers, start=start, interval="1d", auto_adjust=True,
+                               group_by="ticker", progress=False, threads=True)
+        except Exception as e:
+            print(f"    [batch {i//chunk_size}] download failed: {e}")
+            continue
+        if data is None or len(data) == 0:
+            continue
+
+        for sym in chunk:
+            tkr = f"{sym}.NS"
+            try:
+                # For a single-ticker chunk yfinance omits the ticker column level.
+                sub = data[tkr] if isinstance(data.columns, pd.MultiIndex) else data
+            except (KeyError, TypeError):
+                continue
+            tidy = _tidy_one(sub.copy(), sym)
+            if tidy is not None and len(tidy) > 0:
+                out[sym] = tidy
+        time.sleep(0.3)  # be polite between chunks
+
+    return out
+
+
 # ---------------------------------------------------------------------------
 # jugaad-data (raw NSE) + our own adjustment — the full-market path
 # ---------------------------------------------------------------------------

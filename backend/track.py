@@ -11,8 +11,9 @@ record instead grades calls going *forward* — which is the honest way to build
 confidence before opening it to beta users.
 
 An "actionable" call = readiness is on-watch (primed / approaching). It counts as
-"worked" if the price gained >= FOLLOWTHROUGH_TARGET_PCT within FOLLOWTHROUGH_WINDOW
-trading days of the call.
+"worked" if price hit +1R before -1R (stop) within FOLLOWTHROUGH_WINDOW trading days
+of the call — R = entry - stop, where stop = resistance * STOP_LOSS_FRACTION, the same
+stop shown in the live entry guidance (see find_breakouts.add_indicators).
 
 On the very first run the log is empty, so we seed it with a walk-forward
 simulation of the last SEED_DAYS trading days (each day's signal uses only data up
@@ -27,7 +28,7 @@ import settings
 LOG_PATH = settings.DATA_DIR / "predictions_log.jsonl"
 TRACK_PATH = settings.DATA_DIR / "track_record.json"
 HORIZON = settings.FOLLOWTHROUGH_WINDOW
-TARGET = settings.FOLLOWTHROUGH_TARGET_PCT
+STOP_LOSS_FRACTION = settings.STOP_LOSS_FRACTION
 SEED_DAYS = 90
 
 
@@ -58,16 +59,33 @@ def _assess_row(row):
 
 
 def _evaluate(feat, call_date, entry_price):
-    """Did the price reach +TARGET% within HORIZON trading days after call_date?
-    Returns True/False, or None if not enough forward data yet (pending)."""
+    """Did price hit +1R before -1R (stop) within HORIZON trading days after call_date?
+    R = entry_price - stop, where stop = resistance-at-call-date * STOP_LOSS_FRACTION
+    (mirrors the live entry guidance and find_breakouts.add_indicators).
+    Returns True/False, or None if pending (not enough forward data yet) or the risk
+    isn't well-defined for this call (no resistance level yet)."""
     dates = feat["date"].dt.strftime("%Y-%m-%d").tolist()
     if call_date not in dates:
         return None
     idx = dates.index(call_date)
     if idx + HORIZON >= len(feat):
         return None  # still pending
-    fwd_max_high = feat["high"].iloc[idx + 1: idx + 1 + HORIZON].max()
-    return bool(fwd_max_high >= entry_price * (1 + TARGET / 100))
+    res = feat["resistance"].iloc[idx]
+    if res != res or not res:  # NaN or 0
+        return None
+    stop = res * STOP_LOSS_FRACTION
+    risk = entry_price - stop
+    if risk <= 0:
+        return None
+    target = entry_price + risk
+    highs = feat["high"].values
+    lows = feat["low"].values
+    for j in range(idx + 1, idx + 1 + HORIZON):
+        if lows[j] <= stop:
+            return False
+        if highs[j] >= target:
+            return True
+    return False
 
 
 def _load_log():
@@ -154,8 +172,8 @@ def update_and_evaluate(feat_by_symbol, summaries, as_of_date):
     track = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizon_days": HORIZON,
-        "target_pct": TARGET,
-        "criterion": f"gained +{TARGET:g}% within {HORIZON} trading days",
+        "stop_loss_fraction": STOP_LOSS_FRACTION,
+        "criterion": f"hit +1R (risk-defined target) before the stop, within {HORIZON} trading days",
         "actionable_evaluated": evaluated,
         "followed_through": worked,
         "hit_rate": round(worked / evaluated, 3) if evaluated else None,
