@@ -50,8 +50,8 @@
             <!-- Stock Watchlist Chips -->
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-bold tracking-wider text-slate-400 uppercase mr-2">Watchlist:</span>
-                <button onclick="selectStock('ZOMATO')" id="chip-ZOMATO" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-purple-600/20 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]">
-                    ZOMATO
+                <button onclick="selectStock('ETERNAL')" id="chip-ETERNAL" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-purple-600/20 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                    ETERNAL
                 </button>
                 <button onclick="selectStock('TCS')" id="chip-TCS" class="stock-chip px-4 py-1.5 text-sm font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500">
                     TCS
@@ -63,9 +63,6 @@
 
             <!-- Page Navigation Tabs -->
             <div class="flex items-center p-1 rounded-lg bg-slate-800 border border-borderCl overflow-x-auto">
-                <button onclick="switchTab('technical')" id="tab-technical" class="px-4 py-2 text-sm font-medium transition-all rounded-md text-slate-400 hover:text-white whitespace-nowrap">
-                    Technical Indicators
-                </button>
                 <button onclick="switchTab('patterns')" id="tab-patterns" class="px-4 py-2 text-sm font-medium transition-all rounded-md bg-purple-600 text-white shadow-lg whitespace-nowrap">
                     Pre-Breakout Radar
                 </button>
@@ -78,7 +75,10 @@
         <!-- Meta Overview Panel (Always Visible) -->
         <div class="p-4 mb-6 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-6 items-center">
             <div>
-                <h2 id="metaTitle" class="text-xl font-bold text-white">Zomato Ltd.</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h2 id="metaTitle" class="text-xl font-bold text-white">Eternal Ltd.</h2>
+                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded" title="Prices/ratios are refreshed manually for this prototype. Patterns, S/R levels, and signals are illustrative until the live data pipeline ships.">Sample Data</span>
+                </div>
                 <div id="metaSector" class="text-xs text-slate-400 mt-0.5">Sector: Consumer Services | Industry: Internet Retail</div>
             </div>
             <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
@@ -96,65 +96,43 @@
             <!-- Dynamic Left Sidebar -->
             <div class="flex flex-col gap-5 lg:col-span-4" id="sidebar-content">
                 
-                <!-- CONTENT FOR TAB 1: TECHNICALS -->
-                <div id="content-technical" class="hidden space-y-5">
-                    <!-- Advanced Strategies -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Custom Strategy Signals</h3>
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
-                                <div>
-                                    <span class="text-sm font-medium text-slate-200 block">ADX (Trend Strength)</span>
-                                </div>
-                                <span id="valADX" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">> 20 (ACTIVE)</span>
-                            </div>
-                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
-                                <div>
-                                    <span class="text-sm font-medium text-slate-200 block">Zero Lag Trend</span>
-                                </div>
-                                <span id="valZLag" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">BUY SIGNAL</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- EMA Stack -->
-                    <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">Moving Average Stack</h3>
-                        </div>
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-slate-300">10 EMA (Momentum)</span>
-                                <span id="ema10" class="text-xs font-bold text-emerald-400">ABOVE</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-slate-300">20 EMA (Trend)</span>
-                                <span id="ema20" class="text-xs font-bold text-emerald-400">ABOVE</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-slate-300">50 EMA (Structural)</span>
-                                <span id="ema50" class="text-xs font-bold text-emerald-400">ABOVE</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-slate-300">200 EMA (Macro)</span>
-                                <span id="ema200" class="text-xs font-bold text-rose-400">BELOW</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CONTENT FOR TAB 2: PRE-BREAKOUT PATTERNS -->
+                <!-- CONTENT: PRE-BREAKOUT RADAR (incl. Technical Indicators accordion) -->
                 <div id="content-patterns" class="space-y-5">
                     <!-- Pattern AI Analysis -->
                     <div class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">AI Pattern Analysis</h3>
+                        <div class="flex items-start justify-between gap-3 mb-4">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">AI Pattern Analysis</h3>
+                            <span id="sentimentBadge" class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap text-emerald-400 bg-emerald-500/10 border-emerald-500/30">▲ Bullish</span>
+                        </div>
                         <div class="mb-4">
                             <div class="text-2xl font-black text-white tracking-tight mb-1" id="patternName">Cup & Handle</div>
                             <div class="text-xs text-purple-400 font-medium" id="patternStatus">High Probability Setup</div>
                         </div>
-                        <p class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50" id="patternDescription">
+                        <p class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-4" id="patternDescription">
                             A large rounded accumulation phase completed. Forming a tight handle below major resistance on declining volume.
+                        </p>
+
+                        <!-- Entry Guidance -->
+                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-4">
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-1.5">What to watch for</span>
+                            <p class="text-sm text-slate-300 leading-relaxed" id="entryTrigger">
+                                Watch for a breakout above resistance on above-average volume.
+                            </p>
+                            <div class="grid grid-cols-2 gap-3 mt-2 pt-2 border-t border-slate-700/50">
+                                <div>
+                                    <span class="text-xs text-slate-400 block">Suggested entry</span>
+                                    <span class="text-xs font-semibold text-emerald-400" id="entryPoint">—</span>
+                                </div>
+                                <div>
+                                    <span class="text-xs text-slate-400 block">Suggested risk cutoff</span>
+                                    <span class="text-xs font-semibold text-rose-400" id="stopLoss">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-[11px] text-slate-500 leading-snug italic">
+                            ⚠️ Educational content only, not investment advice. Patterns can fail. Always size positions responsibly, use a stop-loss, and do your own research or consult a SEBI-registered advisor before trading.
                         </p>
                     </div>
 
@@ -191,6 +169,53 @@
                         <div class="flex justify-between">
                             <span class="text-sm text-slate-300">Daily Range (ATR)</span>
                             <span class="text-sm font-bold text-purple-400" id="atrStatus">Shrinking</span>
+                        </div>
+                    </div>
+
+                    <!-- Technical Indicators (collapsible) -->
+                    <div class="border rounded-xl bg-cardBg border-borderCl shadow-xl overflow-hidden">
+                        <button onclick="toggleTechPanel()" class="w-full flex items-center justify-between p-5 text-left">
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">Technical Indicators</h3>
+                            <svg id="techChevron" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="techPanelBody" class="hidden px-5 pb-5 space-y-5">
+                            <!-- Advanced Strategies -->
+                            <div class="p-4 rounded-lg bg-slate-900/40 border border-slate-800">
+                                <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase block mb-3">Custom Strategy Signals</span>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
+                                        <span class="text-sm font-medium text-slate-200">ADX (Trend Strength)</span>
+                                        <span id="valADX" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">> 20 (ACTIVE)</span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-800">
+                                        <span class="text-sm font-medium text-slate-200">Zero Lag Trend</span>
+                                        <span id="valZLag" class="px-2.5 py-1 text-xs font-bold text-emerald-400 rounded bg-emerald-500/10 border border-emerald-500/20">BUY SIGNAL</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- EMA Stack -->
+                            <div class="p-4 rounded-lg bg-slate-900/40 border border-slate-800">
+                                <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase block mb-3">Moving Average Stack</span>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-slate-300">10 EMA (Momentum)</span>
+                                        <span id="ema10" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-slate-300">20 EMA (Trend)</span>
+                                        <span id="ema20" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-slate-300">50 EMA (Structural)</span>
+                                        <span id="ema50" class="text-xs font-bold text-emerald-400">ABOVE</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-slate-300">200 EMA (Macro)</span>
+                                        <span id="ema200" class="text-xs font-bold text-rose-400">BELOW</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -261,44 +286,57 @@
     <script>
         // Consolidated Data Store (Tech + Patterns + Fundamentals)
         const dataset = {
-            ZOMATO: {
-                // Meta
-                title: "Zomato Ltd.", sector: "Sector: Consumer Services | Industry: Internet Retail",
-                mcap: "₹142,500 Cr", price: "₹162.50", pe: "112.5", rank: "92", symbol: "BSE:ZOMATO",
+            ETERNAL: {
+                // Meta (price/mcap/PE refreshed 2026-07-03, see disclosures in CLAUDE.md)
+                title: "Eternal Ltd.", sector: "Sector: Consumer Services | Industry: Internet Retail (Food Delivery & Quick Commerce)",
+                mcap: "₹257,150 Cr", price: "₹280.20", pe: "702.6", rank: "92", symbol: "BSE:ETERNAL",
                 // Tech
                 ema10: "ABOVE", ema20: "ABOVE", ema50: "ABOVE", ema200: "ABOVE",
                 adx: "> 25 (STRONG)", zlag: "BUY SIGNAL",
                 // Patterns
-                pattern: "Cup & Handle", pStatus: "High Probability Setup", 
+                pattern: "Cup & Handle", pStatus: "High Probability Setup",
                 pDesc: "A large 3-month rounded accumulation phase has completed. The stock is currently forming a tight 2-week handle just below major resistance.",
-                resLine: "₹164.50", distStr: "1.2% Away", distNum: "1.2%", touches: "3 Times", depth: "-18.4%", vol: "-65%", atr: "Shrinking (Coiled)",
+                resLine: "₹283.55", distStr: "1.2% Away", distNum: "1.2%", touches: "3 Times", depth: "-18.4%", vol: "-65%", atr: "Shrinking (Coiled)",
+                // Sentiment / Entry Guidance
+                sentiment: "Bullish",
+                entryTrigger: "A close above ₹283.55 on above-average volume would confirm the breakout. A pullback that holds above ₹275 without breaking down is an early sign the handle is resolving upward.",
+                entryPoint: "₹283.55+ (breakout close)",
+                stopLoss: "₹262.00 (~-6.5% below current price)",
                 // Fund
                 roe: "4.8%", roce: "5.1%", de: "0.02"
             },
             TCS: {
                 title: "Tata Consultancy Services Ltd.", sector: "Sector: Technology Services | Industry: IT Consulting",
-                mcap: "₹832,395 Cr", price: "₹4,151.40", pe: "30.0", rank: "72", symbol: "BSE:TCS",
+                mcap: "₹717,320 Cr", price: "₹2,106.00", pe: "15.0", rank: "72", symbol: "BSE:TCS",
                 ema10: "BELOW", ema20: "BELOW", ema50: "ABOVE", ema200: "ABOVE",
                 adx: "< 20 (CHOP)", zlag: "SELL SIGNAL",
-                pattern: "Consolidation Base", pStatus: "Neutral", 
+                pattern: "Consolidation Base", pStatus: "Neutral",
                 pDesc: "Trading in a sideways range above the 200 EMA. No clear breakout geometry defined yet.",
-                resLine: "₹4,250.00", distStr: "2.3% Away", distNum: "2.3%", touches: "2 Times", depth: "-8.0%", vol: "-10%", atr: "Expanding",
+                resLine: "₹2,154.00", distStr: "2.3% Away", distNum: "2.3%", touches: "2 Times", depth: "-8.0%", vol: "-10%", atr: "Expanding",
+                sentiment: "Neutral",
+                entryTrigger: "No actionable setup yet — price is range-bound with no volatility contraction. Wait for a decisive close above ₹2,154 (bullish) or below ₹2,000, near the 52-week low (bearish), before acting.",
+                entryPoint: "No trigger currently — wait for range breakout",
+                stopLoss: "Not applicable — no active setup",
                 roe: "51.8%", roce: "63.0%", de: "0.00"
             },
             RELIANCE: {
                 title: "Reliance Industries Ltd.", sector: "Sector: Energy | Industry: Oil & Gas Refining",
-                mcap: "₹1,950,000 Cr", price: "₹2,950.00", pe: "28.5", rank: "85", symbol: "BSE:RELIANCE",
+                mcap: "₹1,764,000 Cr", price: "₹1,308.00", pe: "21.9", rank: "85", symbol: "BSE:RELIANCE",
                 ema10: "ABOVE", ema20: "ABOVE", ema50: "ABOVE", ema200: "ABOVE",
                 adx: "> 30 (EXPLOSIVE)", zlag: "BUY SIGNAL",
-                pattern: "Ascending Triangle", pStatus: "Apex Imminent", 
+                pattern: "Ascending Triangle", pStatus: "Apex Imminent",
                 pDesc: "Price is making higher lows while repeatedly hitting a flat horizontal resistance level. The coil is extremely tight.",
-                resLine: "₹2,980.00", distStr: "1.0% Away", distNum: "1.0%", touches: "5 Times", depth: "-6.5%", vol: "-40%", atr: "Maximum Squeeze",
+                resLine: "₹1,321.00", distStr: "1.0% Away", distNum: "1.0%", touches: "5 Times", depth: "-6.5%", vol: "-40%", atr: "Maximum Squeeze",
+                sentiment: "Bullish",
+                entryTrigger: "The coil is extremely tight, so a breakout above ₹1,321 on strong volume could move fast. Chasing an extended move without a trigger is not advised — wait for confirmation.",
+                entryPoint: "₹1,321+ (breakout close on volume)",
+                stopLoss: "₹1,242.00 (~-6% below breakout entry)",
                 roe: "9.5%", roce: "10.2%", de: "0.45"
             }
         };
 
         let currentTab = 'patterns';
-        let currentStock = 'ZOMATO';
+        let currentStock = 'ETERNAL';
 
         function loadTradingViewChart(symbol) {
             document.getElementById('tv-chart-frame').innerHTML = '';
@@ -354,6 +392,20 @@
             document.getElementById('patternName').innerText = data.pattern;
             document.getElementById('patternStatus').innerText = data.pStatus;
             document.getElementById('patternDescription').innerText = data.pDesc;
+            document.getElementById('entryTrigger').innerText = data.entryTrigger;
+            document.getElementById('entryPoint').innerText = data.entryPoint;
+            document.getElementById('stopLoss').innerText = data.stopLoss;
+
+            const sentimentEl = document.getElementById('sentimentBadge');
+            const sentimentStyles = {
+                Bullish: { text: "▲ Bullish", cls: "px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
+                Bearish: { text: "▼ Bearish", cls: "px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap text-rose-400 bg-rose-500/10 border-rose-500/30" },
+                Neutral: { text: "● Neutral", cls: "px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap text-slate-300 bg-slate-500/10 border-slate-500/30" }
+            };
+            const sentimentStyle = sentimentStyles[data.sentiment] || sentimentStyles.Neutral;
+            sentimentEl.innerText = sentimentStyle.text;
+            sentimentEl.className = sentimentStyle.cls;
+
             document.getElementById('resLine').innerText = data.resLine;
             document.getElementById('resDistance').innerText = data.distStr;
             document.getElementById('distBar').style.right = data.distNum;
@@ -388,7 +440,6 @@
             });
 
             // Active Tab Styling
-            if(tab === 'technical') document.getElementById('tab-technical').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-blue-600 text-white shadow-lg whitespace-nowrap";
             if(tab === 'patterns') document.getElementById('tab-patterns').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-purple-600 text-white shadow-lg whitespace-nowrap";
             if(tab === 'fundamental') document.getElementById('tab-fundamental').className = "px-4 py-2 text-sm font-medium transition-all rounded-md bg-emerald-600 text-white shadow-lg whitespace-nowrap";
 
@@ -399,23 +450,21 @@
             } else {
                 document.getElementById('layout-fundamentals').classList.add('hidden');
                 document.getElementById('layout-sidebar-chart').classList.remove('hidden');
-                
-                // Toggle Sidebar Content based on sub-tab
-                if(tab === 'technical') {
-                    document.getElementById('content-patterns').classList.add('hidden');
-                    document.getElementById('content-technical').classList.remove('hidden');
-                } else {
-                    document.getElementById('content-technical').classList.add('hidden');
-                    document.getElementById('content-patterns').classList.remove('hidden');
-                }
-                
+
                 // Re-render chart to ensure dimensions are correct after un-hiding
                 loadTradingViewChart(dataset[currentStock].symbol);
             }
         }
 
+        function toggleTechPanel() {
+            const body = document.getElementById('techPanelBody');
+            const chevron = document.getElementById('techChevron');
+            body.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
+        }
+
         window.onload = function() {
-            selectStock('ZOMATO');
+            selectStock('ETERNAL');
         };
     </script>
 </body>
