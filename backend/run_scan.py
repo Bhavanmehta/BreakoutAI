@@ -20,6 +20,7 @@ import pandas as pd
 import settings
 from get_prices import get_prices
 from find_breakouts import add_indicators, build_summary
+from track import update_and_evaluate
 
 
 def run():
@@ -28,6 +29,7 @@ def run():
 
     all_prices = []
     all_features = []
+    feat_by_symbol = {}
     summaries = []
 
     print(f"Scanning {len(settings.WATCHLIST)} stocks (source: {settings.PRICE_SOURCE})...\n")
@@ -46,6 +48,7 @@ def run():
 
         all_prices.append(prices)
         all_features.append(feat.assign(symbol=symbol))
+        feat_by_symbol[symbol] = feat
         summaries.append(summary)
 
         b = "BREAKOUT" if summary["breakout"]["today"] else summary["breakout"]["sentiment"]
@@ -76,8 +79,14 @@ def run():
     with open(settings.BREAKOUTS_JSON, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
+    # --- Log today's calls & grade past ones (the forward track record) ---
+    as_of = max(s["as_of"] for s in summaries)
+    track = update_and_evaluate(feat_by_symbol, summaries, as_of)
+    hr = f"{round(track['hit_rate']*100)}%" if track["hit_rate"] is not None else "n/a"
     print(f"\nWrote {settings.BREAKOUTS_JSON.relative_to(settings.REPO_DIR)} "
           f"({len(summaries)} stocks) in {time.time()-started:.1f}s total.")
+    print(f"Track record: {track['actionable_evaluated']} actionable calls graded, "
+          f"hit rate {hr} ({track['pending']} pending, {track['live_calls_logged']} live logged).")
     print(f"DuckDB research file: {settings.DUCKDB_PATH.relative_to(settings.REPO_DIR)}")
 
 

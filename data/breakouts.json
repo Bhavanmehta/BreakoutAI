@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-03T12:24:21+00:00",
+  "generated_at": "2026-07-03T10:50:26+00:00",
   "as_of_date": "2026-07-03",
   "source": "yfinance",
-  "count": 6,
+  "count": 12,
   "disclaimer": "Educational content only, not investment advice. Patterns can fail. Always use a stop-loss and consult a SEBI-registered advisor before trading.",
   "stocks": [
     {
@@ -13,10 +13,30 @@
       "price": 281.65,
       "change_pct": 0.7,
       "ema_stack": {
-        "ema10": "ABOVE",
-        "ema20": "ABOVE",
-        "ema50": "ABOVE",
-        "ema200": "ABOVE"
+        "ema8": {
+          "period": 8,
+          "value": 270.24,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 261.3,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 255.48,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 263.84,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 21.8,
@@ -32,14 +52,58 @@
         "contraction_ratio": 1.0,
         "state": "Coiling (squeeze)"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Cup & Handle",
+        "confidence": 0.68,
+        "direction": "bullish",
+        "description": "A rounded recovery back toward prior highs, now pausing in a shallow handle — classic accumulation before a breakout."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Bullish"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
         "past_breakouts": 14,
-        "winrate_20d": 0.714,
-        "avg_fwd_return_20d_pct": 2.8
+        "followthrough_rate": 0.5,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 2.8,
+        "examples": [
+          {
+            "date": "2025-07-24",
+            "price_then": 313.15,
+            "worked": false,
+            "fwd_5d_pct": -1.7,
+            "fwd_10d_pct": -3.6,
+            "fwd_20d_pct": 1.9
+          },
+          {
+            "date": "2025-07-22",
+            "price_then": 299.8,
+            "worked": false,
+            "fwd_5d_pct": 2.3,
+            "fwd_10d_pct": 0.8,
+            "fwd_20d_pct": 8.9
+          },
+          {
+            "date": "2025-07-14",
+            "price_then": 270.6,
+            "worked": true,
+            "fwd_5d_pct": 0.4,
+            "fwd_10d_pct": 13.6,
+            "fwd_20d_pct": 14.3
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹285.95 on above-average volume to confirm a breakout.",
@@ -55,10 +119,30 @@
       "price": 2093.5,
       "change_pct": 1.23,
       "ema_stack": {
-        "ema10": "ABOVE",
-        "ema20": "BELOW",
-        "ema50": "BELOW",
-        "ema200": "BELOW"
+        "ema8": {
+          "period": 8,
+          "value": 2075.55,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 2128.65,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 2234.37,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 2635.79,
+          "position": "BELOW",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 23.3,
@@ -74,14 +158,58 @@
         "contraction_ratio": 1.07,
         "state": "Expanding"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Head & Shoulders",
+        "confidence": 0.6,
+        "direction": "bearish",
+        "description": "Three peaks with a higher middle and level shoulders — a classic topping pattern that warns of a downside reversal."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Bearish"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
-        "past_breakouts": 10,
-        "winrate_20d": 0.4,
-        "avg_fwd_return_20d_pct": -2.16
+        "past_breakouts": 9,
+        "followthrough_rate": 0.111,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": -2.47,
+        "examples": [
+          {
+            "date": "2024-12-05",
+            "price_then": 4180.29,
+            "worked": false,
+            "fwd_5d_pct": -0.2,
+            "fwd_10d_pct": -4.3,
+            "fwd_20d_pct": -8.2
+          },
+          {
+            "date": "2024-07-18",
+            "price_then": 4022.05,
+            "worked": false,
+            "fwd_5d_pct": 0.4,
+            "fwd_10d_pct": 2.1,
+            "fwd_20d_pct": 2.6
+          },
+          {
+            "date": "2024-07-12",
+            "price_then": 3899.4,
+            "worked": true,
+            "fwd_5d_pct": 2.7,
+            "fwd_10d_pct": 5.0,
+            "fwd_20d_pct": 0.5
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹2,471.49 on above-average volume to confirm a breakout.",
@@ -97,10 +225,30 @@
       "price": 1304.0,
       "change_pct": 0.04,
       "ema_stack": {
-        "ema10": "BELOW",
-        "ema20": "BELOW",
-        "ema50": "BELOW",
-        "ema200": "BELOW"
+        "ema8": {
+          "period": 8,
+          "value": 1306.3,
+          "position": "BELOW",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 1310.62,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 1328.67,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 1380.08,
+          "position": "BELOW",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 15.8,
@@ -116,14 +264,58 @@
         "contraction_ratio": 0.94,
         "state": "Coiling (squeeze)"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Tight Consolidation",
+        "confidence": 0.4,
+        "direction": "neutral",
+        "description": "Trading in a tight range — coiling into a base, but no named pattern has formed yet."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Bearish"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
-        "past_breakouts": 10,
-        "winrate_20d": 0.7,
-        "avg_fwd_return_20d_pct": 2.24
+        "past_breakouts": 7,
+        "followthrough_rate": 0.286,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 1.73,
+        "examples": [
+          {
+            "date": "2025-11-20",
+            "price_then": 1541.97,
+            "worked": false,
+            "fwd_5d_pct": 0.9,
+            "fwd_10d_pct": -0.9,
+            "fwd_20d_pct": -0.3
+          },
+          {
+            "date": "2025-10-20",
+            "price_then": 1460.05,
+            "worked": false,
+            "fwd_5d_pct": 1.4,
+            "fwd_10d_pct": 0.4,
+            "fwd_20d_pct": 3.6
+          },
+          {
+            "date": "2024-06-28",
+            "price_then": 1546.75,
+            "worked": false,
+            "fwd_5d_pct": 1.5,
+            "fwd_10d_pct": 2.0,
+            "fwd_20d_pct": -2.9
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹1,466.62 on above-average volume to confirm a breakout.",
@@ -139,10 +331,30 @@
       "price": 1047.2,
       "change_pct": 0.61,
       "ema_stack": {
-        "ema10": "ABOVE",
-        "ema20": "BELOW",
-        "ema50": "BELOW",
-        "ema200": "BELOW"
+        "ema8": {
+          "period": 8,
+          "value": 1037.65,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 1074.07,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 1128.58,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 1309.12,
+          "position": "BELOW",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 23.0,
@@ -158,14 +370,58 @@
         "contraction_ratio": 1.16,
         "state": "Expanding"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "No clear pattern",
+        "confidence": 0.0,
+        "direction": "neutral",
+        "description": "No recognizable chart pattern right now."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Bearish"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
-        "past_breakouts": 11,
-        "winrate_20d": 0.818,
-        "avg_fwd_return_20d_pct": 2.46
+        "past_breakouts": 9,
+        "followthrough_rate": 0.333,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 2.76,
+        "examples": [
+          {
+            "date": "2025-12-22",
+            "price_then": 1653.81,
+            "worked": false,
+            "fwd_5d_pct": -4.0,
+            "fwd_10d_pct": -4.6,
+            "fwd_20d_pct": -1.8
+          },
+          {
+            "date": "2025-12-19",
+            "price_then": 1603.99,
+            "worked": false,
+            "fwd_5d_pct": 0.4,
+            "fwd_10d_pct": -2.0,
+            "fwd_20d_pct": 2.6
+          },
+          {
+            "date": "2024-07-19",
+            "price_then": 1685.34,
+            "worked": true,
+            "fwd_5d_pct": 4.8,
+            "fwd_10d_pct": 1.6,
+            "fwd_20d_pct": 4.0
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹1,251.81 on above-average volume to confirm a breakout.",
@@ -181,10 +437,30 @@
       "price": 282.2,
       "change_pct": 1.84,
       "ema_stack": {
-        "ema10": "ABOVE",
-        "ema20": "BELOW",
-        "ema50": "BELOW",
-        "ema200": "BELOW"
+        "ema8": {
+          "period": 8,
+          "value": 281.11,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 286.57,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 294.27,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 314.99,
+          "position": "BELOW",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 13.2,
@@ -200,14 +476,58 @@
         "contraction_ratio": 0.77,
         "state": "Coiling (squeeze)"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Tight Consolidation",
+        "confidence": 0.4,
+        "direction": "neutral",
+        "description": "Trading in a tight range — coiling into a base, but no named pattern has formed yet."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Bearish"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
-        "past_breakouts": 9,
-        "winrate_20d": 0.556,
-        "avg_fwd_return_20d_pct": 5.2
+        "past_breakouts": 8,
+        "followthrough_rate": 0.75,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 5.11,
+        "examples": [
+          {
+            "date": "2024-05-17",
+            "price_then": 504.32,
+            "worked": true,
+            "fwd_5d_pct": -5.6,
+            "fwd_10d_pct": 0.1,
+            "fwd_20d_pct": -0.9
+          },
+          {
+            "date": "2024-04-25",
+            "price_then": 413.85,
+            "worked": true,
+            "fwd_5d_pct": 3.4,
+            "fwd_10d_pct": -5.0,
+            "fwd_20d_pct": 15.0
+          },
+          {
+            "date": "2024-04-24",
+            "price_then": 373.26,
+            "worked": true,
+            "fwd_5d_pct": 13.6,
+            "fwd_10d_pct": 3.0,
+            "fwd_20d_pct": 28.9
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹337.40 on above-average volume to confirm a breakout.",
@@ -223,10 +543,30 @@
       "price": 189.8,
       "change_pct": 1.13,
       "ema_stack": {
-        "ema10": "BELOW",
-        "ema20": "BELOW",
-        "ema50": "BELOW",
-        "ema200": "ABOVE"
+        "ema8": {
+          "period": 8,
+          "value": 189.56,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 193.96,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 197.97,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 187.2,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
       },
       "adx": {
         "value": 23.2,
@@ -242,19 +582,699 @@
         "contraction_ratio": 0.83,
         "state": "Coiling (squeeze)"
       },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Head & Shoulders",
+        "confidence": 0.6,
+        "direction": "bearish",
+        "description": "Three peaks with a higher middle and level shoulders — a classic topping pattern that warns of a downside reversal."
+      },
       "breakout": {
         "today": false,
         "sentiment": "Neutral"
       },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
       "history": {
-        "past_breakouts": 18,
-        "winrate_20d": 0.444,
-        "avg_fwd_return_20d_pct": -0.87
+        "past_breakouts": 15,
+        "followthrough_rate": 0.133,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 1.0,
+        "examples": [
+          {
+            "date": "2026-05-13",
+            "price_then": 215.18,
+            "worked": false,
+            "fwd_5d_pct": -5.7,
+            "fwd_10d_pct": -2.2,
+            "fwd_20d_pct": -9.2
+          },
+          {
+            "date": "2026-02-10",
+            "price_then": 203.81,
+            "worked": false,
+            "fwd_5d_pct": -2.4,
+            "fwd_10d_pct": 0.5,
+            "fwd_20d_pct": -6.4
+          },
+          {
+            "date": "2026-01-29",
+            "price_then": 198.23,
+            "worked": false,
+            "fwd_5d_pct": -2.3,
+            "fwd_10d_pct": 2.9,
+            "fwd_20d_pct": 6.5
+          }
+        ]
       },
       "entry": {
         "trigger": "Watch for a close above ₹219.87 on above-average volume to confirm a breakout.",
         "suggested_entry": "₹219.87+ (breakout close on volume)",
         "stop_loss": "₹206.67 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "HDFCBANK",
+      "name": "HDFC Bank Ltd.",
+      "sector": "Financials · Private Bank",
+      "as_of": "2026-07-03",
+      "price": 801.05,
+      "change_pct": 0.65,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 794.27,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 780.24,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 776.1,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 841.42,
+          "position": "BELOW",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 27.0,
+        "label": "STRONG"
+      },
+      "resistance": {
+        "level": 806.1,
+        "distance_pct": 0.63,
+        "touches": 9
+      },
+      "base_depth_pct": -10.7,
+      "volatility": {
+        "contraction_ratio": 0.83,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "No clear pattern",
+        "confidence": 0.0,
+        "direction": "neutral",
+        "description": "No recognizable chart pattern right now."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Neutral"
+      },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
+      "history": {
+        "past_breakouts": 7,
+        "followthrough_rate": 0.286,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": -1.16,
+        "examples": [
+          {
+            "date": "2025-06-26",
+            "price_then": 981.19,
+            "worked": false,
+            "fwd_5d_pct": -0.6,
+            "fwd_10d_pct": 0.3,
+            "fwd_20d_pct": 0.7
+          },
+          {
+            "date": "2025-04-22",
+            "price_then": 952.02,
+            "worked": false,
+            "fwd_5d_pct": -2.7,
+            "fwd_10d_pct": -0.8,
+            "fwd_20d_pct": -1.8
+          },
+          {
+            "date": "2025-04-15",
+            "price_then": 905.05,
+            "worked": true,
+            "fwd_5d_pct": 3.2,
+            "fwd_10d_pct": 3.2,
+            "fwd_20d_pct": 3.7
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹806.10 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹806.10+ (breakout close on volume)",
+        "stop_loss": "₹757.73 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "ICICIBANK",
+      "name": "ICICI Bank Ltd.",
+      "sector": "Financials · Private Bank",
+      "as_of": "2026-07-03",
+      "price": 1411.4,
+      "change_pct": 0.81,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 1384.86,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 1350.98,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 1321.16,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 1331.37,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 33.8,
+        "label": "EXPLOSIVE"
+      },
+      "resistance": {
+        "level": 1405.0,
+        "distance_pct": -0.45,
+        "touches": 8
+      },
+      "base_depth_pct": -14.5,
+      "volatility": {
+        "contraction_ratio": 0.97,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": true,
+        "label": "Uptrend (above rising 200-day avg)"
+      },
+      "pattern": {
+        "name": "Cup & Handle",
+        "confidence": 0.68,
+        "direction": "bullish",
+        "description": "A rounded recovery back toward prior highs, now pausing in a shallow handle — classic accumulation before a breakout."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bullish"
+      },
+      "readiness": {
+        "label": "Coiling — building a base",
+        "watch": false,
+        "score": "medium",
+        "reliability": null,
+        "reliable": null
+      },
+      "history": {
+        "past_breakouts": 6,
+        "followthrough_rate": 0.0,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": -1.95,
+        "examples": [
+          {
+            "date": "2026-01-08",
+            "price_then": 1435.0,
+            "worked": false,
+            "fwd_5d_pct": -1.2,
+            "fwd_10d_pct": -6.2,
+            "fwd_20d_pct": -2.0
+          },
+          {
+            "date": "2025-03-21",
+            "price_then": 1332.82,
+            "worked": false,
+            "fwd_5d_pct": 0.4,
+            "fwd_10d_pct": -4.1,
+            "fwd_20d_pct": 4.4
+          },
+          {
+            "date": "2024-12-05",
+            "price_then": 1326.27,
+            "worked": false,
+            "fwd_5d_pct": -0.5,
+            "fwd_10d_pct": -3.7,
+            "fwd_20d_pct": -5.3
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹1,405.00 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹1,405.00+ (breakout close on volume)",
+        "stop_loss": "₹1,320.70 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "BHARTIARTL",
+      "name": "Bharti Airtel Ltd.",
+      "sector": "Communications · Telecom",
+      "as_of": "2026-07-03",
+      "price": 1910.4,
+      "change_pct": 1.89,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 1874.94,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 1862.17,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 1857.65,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 1890.21,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 14.2,
+        "label": "CHOP"
+      },
+      "resistance": {
+        "level": 1953.8,
+        "distance_pct": 2.27,
+        "touches": 7
+      },
+      "base_depth_pct": -10.9,
+      "volatility": {
+        "contraction_ratio": 0.94,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Double Bottom",
+        "confidence": 0.6,
+        "direction": "bullish",
+        "description": "Two lows at a similar level with a bounce between — sellers failed twice at the same price. A reversal setup if it clears the middle peak."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bullish"
+      },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
+      "history": {
+        "past_breakouts": 16,
+        "followthrough_rate": 0.312,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 1.31,
+        "examples": [
+          {
+            "date": "2025-11-04",
+            "price_then": 2113.3,
+            "worked": false,
+            "fwd_5d_pct": -1.9,
+            "fwd_10d_pct": 2.2,
+            "fwd_20d_pct": -1.3
+          },
+          {
+            "date": "2025-06-20",
+            "price_then": 1920.64,
+            "worked": true,
+            "fwd_5d_pct": 4.7,
+            "fwd_10d_pct": 4.2,
+            "fwd_20d_pct": -1.0
+          },
+          {
+            "date": "2025-04-17",
+            "price_then": 1873.44,
+            "worked": false,
+            "fwd_5d_pct": -3.8,
+            "fwd_10d_pct": -1.2,
+            "fwd_20d_pct": -3.7
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹1,953.80 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹1,953.80+ (breakout close on volume)",
+        "stop_loss": "₹1,836.57 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "SUNPHARMA",
+      "name": "Sun Pharmaceutical Ind. Ltd.",
+      "sector": "Health Care · Pharma",
+      "as_of": "2026-07-03",
+      "price": 1904.8,
+      "change_pct": 1.81,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 1871.68,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 1849.19,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 1822.38,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 1754.65,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 29.4,
+        "label": "STRONG"
+      },
+      "resistance": {
+        "level": 1916.6,
+        "distance_pct": 0.62,
+        "touches": 17
+      },
+      "base_depth_pct": -15.7,
+      "volatility": {
+        "contraction_ratio": 0.89,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": true,
+        "label": "Uptrend (above rising 200-day avg)"
+      },
+      "pattern": {
+        "name": "Cup & Handle",
+        "confidence": 0.68,
+        "direction": "bullish",
+        "description": "A rounded recovery back toward prior highs, now pausing in a shallow handle — classic accumulation before a breakout."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bullish"
+      },
+      "readiness": {
+        "label": "Primed — coiling below resistance in an uptrend",
+        "watch": true,
+        "score": "high",
+        "reliability": "Caution: only 38% of this stock's past breakouts followed through — historically unreliable.",
+        "reliable": false
+      },
+      "history": {
+        "past_breakouts": 13,
+        "followthrough_rate": 0.385,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": 3.63,
+        "examples": [
+          {
+            "date": "2026-03-09",
+            "price_then": 1807.4,
+            "worked": false,
+            "fwd_5d_pct": -1.3,
+            "fwd_10d_pct": -2.7,
+            "fwd_20d_pct": -5.0
+          },
+          {
+            "date": "2026-03-06",
+            "price_then": 1799.4,
+            "worked": false,
+            "fwd_5d_pct": 0.1,
+            "fwd_10d_pct": -1.2,
+            "fwd_20d_pct": -4.7
+          },
+          {
+            "date": "2025-11-27",
+            "price_then": 1798.62,
+            "worked": false,
+            "fwd_5d_pct": 0.4,
+            "fwd_10d_pct": -0.2,
+            "fwd_20d_pct": -5.0
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹1,916.60 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹1,916.60+ (breakout close on volume)",
+        "stop_loss": "₹1,801.60 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "TITAN",
+      "name": "Titan Company Ltd.",
+      "sector": "Consumer Discretionary · Jewellery",
+      "as_of": "2026-07-03",
+      "price": 4461.1,
+      "change_pct": -0.45,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 4391.5,
+          "position": "ABOVE",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 4318.89,
+          "position": "ABOVE",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 4267.15,
+          "position": "ABOVE",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 4057.67,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 14.9,
+        "label": "CHOP"
+      },
+      "resistance": {
+        "level": 4605.0,
+        "distance_pct": 3.23,
+        "touches": 1
+      },
+      "base_depth_pct": -13.9,
+      "volatility": {
+        "contraction_ratio": 0.97,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": true,
+        "label": "Uptrend (above rising 200-day avg)"
+      },
+      "pattern": {
+        "name": "Cup & Handle",
+        "confidence": 0.68,
+        "direction": "bullish",
+        "description": "A rounded recovery back toward prior highs, now pausing in a shallow handle — classic accumulation before a breakout."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Bullish"
+      },
+      "readiness": {
+        "label": "Coiling — building a base",
+        "watch": false,
+        "score": "medium",
+        "reliability": null,
+        "reliable": null
+      },
+      "history": {
+        "past_breakouts": 13,
+        "followthrough_rate": 0.154,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": -1.28,
+        "examples": [
+          {
+            "date": "2026-04-08",
+            "price_then": 4492.5,
+            "worked": false,
+            "fwd_5d_pct": -0.7,
+            "fwd_10d_pct": -0.8,
+            "fwd_20d_pct": -4.1
+          },
+          {
+            "date": "2026-01-07",
+            "price_then": 4273.2,
+            "worked": false,
+            "fwd_5d_pct": -1.2,
+            "fwd_10d_pct": -4.5,
+            "fwd_20d_pct": -4.1
+          },
+          {
+            "date": "2025-12-31",
+            "price_then": 4051.5,
+            "worked": true,
+            "fwd_5d_pct": 5.5,
+            "fwd_10d_pct": 4.2,
+            "fwd_20d_pct": -2.8
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹4,605.00 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹4,605.00+ (breakout close on volume)",
+        "stop_loss": "₹4,328.70 (~-6% below the trigger)"
+      }
+    },
+    {
+      "symbol": "LT",
+      "name": "Larsen & Toubro Ltd.",
+      "sector": "Industrials · Construction",
+      "as_of": "2026-07-03",
+      "price": 4026.6,
+      "change_pct": -0.81,
+      "ema_stack": {
+        "ema8": {
+          "period": 8,
+          "value": 4108.55,
+          "position": "BELOW",
+          "label": "Momentum"
+        },
+        "ema21": {
+          "period": 21,
+          "value": 4098.19,
+          "position": "BELOW",
+          "label": "Short-term trend"
+        },
+        "ema50": {
+          "period": 50,
+          "value": 4033.46,
+          "position": "BELOW",
+          "label": "Structural"
+        },
+        "ema200": {
+          "period": 200,
+          "value": 3889.34,
+          "position": "ABOVE",
+          "label": "Macro"
+        }
+      },
+      "adx": {
+        "value": 19.5,
+        "label": "CHOP"
+      },
+      "resistance": {
+        "level": 4272.3,
+        "distance_pct": 6.1,
+        "touches": 12
+      },
+      "base_depth_pct": -10.8,
+      "volatility": {
+        "contraction_ratio": 0.85,
+        "state": "Coiling (squeeze)"
+      },
+      "trend": {
+        "in_uptrend": false,
+        "label": "Not in an uptrend"
+      },
+      "pattern": {
+        "name": "Cup & Handle",
+        "confidence": 0.68,
+        "direction": "bullish",
+        "description": "A rounded recovery back toward prior highs, now pausing in a shallow handle — classic accumulation before a breakout."
+      },
+      "breakout": {
+        "today": false,
+        "sentiment": "Neutral"
+      },
+      "readiness": {
+        "label": "Not in an uptrend — breakouts unreliable here",
+        "watch": false,
+        "score": "low",
+        "reliability": null,
+        "reliable": null
+      },
+      "history": {
+        "past_breakouts": 10,
+        "followthrough_rate": 0.1,
+        "followthrough_label": "gained +5% within 10 trading days",
+        "avg_fwd_return_20d_pct": -0.14,
+        "examples": [
+          {
+            "date": "2026-06-15",
+            "price_then": 4169.8,
+            "worked": false,
+            "fwd_5d_pct": 0.8,
+            "fwd_10d_pct": -0.1,
+            "fwd_20d_pct": null
+          },
+          {
+            "date": "2025-10-28",
+            "price_then": 3934.37,
+            "worked": false,
+            "fwd_5d_pct": -1.2,
+            "fwd_10d_pct": -0.5,
+            "fwd_20d_pct": 2.2
+          },
+          {
+            "date": "2025-10-23",
+            "price_then": 3880.79,
+            "worked": false,
+            "fwd_5d_pct": 1.8,
+            "fwd_10d_pct": -0.9,
+            "fwd_20d_pct": 2.7
+          }
+        ]
+      },
+      "entry": {
+        "trigger": "Watch for a close above ₹4,272.30 on above-average volume to confirm a breakout.",
+        "suggested_entry": "₹4,272.30+ (breakout close on volume)",
+        "stop_loss": "₹4,015.96 (~-6% below the trigger)"
       }
     }
   ]

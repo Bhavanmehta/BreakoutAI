@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 import settings
+from patterns import detect_pattern
 
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -52,17 +53,42 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
     df["adx"] = dx.ewm(alpha=alpha, adjust=False).mean()
 
-    # --- Resistance = highest high of prior N days; breakout = close above it on volume ---
+    # --- Trend filter (Stage 2): above a rising long EMA and above the mid EMA ---
+    long_ema = df[f"ema{settings.TREND_EMA_LONG}"]
+    mid_ema = df[f"ema{settings.TREND_EMA_MID}"]
+    ema_long_rising = long_ema > long_ema.shift(settings.EMA200_SLOPE_LOOKBACK)
+    df["uptrend"] = (df["close"] > long_ema) & ema_long_rising & (df["close"] > mid_ema)
+
+    # --- Proximity to the 52-week high (a real high, not a bounce mid-decline) ---
+    high_52w = df["high"].rolling(252, min_periods=50).max()
+    df["dist_from_52w_high"] = (high_52w - df["close"]) / high_52w * 100
+
+    # --- Resistance = highest high of prior N days ---
     df["resistance"] = df["high"].rolling(settings.LOOKBACK_HIGH).max().shift(1)
     df["avg_vol"] = df["volume"].rolling(settings.VOL_AVG_WINDOW).mean().shift(1)
-    df["is_breakout"] = (
-        (df["close"] > df["resistance"]) &
-        (df["volume"] > df["avg_vol"] * settings.VOL_SURGE_MULT)
-    )
 
-    # --- Forward returns (to score historical breakouts) ---
+    # --- Breakout = new high + volume surge + (optionally) uptrend + near 52w high ---
+    cond = (df["close"] > df["resistance"]) & (df["volume"] > df["avg_vol"] * settings.VOL_SURGE_MULT)
+    if settings.REQUIRE_UPTREND:
+        cond = cond & df["uptrend"] & (df["dist_from_52w_high"] <= settings.MAX_DIST_FROM_52W_HIGH)
+    df["is_breakout"] = cond
+
+    # --- Forward returns (context) ---
     for w in settings.FORWARD_WINDOWS:
         df[f"fwd_ret_{w}d"] = df["close"].shift(-w) / df["close"] - 1
+
+    # --- Follow-through: did the HIGH reach +TARGET% within the next WINDOW days? ---
+    highs = df["high"].values
+    closes = df["close"].values
+    n = len(df)
+    W = settings.FOLLOWTHROUGH_WINDOW
+    target = 1 + settings.FOLLOWTHROUGH_TARGET_PCT / 100
+    worked = np.full(n, np.nan, dtype=object)
+    for i in range(n):
+        if i + W < n:  # need a full forward window to judge fairly
+            fwd_max = highs[i + 1:i + 1 + W].max()
+            worked[i] = bool(fwd_max >= closes[i] * target)
+    df["followthrough"] = worked
     return df
 
 
@@ -113,8 +139,16 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     price = round(float(latest["close"]), 2)
     change_pct = round((float(latest["close"]) / float(prev["close"]) - 1) * 100, 2)
 
-    ema_stack = {f"ema{w}": ("ABOVE" if latest["close"] > latest[f"ema{w}"] else "BELOW")
-                 for w in settings.EMA_WINDOWS}
+    # Each EMA carries its actual value, its position vs price, and a friendly label.
+    ema_stack = {}
+    for w in settings.EMA_WINDOWS:
+        val = float(latest[f"ema{w}"])
+        ema_stack[f"ema{w}"] = {
+            "period": w,
+            "value": round(val, 2),
+            "position": "ABOVE" if latest["close"] > val else "BELOW",
+            "label": settings.EMA_LABELS.get(w, ""),
+        }
 
     adx_val = float(latest["adx"]) if not np.isnan(latest["adx"]) else None
     resistance = float(latest["resistance"]) if not np.isnan(latest["resistance"]) else None
@@ -128,17 +162,73 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     recent = df.tail(settings.LOOKBACK_HIGH)
     base_depth = round((recent["low"].min() / recent["high"].max() - 1) * 100, 1)
 
-    # Historical breakout scoring for THIS stock
-    events = df[df["is_breakout"] == True].dropna(subset=[f"fwd_ret_{w}d" for w in settings.FORWARD_WINDOWS])
+    # Historical breakout scoring for THIS stock. "Worked" = followed through:
+    # the price gained at least FOLLOWTHROUGH_TARGET_PCT within FOLLOWTHROUGH_WINDOW days.
+    events = df[(df["is_breakout"] == True) & (df["followthrough"].notna())]
     if len(events) > 0:
-        winrate_20d = round(float((events["fwd_ret_20d"] > 0).mean()), 3)
-        avg_fwd_20d = round(float(events["fwd_ret_20d"].mean()) * 100, 2)
+        followthrough_rate = round(float(events["followthrough"].astype(bool).mean()), 3)
+        avg_fwd_20d = round(float(events["fwd_ret_20d"].dropna().mean()) * 100, 2) if events["fwd_ret_20d"].notna().any() else None
     else:
-        winrate_20d = None
+        followthrough_rate = None
         avg_fwd_20d = None
+    followthrough_label = (f"gained +{settings.FOLLOWTHROUGH_TARGET_PCT:g}% within "
+                           f"{settings.FOLLOWTHROUGH_WINDOW} trading days")
+
+    # Concrete "last time this happened" examples — the most recent past breakouts
+    # on THIS stock and how the price moved in the days after each.
+    examples = []
+    for _, ev in events.sort_values("date", ascending=False).head(3).iterrows():
+        examples.append({
+            "date": ev["date"].strftime("%Y-%m-%d"),
+            "price_then": round(float(ev["close"]), 2),
+            "worked": bool(ev["followthrough"]),
+            "fwd_5d_pct": round(float(ev["fwd_ret_5d"]) * 100, 1) if pd.notna(ev["fwd_ret_5d"]) else None,
+            "fwd_10d_pct": round(float(ev["fwd_ret_10d"]) * 100, 1) if pd.notna(ev["fwd_ret_10d"]) else None,
+            "fwd_20d_pct": round(float(ev["fwd_ret_20d"]) * 100, 1) if pd.notna(ev["fwd_ret_20d"]) else None,
+        })
 
     sentiment = _sentiment(latest, adx_val)
     broke_out_today = bool(latest["is_breakout"])
+    in_uptrend = bool(latest["uptrend"])
+    trend = {
+        "in_uptrend": in_uptrend,
+        "label": "Uptrend (above rising 200-day avg)" if in_uptrend else "Not in an uptrend",
+    }
+
+    # "Breakout soon?" readiness — proximity to resistance + coiling, gated by trend.
+    # A coil below resistance only counts as "primed" if the stock is actually trending up.
+    coiling = (vc is not None and vc < 1)
+    near = (dist_pct is not None and 0 <= dist_pct <= 3)   # within 3% below resistance
+    if broke_out_today:
+        readiness = {"label": "Breaking out now", "watch": True, "score": "high"}
+    elif not in_uptrend:
+        readiness = {"label": "Not in an uptrend — breakouts unreliable here", "watch": False, "score": "low"}
+    elif near and coiling:
+        readiness = {"label": "Primed — coiling below resistance in an uptrend", "watch": True, "score": "high"}
+    elif near:
+        readiness = {"label": "Approaching resistance", "watch": True, "score": "medium"}
+    elif coiling:
+        readiness = {"label": "Coiling — building a base", "watch": False, "score": "medium"}
+    else:
+        readiness = {"label": "In an uptrend, no setup yet", "watch": False, "score": "low"}
+
+    # Fold the historical follow-through rate into the read, so "primed" never
+    # oversells: a setup on a stock whose breakouts rarely work gets a caution.
+    if readiness["watch"] and followthrough_rate is not None:
+        pct = round(followthrough_rate * 100)
+        if followthrough_rate < 0.4:
+            readiness["reliability"] = (f"Caution: only {pct}% of this stock's past breakouts "
+                                        f"followed through — historically unreliable.")
+            readiness["reliable"] = False
+        else:
+            readiness["reliability"] = f"{pct}% of its past breakouts followed through historically."
+            readiness["reliable"] = True
+    else:
+        readiness["reliability"] = None
+        readiness["reliable"] = None
+
+    # Named chart pattern (real geometry — see patterns.py)
+    pattern = detect_pattern(df)
 
     # Plain-English guidance derived from the computed state
     if resistance:
@@ -165,8 +255,14 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
                        "distance_pct": dist_pct, "touches": touches},
         "base_depth_pct": base_depth,
         "volatility": {"contraction_ratio": round(vc, 2) if vc else None, "state": vol_state},
+        "trend": trend,
+        "pattern": pattern,
         "breakout": {"today": broke_out_today, "sentiment": sentiment},
+        "readiness": readiness,
         "history": {"past_breakouts": int(len(events)),
-                    "winrate_20d": winrate_20d, "avg_fwd_return_20d_pct": avg_fwd_20d},
+                    "followthrough_rate": followthrough_rate,
+                    "followthrough_label": followthrough_label,
+                    "avg_fwd_return_20d_pct": avg_fwd_20d,
+                    "examples": examples},
         "entry": {"trigger": trigger, "suggested_entry": suggested_entry, "stop_loss": stop_loss},
     }

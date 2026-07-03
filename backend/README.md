@@ -11,8 +11,14 @@ there is **no always-on server** — it wakes up, does its job, writes a file, a
 | **settings.py** | The knobs: watchlist, years of history, price source, thresholds. Start here. |
 | **get_prices.py** | Pulls ~3 years of daily prices per stock. Default source `yfinance` (already split/bonus-adjusted, works anywhere); alternative `jugaad` (raw NSE, whole-market friendly) corrected by `adjust_for_splits.py`. |
 | **adjust_for_splits.py** | Fixes the fake overnight "crashes" caused by splits/bonuses, using NSE's official corporate-action list. Run it directly to self-test the ratio parser. |
-| **find_breakouts.py** | The "brain": EMA stack, ADX (trend strength), nearby resistance, volatility contraction (VCP), breakout detection, a bullish/neutral/bearish read, and plain-English entry/stop guidance. |
-| **run_scan.py** | The one you run. Does all of the above for every watchlist stock, stores data in a local DuckDB file for research, and writes **`../data/breakouts.json`** — the single file the website consumes. |
+| **find_breakouts.py** | The "brain": EMA stack (8/21/50/200), ADX, resistance, VCP, trend-filtered breakout detection, follow-through scoring, sentiment/readiness (+ reliability caveat), entry/stop guidance. |
+| **patterns.py** | Real chart-pattern detection via swing pivots: Ascending Triangle, Cup & Handle, Double Bottom (bullish), Head & Shoulders (bearish), fallbacks. Heuristic. |
+| **track.py** | The forward track record: logs each day's calls to `../data/predictions_log.jsonl` and grades past on-watch episodes → `../data/track_record.json`. |
+| **run_scan.py** | The one you run. Does all of the above for every watchlist stock, stores data in a local DuckDB file for research, writes **`../data/breakouts.json`** (the file the website consumes), and updates the track record. |
+
+**Breakout rule** (grounded in Minervini/Weinstein/Turtle): close above prior 50-day high, on
+≥1.5× avg volume, **while in an uptrend** (above a rising 200 EMA + above 50 EMA) and **within 25%
+of the 52-week high**. "Worked" = gained +5% within 10 trading days. All tunable in `settings.py`.
 
 ## Run it locally
 
