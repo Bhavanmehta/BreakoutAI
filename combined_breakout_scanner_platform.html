@@ -14,6 +14,10 @@
         }
     </script>
     <style>
+        /* Render native form controls (incl. the <select> dropdown popup) dark, so the
+           options list isn't a light box on Windows/Chromium. */
+        html { color-scheme: dark; }
+        select option { background-color: #1e293b; color: #e2e8f0; }
         .fade-in { animation: fade 0.35s ease; }
         @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
         /* A single body-level floating tooltip (portal-style) so it's never clipped by a
@@ -88,26 +92,39 @@
                         class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
                     ◎ Primed only
                 </button>
-                <button id="fundToggle" type="button"
-                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
-                    ⚙ Fundamentals <span id="fundChevron">▸</span>
-                </button>
                 <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
             </div>
 
-            <!-- Fundamentals filter panel (collapsed by default) -->
-            <div id="fundPanel" class="hidden mb-5 p-4 rounded-xl bg-cardBg border border-borderCl">
-                <p class="text-[11px] text-slate-500 mb-3 leading-snug">
-                    Filters on valuation/quality data (yfinance), refreshed separately from the daily
-                    price scan — some newly-listed or thinly-covered stocks may not have it yet.
-                </p>
-                <div id="fundRows" class="flex flex-col gap-3"></div>
+            <!-- Fundamentals filters — always visible, compact horizontal row so the options are discoverable without eating space -->
+            <div id="fundPanel" class="mb-5 px-3 py-2.5 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center whitespace-nowrap">
+                    ⚙ Fundamentals
+                    <span class="text-slate-500 ml-1.5" data-tip="Filter by the company's valuation &amp; quality (from yfinance), on top of the price setup. Hover the ⓘ on any filter to learn what it means. This data refreshes separately from the daily price scan — a few newly-listed or thinly-covered stocks may not have it yet, and those are hidden by any active fundamentals filter.">ⓘ</span>
+                </span>
+                <div id="fundRows" class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
+                <button id="fundReset" type="button"
+                        class="hidden ml-auto px-2.5 py-1 text-[11px] font-semibold rounded-md border border-borderCl text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-all">
+                    ✕ Clear
+                </button>
+            </div>
+
+            <!-- Curated collections — one-click baskets (index membership, cap tier, smart screens) -->
+            <div class="mb-5 flex flex-wrap items-center gap-2">
+                <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mr-1 flex items-center">Collections<span class="text-slate-500 ml-1" data-tip="One-click curated baskets layered on top of your filters: index membership (Nifty 50), SEBI market-cap tiers, and smart screens that combine setup + fundamentals.">ⓘ</span></span>
+                <div id="collectionChips" class="flex flex-wrap items-center gap-2"></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- LEFT: sector radar + vertical watchlist -->
+                <!-- LEFT: setup breakdown + sector radar + vertical watchlist -->
                 <div class="lg:col-span-3 flex flex-col gap-5">
+
+                    <!-- Setup-type breakdown (validated axes: how the universe splits by setup) -->
+                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
+                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center">Setup Type<span class="text-slate-500 ml-1 font-normal" data-tip="How the whole universe splits across the four validated setup stages, most-actionable first. Click one to filter the list. (These are the readiness tiers the conviction score is built on — unlike named chart patterns, they're backed by the reliability study.)">ⓘ</span></span>
+                        <p class="text-[11px] text-slate-500 mb-3 leading-snug">Where names sit in the breakout lifecycle. Click to filter.</p>
+                        <div id="setupBreakdown" class="space-y-2"></div>
+                    </div>
 
                     <!-- Sector radar -->
                     <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
@@ -139,14 +156,18 @@
                             <div id="metaSector" class="text-xs text-slate-400 mt-0.5">—</div>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
-                        <div class="flex-none text-center" title="0–100 conviction: how imminent the setup is, blended with how reliably this stock's breakouts have followed through historically (validated composite score).">
-                            <span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Conviction</span>
+                        <div class="flex-none text-center">
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center" data-tip="A single 0–100 score the whole list ranks by. It blends two things a whole-market study found actually predict follow-through: (1) <b>imminence</b> — how close this stock is to breaking out (its readiness tier, ~55%), and (2) <b>reliability</b> — how well this stock's own past breakouts followed through, plus base depth and relative-strength / trend confirmation (~45%). It deliberately ignores ADX, chart-pattern names and the single historical analog (which didn't hold up in testing). <b>Technical only</b> — it does not yet factor in fundamentals like P/E or profit growth.">Conviction<span class="text-slate-500 ml-1 text-[9px]">ⓘ</span></span>
                             <span id="metaConviction" class="text-2xl font-black leading-none">—</span>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
                         <div class="flex gap-6 sm:gap-8">
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center" data-tip="Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.">Mkt Cap<span class="text-slate-500 ml-1">ⓘ</span></span>
+                                <span id="metaMcap" class="text-sm font-semibold text-slate-200">—</span>
+                            </div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
                         </div>
                     </div>
@@ -164,28 +185,51 @@
                         <div id="readinessLabel" class="text-2xl font-black text-white tracking-tight mb-1">—</div>
                         <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-3">—</div>
 
-                        <!-- Historical analog (one similar past day — context, not a track record) -->
-                        <div id="analogBox" class="hidden mb-3 p-3.5 rounded-lg bg-slate-900/50 border border-slate-700/50">
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <span class="text-base opacity-70">🕰️</span>
-                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
-                            </div>
-                            <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
-                            <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
-                            <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
+                        <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"></p>
+
+                        <!-- Fundamentals snapshot (one line) — the business behind the setup -->
+                        <div id="fundLine" class="hidden mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Fundamentals<span class="text-slate-500 ml-1" data-tip="A quick snapshot of the underlying business (from yfinance): valuation (P/E), growth (revenue &amp; profit YoY), profitability (ROE) and leverage (D/E). Context for the price setup — the conviction score above is technical only and does not include these.">ⓘ</span></span>
+                            <span id="fundLineItems" class="flex flex-wrap items-center gap-x-3 gap-y-1"></span>
                         </div>
 
-                        <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"></p>
                         <p id="patternLine" class="text-xs text-slate-500 mt-2">—</p>
                         <p id="reliabilityLine" class="text-xs mt-2 hidden"></p>
                     </div>
 
                     <!-- Chart + indicator strip -->
                     <div class="flex flex-col border border-borderCl rounded-xl overflow-hidden bg-cardBg shadow-2xl">
-                        <div class="border-b border-borderCl bg-slate-900/40 p-3">
+                        <div class="border-b border-borderCl bg-slate-900/40 p-3 flex items-start justify-between gap-3">
                             <div id="indicatorStrip" class="flex flex-wrap items-stretch gap-2"></div>
+                            <div class="flex-none flex items-center gap-1 p-0.5 rounded-lg bg-slate-800 border border-borderCl">
+                                <button id="chartModeAnnotated" type="button" data-mode="annotated" class="px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all">Annotated</button>
+                                <button id="chartModeTradingview" type="button" data-mode="tradingview" class="px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all">TradingView</button>
+                            </div>
                         </div>
-                        <div id="tv-chart-frame" class="w-full min-h-[460px] lg:min-h-[560px]"></div>
+                        <!-- Annotated chart (lightweight-charts) draws into #lwChart; TradingView draws into #tv-chart-frame -->
+                        <div id="chartHost" class="relative w-full min-h-[460px] lg:min-h-[560px]">
+                            <div id="lwChart" class="w-full h-[460px] lg:h-[560px]"></div>
+                            <div id="tv-chart-frame" class="w-full h-[460px] lg:h-[560px] hidden"></div>
+                        </div>
+                        <div id="chartLegend" class="hidden flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-t border-borderCl bg-slate-900/40 text-[10px] text-slate-400">
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-rose-500"></span> Resistance</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-purple-400"></span> 50-day EMA</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-amber-400"></span> 200-day EMA</span>
+                            <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout day</span>
+                            <span class="text-slate-500">· green/red candles = up/down days</span>
+                        </div>
+                    </div>
+
+                    <!-- Historical analog — moved below the chart (supporting context, deliberately
+                         de-emphasised vs. The Read; a single closest-match day, not a track record) -->
+                    <div id="analogBox" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <span class="text-base opacity-70">🕰️</span>
+                            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
+                        </div>
+                        <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
+                        <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
+                        <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
                     </div>
 
                     <!-- Detail cards grid -->
@@ -251,10 +295,11 @@
                                 <span class="text-slate-500" data-tip="Compares the recent daily range to its longer baseline. A tightening range (coiling) stores energy that often precedes a strong move.">ⓘ</span>
                             </h3>
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-slate-300">Daily range vs. baseline</span>
+                                <span class="text-sm text-slate-300">Range vs. baseline</span>
                                 <span class="text-sm font-bold text-purple-400" id="vcpState">—</span>
                             </div>
-                            <p class="text-[11px] text-slate-500 mt-2 leading-snug">A tightening range ("coiling") often precedes a strong move as the stock builds energy.</p>
+                            <p id="vcpExplain" class="text-xs text-slate-300 mt-2 leading-snug"></p>
+                            <p class="text-[11px] text-slate-500 mt-2 leading-snug">The number is the last 10 days' average price range ÷ its 30-day baseline. <b class="text-emerald-400">Below 1.0</b> = coiling (range tightening, energy building — the setup you want); <b class="text-purple-300">above 1.0</b> = expanding.</p>
                         </div>
 
                         <!-- Entry guidance (full width) -->
@@ -316,6 +361,8 @@
     </div>
 
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <!-- lightweight-charts (v4 API): powers the annotated chart with our own resistance/EMA/breakout overlays -->
+    <script type="text/javascript" src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <script>
         let STOCKS = [];
         let current = null;
@@ -334,6 +381,14 @@
             if (c >= 40) return "text-amber-300";
             return "text-slate-400";
         }
+        // Market cap comes in ₹ crore. Show it human-readably in Indian units: plain crore
+        // with lakh-style grouping up to 1 lakh-crore, then switch to "L Cr" (lakh-crore).
+        function fmtMarketCap(cr) {
+            if (cr == null || isNaN(cr)) return "—";
+            if (cr >= 100000) return "₹" + (cr / 100000).toFixed(2) + " L Cr";
+            if (cr >= 1000)   return "₹" + Math.round(cr).toLocaleString("en-IN") + " Cr";
+            return "₹" + cr.toFixed(cr < 100 ? 1 : 0) + " Cr";
+        }
         const SENTIMENT_STYLE = {
             Bullish: { text: "▲ Bullish", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
             Bearish: { text: "▼ Bearish", cls: "text-rose-400 bg-rose-500/10 border-rose-500/30" },
@@ -342,33 +397,127 @@
         const RANK = { high: 0, medium: 1, low: 2 };
 
         // Fundamentals filter definitions — field key into s.fundamentals, display label,
-        // and (where the user gave us exact bucket boundaries) preset chips. Revenue/Profit
-        // growth, ROE and D/E have no presets since we weren't given specific thresholds for
-        // them — plain min/max covers the need until specific buckets are wanted.
+        // an ⓘ explanation, and a compact set of range options rendered as a single dropdown
+        // each (keeps the whole fundamentals bar on one horizontal line). The first option is
+        // always "Any" (no filter); each carries the {min,max} it applies to s.fundamentals[field].
         const FUND_FIELDS = [
-            { key: "mcap", label: "Market Cap (₹ Cr)", field: "market_cap_cr", presets: [
-                { label: "Micro (<5K)", min: null, max: 5000 },
-                { label: "Small (5K–30K)", min: 5000, max: 30000 },
-                { label: "Mid (30K–1L)", min: 30000, max: 100000 },
-                { label: "Large (1L+)", min: 100000, max: null },
+            { key: "mcap", label: "Market Cap", field: "market_cap_cr",
+              tip: "The total value of all the company's shares — share price × number of shares — in ₹ crore (1 lakh Cr = 1L Cr). A rough size gauge: <b>larger = more established and generally more stable</b>; smaller can move faster but carries more risk.",
+              options: [
+                { label: "Any size", min: null, max: null },
+                { label: "Micro · <5K Cr", min: null, max: 5000 },
+                { label: "Small · 5K–30K Cr", min: 5000, max: 30000 },
+                { label: "Mid · 30K–1L Cr", min: 30000, max: 100000 },
+                { label: "Large · 1L Cr+", min: 100000, max: null },
             ] },
-            { key: "pe", label: "P/E Ratio", field: "pe_ratio", presets: [
-                { label: "Deep Value (0–10)", min: 0, max: 10 },
-                { label: "Value (10–15)", min: 10, max: 15 },
-                { label: "Fair (15–25)", min: 15, max: 25 },
-                { label: "Growth (25–40)", min: 25, max: 40 },
-                { label: "High Growth (40+)", min: 40, max: null },
+            { key: "pe", label: "P/E", field: "pe_ratio",
+              tip: "Price-to-Earnings — share price ÷ yearly profit per share. Roughly <b>how many years of current profit you're paying for one share</b>. Lower can mean cheap (or slow-growing); higher means the market expects fast growth. Compare within the same industry.",
+              options: [
+                { label: "Any P/E", min: null, max: null },
+                { label: "Deep value · <10", min: 0, max: 10 },
+                { label: "Value · 10–15", min: 10, max: 15 },
+                { label: "Fair · 15–25", min: 15, max: 25 },
+                { label: "Growth · 25–40", min: 25, max: 40 },
+                { label: "High growth · 40+", min: 40, max: null },
             ] },
-            { key: "revGrowth", label: "Revenue Growth (%)", field: "revenue_growth_pct" },
-            { key: "profitGrowth", label: "Profit Growth (%)", field: "profit_growth_pct" },
-            { key: "roe", label: "ROE (%)", field: "roe_pct" },
-            { key: "de", label: "D/E Ratio", field: "debt_to_equity" },
+            { key: "revGrowth", label: "Revenue Growth", field: "revenue_growth_pct",
+              tip: "Year-over-year change in total <b>sales</b> (top line). Positive and rising means the business is selling more — the earliest sign a company is expanding.",
+              options: [
+                { label: "Any", min: null, max: null },
+                { label: "Positive · >0%", min: 0, max: null },
+                { label: "Solid · >10%", min: 10, max: null },
+                { label: "Strong · >20%", min: 20, max: null },
+                { label: "Rapid · >30%", min: 30, max: null },
+            ] },
+            { key: "profitGrowth", label: "Profit Growth", field: "profit_growth_pct",
+              tip: "Year-over-year change in <b>net profit</b> (bottom line, after all costs). Growing profit is the fundamental fuel behind sustained price uptrends — a breakout backed by rising profit tends to hold better.",
+              options: [
+                { label: "Any", min: null, max: null },
+                { label: "Positive · >0%", min: 0, max: null },
+                { label: "Solid · >10%", min: 10, max: null },
+                { label: "Strong · >20%", min: 20, max: null },
+                { label: "Rapid · >30%", min: 30, max: null },
+            ] },
+            { key: "roe", label: "ROE", field: "roe_pct",
+              tip: "Return on Equity — net profit ÷ shareholders' money in the business. Measures <b>how efficiently the company turns owners' capital into profit</b>. Higher is better; 15%+ is generally considered healthy.",
+              options: [
+                { label: "Any", min: null, max: null },
+                { label: "Decent · >10%", min: 10, max: null },
+                { label: "Healthy · >15%", min: 15, max: null },
+                { label: "High · >20%", min: 20, max: null },
+                { label: "Excellent · >25%", min: 25, max: null },
+            ] },
+            { key: "de", label: "D/E", field: "debt_to_equity",
+              tip: "Debt-to-Equity — total borrowings ÷ shareholders' equity. <b>How much the company leans on debt.</b> Lower = safer balance sheet; a very high ratio can be dangerous if business slows or rates rise (a value of 0.5 means ₹0.50 of debt per ₹1 of equity).",
+              options: [
+                { label: "Any", min: null, max: null },
+                { label: "Debt-free-ish · <0.25", min: null, max: 0.25 },
+                { label: "Low debt · <0.5", min: null, max: 0.5 },
+                { label: "Moderate · <1", min: null, max: 1 },
+                { label: "Leveraged · <2", min: null, max: 2 },
+            ] },
         ];
 
         // Filter/sort state, driven by the top bar. Default sort is the composite
         // conviction score (most→least likely to break out and follow through).
-        const filters = { query: "", sector: "", sort: "conviction", primedOnly: false, fundamentals: {} };
+        const filters = { query: "", sector: "", sort: "conviction", primedOnly: false, fundamentals: {}, collection: "", setup: "" };
         FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
+
+        // --- Curated collections -------------------------------------------------------
+        // Nifty 50 constituents (curated large-cap bluechip basket; NSE symbols). Membership
+        // shifts ~twice a year at index reviews — resync periodically. Anything not present
+        // in the loaded universe is simply ignored, so a rename/demerger can't error.
+        const NIFTY50 = new Set(("ADANIENT ADANIPORTS APOLLOHOSP ASIANPAINT AXISBANK BAJAJ-AUTO " +
+            "BAJFINANCE BAJAJFINSV BEL BHARTIARTL BRITANNIA CIPLA COALINDIA DRREDDY EICHERMOT ETERNAL " +
+            "GRASIM HCLTECH HDFCBANK HDFCLIFE HEROMOTOCO HINDALCO HINDUNILVR ICICIBANK INDUSINDBK INFY " +
+            "ITC JIOFIN JSWSTEEL KOTAKBANK LT M&M MARUTI MAXHEALTH NESTLEIND NTPC ONGC POWERGRID RELIANCE " +
+            "SBILIFE SBIN SHRIRAMFIN SUNPHARMA TATACONSUM TATASTEEL TCS TECHM TITAN TRENT ULTRACEMCO WIPRO").split(" "));
+
+        // Market-cap rank (1 = biggest) over the whole loaded universe, so cap tiers follow
+        // SEBI's definition (large = top 100, mid = 101–250, small = 251+). Self-updating.
+        const MCAP_RANK = {};
+        function computeMcapRank() {
+            STOCKS.filter(s => s.fundamentals && s.fundamentals.market_cap_cr != null)
+                .sort((a, b) => b.fundamentals.market_cap_cr - a.fundamentals.market_cap_cr)
+                .forEach((s, i) => { MCAP_RANK[s.symbol] = i + 1; });
+        }
+        const rankIn = (s, lo, hi) => {
+            const r = MCAP_RANK[s.symbol];
+            return r != null && r >= lo && r <= hi;
+        };
+        const COLLECTIONS = [
+            { key: "", label: "All stocks" },
+            { key: "nifty50", label: "Nifty 50", tip: "Nifty 50 large-cap constituents (curated bluechip list; resynced at index reviews).", match: s => NIFTY50.has(s.symbol) },
+            { key: "large", label: "Large cap", tip: "Top 100 by market cap (SEBI large-cap).", match: s => rankIn(s, 1, 100) },
+            { key: "mid", label: "Mid cap", tip: "Ranks 101–250 by market cap (SEBI mid-cap).", match: s => rankIn(s, 101, 250) },
+            { key: "small", label: "Small cap", tip: "Rank 251+ by market cap (SEBI small-cap).", match: s => rankIn(s, 251, Infinity) },
+            { key: "primedProven", label: "Primed & proven", tip: "On-watch setups with a conviction score of 60 or more.", match: s => s.readiness && s.readiness.watch && (s.readiness.conviction ?? 0) >= 60 },
+            { key: "qualityGrowth", label: "Quality growth", tip: "ROE ≥ 15% and positive profit growth — solid businesses, not just chart setups.", match: s => { const f = s.fundamentals; return f && f.roe_pct != null && f.roe_pct >= 15 && f.profit_growth_pct != null && f.profit_growth_pct > 0; } },
+        ];
+        const collectionMatch = (s) => {
+            if (!filters.collection) return true;
+            const c = COLLECTIONS.find(x => x.key === filters.collection);
+            return !c || !c.match || c.match(s);
+        };
+
+        // --- Setup-type breakdown ------------------------------------------------------
+        // One primary "where in the breakout lifecycle" label per stock, following the same
+        // priority ladder the backend readiness uses. Null = no actionable setup (not shown).
+        const SETUP_TYPES = [
+            { key: "Breaking out",      color: "bg-emerald-500", text: "text-emerald-300" },
+            { key: "Primed",            color: "bg-purple-500",  text: "text-purple-300" },
+            { key: "Relative strength", color: "bg-sky-500",     text: "text-sky-300" },
+            { key: "Coiling / basing",  color: "bg-amber-500",   text: "text-amber-300" },
+        ];
+        function setupType(s) {
+            if (s.breakout && s.breakout.today) return "Breaking out";
+            if (s.readiness && s.readiness.signal === "relative_strength") return "Relative strength";
+            const score = s.readiness && s.readiness.score;
+            const label = (s.readiness && s.readiness.label) || "";
+            if (score === "high") return "Primed";
+            if (/coil|approach|base/i.test(label)) return "Coiling / basing";
+            return null;
+        }
 
         // The broad sector "group" (before the " · industry" part) — used for the
         // filter dropdown and the sector radar so we group by e.g. "Financial Services"
@@ -393,10 +542,14 @@
 
                 STOCKS.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
 
+                computeMcapRank();
                 buildSectorOptions();
+                renderCollections();
+                renderSetupBreakdown();
                 renderSectorRadar();
                 renderFundPanel();
                 wireControls();
+                wireChartToggle();
                 initTooltips();
                 initAskAi();
                 applyFilters();
@@ -440,10 +593,10 @@
                 r.classList.toggle("hidden");
                 $("radarChevron").innerText = r.classList.contains("hidden") ? "▸" : "▾";
             };
-            $("fundToggle").onclick = () => {
-                const p = $("fundPanel");
-                p.classList.toggle("hidden");
-                $("fundChevron").innerText = p.classList.contains("hidden") ? "▸" : "▾";
+            $("fundReset").onclick = () => {
+                FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
+                renderFundPanel();
+                applyFilters();
             };
         }
 
@@ -459,55 +612,32 @@
             host.innerHTML = "";
             FUND_FIELDS.forEach(f => {
                 const range = filters.fundamentals[f.key];
-                const chipsHtml = (f.presets || []).map((p, i) => {
-                    const active = range.min === p.min && range.max === p.max;
-                    return `<button data-fund-preset="${f.key}" data-idx="${i}" class="px-2.5 py-1 text-[11px] rounded-md border transition-all ${active ? "bg-purple-600/25 border-purple-500 text-purple-200" : "bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500"}">${p.label}</button>`;
+                const optsHtml = f.options.map((o, i) => {
+                    const sel = (range.min === o.min && range.max === o.max) ? " selected" : "";
+                    return `<option value="${i}"${sel}>${o.label}</option>`;
                 }).join("");
-                const row = document.createElement("div");
-                row.className = "flex flex-wrap items-center gap-2 pb-3 border-b border-slate-800 last:border-0 last:pb-0";
-                row.innerHTML = `
-                    <span class="text-xs font-semibold text-slate-300 w-40 flex-none">${f.label}</span>
-                    <div class="flex flex-wrap items-center gap-1.5">${chipsHtml}</div>
-                    <div class="flex items-center gap-1.5 ml-auto">
-                        <input type="number" data-fund-min="${f.key}" placeholder="Min" value="${range.min ?? ""}"
-                               class="w-20 px-2 py-1 text-xs rounded-md bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
-                        <span class="text-slate-600 text-xs">–</span>
-                        <input type="number" data-fund-max="${f.key}" placeholder="Max" value="${range.max ?? ""}"
-                               class="w-20 px-2 py-1 text-xs rounded-md bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
-                        <button data-fund-apply="${f.key}" class="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-purple-600/20 border border-purple-500 text-purple-200 hover:bg-purple-600/30">Apply</button>
-                    </div>`;
-                host.appendChild(row);
+                const active = range.min != null || range.max != null;
+                const unit = document.createElement("label");
+                unit.className = "flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap";
+                unit.innerHTML =
+                    `<span class="flex items-center uppercase tracking-wider">${f.label}${infoTip(f.tip)}</span>` +
+                    `<select data-fund="${f.key}" class="px-2 py-1.5 text-sm rounded-lg border focus:outline-none focus:border-purple-500 ${active ? "bg-purple-600/20 border-purple-500 text-white" : "bg-slate-800 border-borderCl text-slate-200"}">${optsHtml}</select>`;
+                host.appendChild(unit);
             });
 
-            host.querySelectorAll("[data-fund-preset]").forEach(btn => {
-                btn.onclick = () => {
-                    const key = btn.dataset.fundPreset;
-                    const preset = FUND_FIELDS.find(f => f.key === key).presets[Number(btn.dataset.idx)];
-                    const range = filters.fundamentals[key];
-                    const active = range.min === preset.min && range.max === preset.max;
-                    filters.fundamentals[key] = active ? { min: null, max: null } : { min: preset.min, max: preset.max };
-                    renderFundPanel();
-                    applyFilters();
-                };
-            });
-            host.querySelectorAll("[data-fund-apply]").forEach(btn => {
-                btn.onclick = () => {
-                    const key = btn.dataset.fundApply;
-                    const minEl = host.querySelector(`[data-fund-min="${key}"]`);
-                    const maxEl = host.querySelector(`[data-fund-max="${key}"]`);
-                    filters.fundamentals[key] = {
-                        min: minEl.value === "" ? null : Number(minEl.value),
-                        max: maxEl.value === "" ? null : Number(maxEl.value),
-                    };
+            host.querySelectorAll("[data-fund]").forEach(sel => {
+                sel.onchange = () => {
+                    const f = FUND_FIELDS.find(x => x.key === sel.dataset.fund);
+                    const o = f.options[Number(sel.value)];
+                    filters.fundamentals[f.key] = { min: o.min, max: o.max };
                     renderFundPanel();
                     applyFilters();
                 };
             });
 
-            const t = $("fundToggle");
-            const active = fundamentalsActive();
-            t.className = "px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
-                (active ? "bg-purple-600/20 border-purple-500 text-white" : "bg-slate-800 border-borderCl text-slate-300");
+            // No toggle button anymore (the panel is always visible) — just show the
+            // "clear" affordance whenever at least one fundamentals filter is active.
+            $("fundReset").classList.toggle("hidden", !fundamentalsActive());
         }
 
         function passesFundamentals(s) {
@@ -555,6 +685,8 @@
             let list = STOCKS.filter(s => {
                 if (filters.primedOnly && !(s.readiness && s.readiness.watch)) return false;
                 if (filters.sector && sectorGroup(s) !== filters.sector) return false;
+                if (filters.setup && setupType(s) !== filters.setup) return false;
+                if (!collectionMatch(s)) return false;
                 if (q && !(s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q))) return false;
                 if (!passesFundamentals(s)) return false;
                 return true;
@@ -675,6 +807,58 @@
             if (!rows.length) host.innerHTML = `<p class="text-[11px] text-slate-500">No sector data yet — run fetch_sectors.py.</p>`;
         }
 
+        function renderCollections() {
+            const host = $("collectionChips");
+            host.innerHTML = "";
+            COLLECTIONS.forEach(c => {
+                const active = filters.collection === c.key;
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all flex items-center " +
+                    (active ? "bg-purple-600/25 border-purple-500 text-purple-200" : "bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500");
+                btn.innerHTML = c.label + (c.tip ? `<span class="ml-1 text-slate-500" data-tip="${c.tip.replace(/"/g, "&quot;")}">ⓘ</span>` : "");
+                btn.onclick = (e) => {
+                    // let the ⓘ show its tooltip without also toggling the chip
+                    if (e.target.closest("[data-tip]")) return;
+                    filters.collection = active ? "" : c.key;
+                    renderCollections();
+                    applyFilters();
+                };
+                host.appendChild(btn);
+            });
+        }
+
+        function renderSetupBreakdown() {
+            const counts = {};
+            SETUP_TYPES.forEach(t => counts[t.key] = 0);
+            STOCKS.forEach(s => { const t = setupType(s); if (t != null) counts[t]++; });
+            const max = Math.max(1, ...SETUP_TYPES.map(t => counts[t.key]));
+            const host = $("setupBreakdown");
+            host.innerHTML = "";
+            SETUP_TYPES.forEach(t => {
+                const n = counts[t.key];
+                const w = Math.round((n / max) * 100);
+                const active = filters.setup === t.key;
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "w-full text-left group";
+                btn.onclick = () => {
+                    filters.setup = active ? "" : t.key;
+                    renderSetupBreakdown();
+                    applyFilters();
+                };
+                btn.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="text-[11px] font-semibold truncate ${active ? t.text : "text-slate-300"}">${t.key}</span>
+                        <span class="text-[10px] text-slate-500 flex-none">${n}</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-900">
+                        <div class="h-full rounded-full ${t.color} ${active ? "" : "opacity-60 group-hover:opacity-100"}" style="width:${w}%"></div>
+                    </div>`;
+                host.appendChild(btn);
+            });
+        }
+
         function selectStock(symbol) {
             current = STOCKS.find(s => s.symbol === symbol);
             if (!current) return;
@@ -684,6 +868,7 @@
             $("metaTitle").innerText = s.name;
             $("metaSector").innerText = s.sector || "Unclassified";
             $("metaPrice").innerText = "₹" + s.price.toLocaleString("en-IN");
+            $("metaMcap").innerText = fmtMarketCap(s.fundamentals && s.fundamentals.market_cap_cr);
             const chg = s.change_pct;
             const chgEl = $("metaChange");
             chgEl.innerText = (chg >= 0 ? "+" : "") + chg + "%";
@@ -836,6 +1021,42 @@
                 loadingEl.remove();
                 appendAskAiMessage("assistant", `Ask AI hit an error: ${err.message}. Try asking again.`);
             }
+        }
+
+        // The concrete conditions that are "lining up" behind an on-watch read — surfaced
+        // in parentheses so the user sees *what* is aligning, not just that something is.
+        function readinessHighlights(s) {
+            const h = [];
+            if (s.trend && s.trend.in_uptrend) h.push("in an uptrend");
+            if (s.volatility && /^Coiling/.test(s.volatility.state || "")) h.push("range coiling");
+            const d = s.resistance && s.resistance.distance_pct;
+            if (d != null && d >= 0 && d <= 8) h.push(`${d}% below resistance`);
+            if (s.adx && s.adx.value != null && s.adx.value >= 25) h.push(`strong trend · ADX ${s.adx.value}`);
+            if (s.readiness && s.readiness.signal === "relative_strength") h.push("outperforming the Nifty");
+            return h.slice(0, 3);   // keep it to the top few so the line stays readable
+        }
+
+        // One-line fundamentals snapshot inside The Read — the business behind the setup.
+        // Growth figures are colour-coded by sign; skips any field the data doesn't have,
+        // and hides the whole line if this stock has no fundamentals yet.
+        function renderFundLine(s) {
+            const f = s.fundamentals;
+            const wrap = $("fundLine"), host = $("fundLineItems");
+            if (!f) { wrap.classList.add("hidden"); return; }
+            const trim = (n) => Math.round(n * 100) / 100;
+            const stat = (label, val, cls) =>
+                `<span class="whitespace-nowrap"><span class="text-slate-500">${label}</span> <b class="${cls || "text-slate-200"}">${val}</b></span>`;
+            const gCls = (v) => v >= 0 ? "text-emerald-400" : "text-rose-400";
+            const pct = (v) => (v >= 0 ? "+" : "") + trim(v) + "%";
+            const parts = [];
+            if (f.pe_ratio != null)           parts.push(stat("P/E", trim(f.pe_ratio)));
+            if (f.revenue_growth_pct != null) parts.push(stat("Rev growth", pct(f.revenue_growth_pct), gCls(f.revenue_growth_pct)));
+            if (f.profit_growth_pct != null)  parts.push(stat("Profit growth", pct(f.profit_growth_pct), gCls(f.profit_growth_pct)));
+            if (f.roe_pct != null)            parts.push(stat("ROE", trim(f.roe_pct) + "%"));
+            if (f.debt_to_equity != null)     parts.push(stat("D/E", trim(f.debt_to_equity)));
+            if (!parts.length) { wrap.classList.add("hidden"); return; }
+            host.innerHTML = parts.join(`<span class="text-slate-600">·</span>`);
+            wrap.classList.remove("hidden");
         }
 
         function renderAnalog(s) {
@@ -1001,10 +1222,17 @@
             $("verdictGlow").className = "absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10 " + rs.glow;
             $("readinessLabel").innerText = s.readiness.label;
             $("readinessLabel").className = "text-2xl font-black tracking-tight mb-1 fade-in " + (s.readiness.score === "low" ? "text-slate-300" : "text-white");
-            $("readinessSub").innerText = s.readiness.watch ? "On watch — conditions are lining up" : "Not actionable yet — keep monitoring";
+            if (s.readiness.watch) {
+                const hl = readinessHighlights(s);
+                const paren = hl.length ? ` (${hl.join(" · ")})` : "";
+                $("readinessSub").innerText = "On watch — conditions are lining up" + paren;
+            } else {
+                $("readinessSub").innerText = "Not actionable yet — keep monitoring";
+            }
             $("readinessSub").className = "text-xs font-medium mb-3 " + rs.text;
 
             renderAnalog(s);
+            renderFundLine(s);
 
             // Detected chart pattern (decorative context, not a signal — see reliability study)
             const pat = s.pattern;
@@ -1101,9 +1329,22 @@
 
         function renderVCP(s) {
             const v = s.volatility;
+            const r = v.contraction_ratio;
             const el = $("vcpState");
-            el.innerText = v.state + (v.contraction_ratio != null ? ` (${v.contraction_ratio}×)` : "");
+            el.innerText = v.state + (r != null ? ` (${r}×)` : "");
             el.className = "text-sm font-bold " + (v.state.startsWith("Coiling") ? "text-emerald-400" : "text-purple-400");
+
+            // Plain-language read of what the ratio number actually means.
+            const ex = $("vcpExplain");
+            if (r == null) { ex.innerHTML = ""; return; }
+            const pct = Math.round(Math.abs(r - 1) * 100);
+            if (r < 0.95) {
+                ex.innerHTML = `At <b>${r}×</b>, the recent range is about <b class="text-emerald-400">${pct}% tighter</b> than its own baseline — the stock is <b class="text-emerald-400">coiling</b>. Tightening like this stores energy and often precedes a strong move. <b>Lower is tighter</b>, so this is the constructive setup.`;
+            } else if (r <= 1.05) {
+                ex.innerHTML = `At <b>${r}×</b>, the recent range roughly <b class="text-slate-200">matches</b> its baseline — neither clearly coiling nor expanding yet. Watch for it to tighten below 1.0.`;
+            } else {
+                ex.innerHTML = `At <b>${r}×</b>, the recent range is about <b class="text-purple-300">${pct}% wider</b> than its baseline — volatility is <b class="text-purple-300">expanding</b>. Above 1.0 means the quiet coil has already released (or the stock is just choppy), so it's less of a pre-breakout setup.`;
+            }
         }
 
         function renderEntry(s) {
@@ -1174,16 +1415,120 @@
             });
         }
 
-        function loadChart(symbol) {
-            $("tv-chart-frame").innerHTML = "";
-            new TradingView.widget({
-                autosize: true, symbol: "BSE:" + symbol, interval: "D",
-                timezone: "Asia/Kolkata", theme: "dark", style: "1", locale: "in",
-                enable_publishing: false, backgroundColor: "#1e293b", gridColor: "#334155",
-                hide_top_toolbar: false, hide_legend: false, save_image: false,
-                container_id: "tv-chart-frame",
-                studies: ["MAExp@tv-basicstudies"],
+        // --- Chart: annotated (lightweight-charts, our overlays) with a TradingView toggle ---
+        let chartMode = "annotated";      // "annotated" | "tradingview"
+        let lwChart = null;               // current lightweight-charts instance
+        let lwResizeObs = null;
+
+        // Symbol → OHLC filename stem, mirroring backend export_ohlc._safe().
+        const safeName = (sym) => sym.replace(/[^A-Za-z0-9]/g, "_");
+
+        function styleChartToggle() {
+            [["chartModeAnnotated", "annotated"], ["chartModeTradingview", "tradingview"]].forEach(([id, mode]) => {
+                $(id).className = "px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all " +
+                    (chartMode === mode ? "bg-purple-600 text-white" : "text-slate-300 hover:text-white");
             });
+        }
+
+        function destroyLwChart() {
+            if (lwResizeObs) { try { lwResizeObs.disconnect(); } catch (e) {} lwResizeObs = null; }
+            if (lwChart) { try { lwChart.remove(); } catch (e) {} lwChart = null; }
+            $("lwChart").innerHTML = "";
+        }
+
+        function loadChart(symbol) {
+            styleChartToggle();
+            if (chartMode === "tradingview") {
+                destroyLwChart();
+                $("lwChart").classList.add("hidden");
+                $("chartLegend").classList.add("hidden");
+                const frame = $("tv-chart-frame");
+                frame.classList.remove("hidden");
+                frame.innerHTML = "";
+                new TradingView.widget({
+                    autosize: true, symbol: "BSE:" + symbol, interval: "D",
+                    timezone: "Asia/Kolkata", theme: "dark", style: "1", locale: "in",
+                    enable_publishing: false, backgroundColor: "#1e293b", gridColor: "#334155",
+                    hide_top_toolbar: false, hide_legend: false, save_image: false,
+                    container_id: "tv-chart-frame",
+                    studies: ["MAExp@tv-basicstudies"],
+                });
+                return;
+            }
+            // annotated
+            $("tv-chart-frame").classList.add("hidden");
+            $("lwChart").classList.remove("hidden");
+            renderAnnotatedChart(symbol);
+        }
+
+        async function renderAnnotatedChart(symbol) {
+            destroyLwChart();
+            $("chartLegend").classList.add("hidden");
+            let data;
+            try {
+                const res = await fetch(`data/ohlc/${safeName(symbol)}.json`, { cache: "no-store" });
+                if (!res.ok) throw new Error("no ohlc");
+                data = await res.json();
+            } catch (e) {
+                // No per-stock OHLC (e.g. brand-new listing) — fall back to TradingView so the
+                // chart pane is never empty.
+                $("lwChart").innerHTML = `<div class="h-full flex items-center justify-center text-center text-xs text-slate-500 px-6">No annotated chart data for this stock yet — showing TradingView instead.</div>`;
+                chartMode = "tradingview";
+                loadChart(symbol);
+                chartMode = "annotated";   // keep the default sticky for the next stock
+                return;
+            }
+            const host = $("lwChart");
+            host.innerHTML = "";
+            const chart = LightweightCharts.createChart(host, {
+                layout: { background: { color: "#1e293b" }, textColor: "#94a3b8", fontSize: 11 },
+                grid: { vertLines: { color: "#26324a" }, horzLines: { color: "#26324a" } },
+                rightPriceScale: { borderColor: "#334155" },
+                timeScale: { borderColor: "#334155", rightOffset: 4, fixLeftEdge: true },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                width: host.clientWidth, height: host.clientHeight,
+            });
+            lwChart = chart;
+
+            const candles = chart.addCandlestickSeries({
+                upColor: "#10b981", downColor: "#ef4444", borderVisible: false,
+                wickUpColor: "#10b981", wickDownColor: "#ef4444",
+            });
+            candles.setData(data.bars.map(b => ({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] })));
+
+            const line = (color) => chart.addLineSeries({
+                color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+            });
+            const zip = (arr) => data.bars.map((b, i) => arr[i] == null ? null : { time: b[0], value: arr[i] }).filter(Boolean);
+            if (data.ema50) line("#a855f7").setData(zip(data.ema50));
+            if (data.ema200) line("#f59e0b").setData(zip(data.ema200));
+
+            if (data.resistance != null) {
+                candles.createPriceLine({
+                    price: data.resistance, color: "#f43f5e", lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Resistance",
+                });
+            }
+            if (data.breakouts && data.breakouts.length) {
+                candles.setMarkers(data.breakouts.map(d => ({
+                    time: d, position: "belowBar", color: "#10b981", shape: "arrowUp", text: "BO",
+                })));
+            }
+            chart.timeScale().fitContent();
+
+            // keep it sized to the container
+            lwResizeObs = new ResizeObserver(() => {
+                if (lwChart) lwChart.applyOptions({ width: host.clientWidth, height: host.clientHeight });
+            });
+            lwResizeObs.observe(host);
+            $("chartLegend").classList.remove("hidden");
+            $("chartLegend").classList.add("flex");
+        }
+
+        function wireChartToggle() {
+            $("chartModeAnnotated").onclick = () => { if (chartMode !== "annotated") { chartMode = "annotated"; if (current) loadChart(current.symbol); } };
+            $("chartModeTradingview").onclick = () => { if (chartMode !== "tradingview") { chartMode = "tradingview"; if (current) loadChart(current.symbol); } };
+            styleChartToggle();
         }
 
         window.onload = loadData;

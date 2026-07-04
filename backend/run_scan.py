@@ -18,6 +18,7 @@ import duckdb
 import pandas as pd
 
 import settings
+import export_ohlc
 from get_prices import get_prices, fetch_prices_yfinance_batch
 from find_breakouts import add_indicators, build_summary
 from methods import add_method_e_relative_strength, add_method_e2_relative_strength_uptrend, fetch_benchmark
@@ -143,6 +144,12 @@ def run():
     con.execute("CREATE OR REPLACE TABLE ohlcv_daily AS SELECT * FROM prices_df")
     con.execute("CREATE OR REPLACE TABLE ohlcv_features AS SELECT * FROM features_df")
     con.close()
+
+    # --- Export compact per-stock OHLC for the frontend's annotated chart ---
+    # One small file per shown stock (data/ohlc/<symbol>.json); the site fetches only the
+    # open stock on demand and draws candles + resistance/EMA/breakout overlays.
+    n_ohlc = export_ohlc.export_from_frame(features_df)
+    print(f"  wrote {n_ohlc} per-stock OHLC files for the annotated chart")
 
     # --- Write breakouts.json (serving layer the website reads) ---
     output = {
