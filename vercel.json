@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/combined_breakout_scanner_platform.html" }
+  ]
+}
