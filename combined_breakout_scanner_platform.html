@@ -76,6 +76,7 @@
                 <label class="flex items-center gap-2 text-xs text-slate-400">
                     <span class="uppercase tracking-wider">Sort</span>
                     <select id="fltSort" class="px-2.5 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="conviction">Breakout conviction</option>
                         <option value="readiness">Breakout readiness</option>
                         <option value="proximity">Closest to resistance</option>
                         <option value="change">Biggest day move</option>
@@ -87,7 +88,20 @@
                         class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
                     ◎ Primed only
                 </button>
+                <button id="fundToggle" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
+                    ⚙ Fundamentals <span id="fundChevron">▸</span>
+                </button>
                 <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
+            </div>
+
+            <!-- Fundamentals filter panel (collapsed by default) -->
+            <div id="fundPanel" class="hidden mb-5 p-4 rounded-xl bg-cardBg border border-borderCl">
+                <p class="text-[11px] text-slate-500 mb-3 leading-snug">
+                    Filters on valuation/quality data (yfinance), refreshed separately from the daily
+                    price scan — some newly-listed or thinly-covered stocks may not have it yet.
+                </p>
+                <div id="fundRows" class="flex flex-col gap-3"></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -125,6 +139,11 @@
                             <div id="metaSector" class="text-xs text-slate-400 mt-0.5">—</div>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
+                        <div class="flex-none text-center" title="0–100 conviction: how imminent the setup is, blended with how reliably this stock's breakouts have followed through historically (validated composite score).">
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Conviction</span>
+                            <span id="metaConviction" class="text-2xl font-black leading-none">—</span>
+                        </div>
+                        <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
                         <div class="flex gap-6 sm:gap-8">
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
@@ -145,14 +164,15 @@
                         <div id="readinessLabel" class="text-2xl font-black text-white tracking-tight mb-1">—</div>
                         <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-3">—</div>
 
-                        <!-- Historical analog hero -->
-                        <div id="analogBox" class="hidden mb-3 p-3.5 rounded-lg bg-slate-900/60 border border-purple-500/25">
+                        <!-- Historical analog (one similar past day — context, not a track record) -->
+                        <div id="analogBox" class="hidden mb-3 p-3.5 rounded-lg bg-slate-900/50 border border-slate-700/50">
                             <div class="flex items-center gap-2 mb-1.5">
-                                <span class="text-base">🕰️</span>
-                                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300">This setup has happened before</span>
+                                <span class="text-base opacity-70">🕰️</span>
+                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
                             </div>
-                            <p id="analogHeadline" class="text-sm text-slate-200 leading-relaxed"></p>
+                            <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
                             <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
+                            <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
                         </div>
 
                         <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"></p>
@@ -261,6 +281,40 @@
         </div>
     </main>
 
+    <!-- Ask AI: floating launcher + slide-over panel. Talks to a local dev server
+         (backend/chat_server.py) that proxies Groq so the API key stays server-side. -->
+    <button id="askAiFab" type="button"
+            class="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold shadow-xl shadow-purple-900/40 transition-all">
+        <span class="text-lg">✦</span> Ask AI
+    </button>
+
+    <div id="askAiPanel" class="hidden fixed inset-0 z-50 flex justify-end">
+        <div id="askAiBackdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="relative w-full max-w-md h-full bg-cardBg border-l border-borderCl flex flex-col shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="text-purple-400">✦</span> Ask AI
+                        <span class="text-[10px] font-normal text-slate-500 uppercase tracking-wider">beta</span>
+                    </div>
+                    <div id="askAiContext" class="text-[11px] text-slate-500 mt-0.5 truncate">General mode — select a stock to ground answers in its data.</div>
+                </div>
+                <button id="askAiClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+            </div>
+            <div id="askAiMessages" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm wl-scroll"></div>
+            <div class="p-3 border-t border-borderCl">
+                <div class="flex items-center gap-2">
+                    <input id="askAiInput" type="text" placeholder="Ask about any stock, a sector, or recent news…"
+                           class="flex-1 px-3 py-2 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500">
+                    <button id="askAiSend" type="button" class="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold flex-none">Send</button>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-2 leading-snug">Educational only, not investment advice. Answers tag
+                    <span class="text-emerald-400 font-semibold">Our data</span> vs
+                    <span class="text-sky-400 font-semibold">Web</span> sources — always verify before acting.</p>
+            </div>
+        </div>
+    </div>
+
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script>
         let STOCKS = [];
@@ -272,6 +326,14 @@
             medium: { dot: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",   glow: "bg-amber-500/15",   text: "text-amber-300" },
             low:    { dot: "bg-slate-500",                            glow: "bg-slate-500/10",   text: "text-slate-400" },
         };
+        // Conviction (0–100) → colour band. Not a promise — a relative ranking of how
+        // strong the setup is (imminence × validated reliability).
+        function convColor(c) {
+            if (c == null) return "text-slate-500";
+            if (c >= 65) return "text-emerald-300";
+            if (c >= 40) return "text-amber-300";
+            return "text-slate-400";
+        }
         const SENTIMENT_STYLE = {
             Bullish: { text: "▲ Bullish", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
             Bearish: { text: "▼ Bearish", cls: "text-rose-400 bg-rose-500/10 border-rose-500/30" },
@@ -279,8 +341,34 @@
         };
         const RANK = { high: 0, medium: 1, low: 2 };
 
-        // Filter/sort state, driven by the top bar.
-        const filters = { query: "", sector: "", sort: "readiness", primedOnly: false };
+        // Fundamentals filter definitions — field key into s.fundamentals, display label,
+        // and (where the user gave us exact bucket boundaries) preset chips. Revenue/Profit
+        // growth, ROE and D/E have no presets since we weren't given specific thresholds for
+        // them — plain min/max covers the need until specific buckets are wanted.
+        const FUND_FIELDS = [
+            { key: "mcap", label: "Market Cap (₹ Cr)", field: "market_cap_cr", presets: [
+                { label: "Micro (<5K)", min: null, max: 5000 },
+                { label: "Small (5K–30K)", min: 5000, max: 30000 },
+                { label: "Mid (30K–1L)", min: 30000, max: 100000 },
+                { label: "Large (1L+)", min: 100000, max: null },
+            ] },
+            { key: "pe", label: "P/E Ratio", field: "pe_ratio", presets: [
+                { label: "Deep Value (0–10)", min: 0, max: 10 },
+                { label: "Value (10–15)", min: 10, max: 15 },
+                { label: "Fair (15–25)", min: 15, max: 25 },
+                { label: "Growth (25–40)", min: 25, max: 40 },
+                { label: "High Growth (40+)", min: 40, max: null },
+            ] },
+            { key: "revGrowth", label: "Revenue Growth (%)", field: "revenue_growth_pct" },
+            { key: "profitGrowth", label: "Profit Growth (%)", field: "profit_growth_pct" },
+            { key: "roe", label: "ROE (%)", field: "roe_pct" },
+            { key: "de", label: "D/E Ratio", field: "debt_to_equity" },
+        ];
+
+        // Filter/sort state, driven by the top bar. Default sort is the composite
+        // conviction score (most→least likely to break out and follow through).
+        const filters = { query: "", sector: "", sort: "conviction", primedOnly: false, fundamentals: {} };
+        FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
 
         // The broad sector "group" (before the " · industry" part) — used for the
         // filter dropdown and the sector radar so we group by e.g. "Financial Services"
@@ -303,12 +391,14 @@
                 $("disclaimer").innerText = "⚠️ " + (data.disclaimer || "");
                 if (!STOCKS.length) throw new Error("No stocks in data file.");
 
-                STOCKS.sort((a, b) => RANK[a.readiness.score] - RANK[b.readiness.score]);
+                STOCKS.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
 
                 buildSectorOptions();
                 renderSectorRadar();
+                renderFundPanel();
                 wireControls();
                 initTooltips();
+                initAskAi();
                 applyFilters();
                 selectStock(STOCKS[0].symbol);
                 $("statusPane").classList.add("hidden");
@@ -350,6 +440,86 @@
                 r.classList.toggle("hidden");
                 $("radarChevron").innerText = r.classList.contains("hidden") ? "▸" : "▾";
             };
+            $("fundToggle").onclick = () => {
+                const p = $("fundPanel");
+                p.classList.toggle("hidden");
+                $("fundChevron").innerText = p.classList.contains("hidden") ? "▸" : "▾";
+            };
+        }
+
+        function fundamentalsActive() {
+            return FUND_FIELDS.some(f => {
+                const r = filters.fundamentals[f.key];
+                return r.min != null || r.max != null;
+            });
+        }
+
+        function renderFundPanel() {
+            const host = $("fundRows");
+            host.innerHTML = "";
+            FUND_FIELDS.forEach(f => {
+                const range = filters.fundamentals[f.key];
+                const chipsHtml = (f.presets || []).map((p, i) => {
+                    const active = range.min === p.min && range.max === p.max;
+                    return `<button data-fund-preset="${f.key}" data-idx="${i}" class="px-2.5 py-1 text-[11px] rounded-md border transition-all ${active ? "bg-purple-600/25 border-purple-500 text-purple-200" : "bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500"}">${p.label}</button>`;
+                }).join("");
+                const row = document.createElement("div");
+                row.className = "flex flex-wrap items-center gap-2 pb-3 border-b border-slate-800 last:border-0 last:pb-0";
+                row.innerHTML = `
+                    <span class="text-xs font-semibold text-slate-300 w-40 flex-none">${f.label}</span>
+                    <div class="flex flex-wrap items-center gap-1.5">${chipsHtml}</div>
+                    <div class="flex items-center gap-1.5 ml-auto">
+                        <input type="number" data-fund-min="${f.key}" placeholder="Min" value="${range.min ?? ""}"
+                               class="w-20 px-2 py-1 text-xs rounded-md bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
+                        <span class="text-slate-600 text-xs">–</span>
+                        <input type="number" data-fund-max="${f.key}" placeholder="Max" value="${range.max ?? ""}"
+                               class="w-20 px-2 py-1 text-xs rounded-md bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500">
+                        <button data-fund-apply="${f.key}" class="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-purple-600/20 border border-purple-500 text-purple-200 hover:bg-purple-600/30">Apply</button>
+                    </div>`;
+                host.appendChild(row);
+            });
+
+            host.querySelectorAll("[data-fund-preset]").forEach(btn => {
+                btn.onclick = () => {
+                    const key = btn.dataset.fundPreset;
+                    const preset = FUND_FIELDS.find(f => f.key === key).presets[Number(btn.dataset.idx)];
+                    const range = filters.fundamentals[key];
+                    const active = range.min === preset.min && range.max === preset.max;
+                    filters.fundamentals[key] = active ? { min: null, max: null } : { min: preset.min, max: preset.max };
+                    renderFundPanel();
+                    applyFilters();
+                };
+            });
+            host.querySelectorAll("[data-fund-apply]").forEach(btn => {
+                btn.onclick = () => {
+                    const key = btn.dataset.fundApply;
+                    const minEl = host.querySelector(`[data-fund-min="${key}"]`);
+                    const maxEl = host.querySelector(`[data-fund-max="${key}"]`);
+                    filters.fundamentals[key] = {
+                        min: minEl.value === "" ? null : Number(minEl.value),
+                        max: maxEl.value === "" ? null : Number(maxEl.value),
+                    };
+                    renderFundPanel();
+                    applyFilters();
+                };
+            });
+
+            const t = $("fundToggle");
+            const active = fundamentalsActive();
+            t.className = "px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
+                (active ? "bg-purple-600/20 border-purple-500 text-white" : "bg-slate-800 border-borderCl text-slate-300");
+        }
+
+        function passesFundamentals(s) {
+            return FUND_FIELDS.every(f => {
+                const range = filters.fundamentals[f.key];
+                if (range.min == null && range.max == null) return true;
+                const v = s.fundamentals ? s.fundamentals[f.field] : null;
+                if (v == null) return false; // can't confirm it qualifies
+                if (range.min != null && v < range.min) return false;
+                if (range.max != null && v > range.max) return false;
+                return true;
+            });
         }
 
         function buildSectorOptions() {
@@ -365,6 +535,7 @@
         }
 
         const SORTERS = {
+            conviction: (a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1),
             readiness: (a, b) => RANK[a.readiness.score] - RANK[b.readiness.score],
             proximity: (a, b) => distAbs(a) - distAbs(b),
             change:    (a, b) => (b.change_pct ?? -999) - (a.change_pct ?? -999),
@@ -385,6 +556,7 @@
                 if (filters.primedOnly && !(s.readiness && s.readiness.watch)) return false;
                 if (filters.sector && sectorGroup(s) !== filters.sector) return false;
                 if (q && !(s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q))) return false;
+                if (!passesFundamentals(s)) return false;
                 return true;
             });
             list.sort(SORTERS[filters.sort] || SORTERS.readiness);
@@ -400,6 +572,16 @@
                   (list.length > MAX_RESULTS ? ` · showing top ${MAX_RESULTS}` : "")
                 : "no matches";
             $("watchlistCount").innerText = `${shown} of ${STOCKS.length}`;
+
+            // Keep the detail pane in sync with the filters: if the stock currently
+            // shown on the right fell out of the visible list (e.g. a different sector
+            // was picked), jump to the top-ranked match instead of silently leaving a
+            // stale pick showing. If it's still visible, leave it alone (don't yank the
+            // view away mid-search or on an unrelated toggle).
+            const visible = list.slice(0, MAX_RESULTS);
+            if (visible.length && !(current && visible.some(s => s.symbol === current.symbol))) {
+                selectStock(visible[0].symbol);
+            }
         }
 
         function renderWatchlist(list) {
@@ -417,8 +599,7 @@
                     : "—";
                 const chg = s.change_pct ?? 0;
                 const chgCls = chg >= 0 ? "text-emerald-400" : "text-rose-400";
-                const sent = (s.breakout && s.breakout.sentiment) || "Neutral";
-                const sentCls = sent === "Bullish" ? "text-emerald-400" : sent === "Bearish" ? "text-rose-400" : "text-slate-400";
+                const conv = s.readiness.conviction;
                 const row = document.createElement("button");
                 row.id = "wl-" + s.symbol;
                 row.onclick = () => selectStock(s.symbol);
@@ -429,13 +610,15 @@
                             <span class="w-2 h-2 rounded-full flex-none ${rs.dot}"></span>
                             <span class="text-sm font-bold text-slate-100 truncate">${s.symbol}</span>
                         </span>
-                        <span class="text-xs font-semibold ${chgCls} flex-none">${chg >= 0 ? "+" : ""}${chg}%</span>
+                        <span class="flex items-baseline gap-1 flex-none" title="Breakout conviction (0–100)">
+                            <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
+                        </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
                     <div class="flex items-center justify-between gap-2 mt-1">
                         <span class="text-[11px] text-slate-400">₹${(s.price ?? 0).toLocaleString("en-IN")}</span>
+                        <span class="text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
                         <span class="text-[10px] ${rs.text}">${distTxt}</span>
-                        <span class="text-[10px] ${sentCls}">${sent}</span>
                     </div>`;
                 wl.appendChild(row);
             });
@@ -506,6 +689,10 @@
             chgEl.innerText = (chg >= 0 ? "+" : "") + chg + "%";
             chgEl.className = "text-sm font-semibold " + (chg >= 0 ? "text-emerald-400" : "text-rose-400");
             $("metaReadiness").innerText = s.readiness.label;
+            const conv = s.readiness.conviction;
+            const convEl = $("metaConviction");
+            convEl.innerText = conv != null ? conv : "—";
+            convEl.className = "text-2xl font-black leading-none " + convColor(conv);
 
             renderVerdict(s);
             renderPrecedents(s);
@@ -515,6 +702,140 @@
             renderEntry(s);
             renderIndicatorStrip(s);
             loadChart(s.symbol);
+            updateAskAiContext();
+        }
+
+        // --- Ask AI: chat panel that can look up any stock (not just the one open),
+        // run discovery queries across the whole universe, and search the web -- all via
+        // a local backend proxy (backend/chat_server.py -> Groq tool calling). ----------
+        const ASK_AI_ENDPOINT = "http://localhost:8010/api/ask";
+        let askAiHistory = [];
+
+        function initAskAi() {
+            $("askAiFab").onclick = openAskAi;
+            $("askAiClose").onclick = () => $("askAiPanel").classList.add("hidden");
+            $("askAiBackdrop").onclick = () => $("askAiPanel").classList.add("hidden");
+            $("askAiSend").onclick = sendAskAi;
+            $("askAiInput").onkeydown = (e) => { if (e.key === "Enter") sendAskAi(); };
+        }
+
+        function openAskAi() {
+            $("askAiPanel").classList.remove("hidden");
+            updateAskAiContext();
+            if (!askAiHistory.length) {
+                appendAskAiMessage("assistant", current
+                    ? `Ask me about **${current.symbol}** (open in the app right now), any other stock by name, or a discovery question like "which sector has the most primed names?" — I can also search the web, and I'll tag what's from our data vs. the web.`
+                    : `Ask about any stock by name, a discovery question like "which IT stocks are primed?", or search the web — I'm not limited to whatever's open in the app.`);
+            }
+            $("askAiInput").focus();
+        }
+
+        function updateAskAiContext() {
+            const el = $("askAiContext");
+            if (!el) return;
+            el.innerText = current
+                ? `${current.symbol} is open, but ask about any stock or the wider market`
+                : "Ask about any stock, sector, or the wider market";
+        }
+
+        function askAiFormat(text) {
+            const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return esc
+                .replace(/\[Our data\]/gi, '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-900/40 text-emerald-300 border border-emerald-700/40 align-middle">OUR DATA</span>')
+                .replace(/\[Web\]/gi, '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-900/40 text-sky-300 border border-sky-700/40 align-middle">WEB</span>')
+                .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+                .replace(/\n/g, "<br>");
+        }
+
+        // Human-readable label for one tool call, e.g. "looked up CGPOWER" or
+        // "searched the web: 'reliance news'" -- lets the user see what's actually
+        // grounding an answer instead of trusting the [Our data]/[Web] tags blindly.
+        function toolCallLabel(tc) {
+            const a = tc.args || {};
+            switch (tc.tool) {
+                case "lookup_stock": return `looked up ${a.symbol_or_name || "a stock"}`;
+                case "search_stocks": return `searched stocks${a.sector ? ` in ${a.sector}` : ""}`;
+                case "run_sql": return `ran a data query`;
+                case "web_search": return `searched the web: "${a.query || ""}"`;
+                default: return tc.tool;
+            }
+        }
+
+        function appendAskAiMessage(role, text, sources, toolsUsed, backendsUsed) {
+            const box = $("askAiMessages");
+            const wrap = document.createElement("div");
+            if (role === "user") {
+                wrap.className = "ml-8 px-3 py-2 rounded-lg bg-purple-600/20 border border-purple-500/30 text-slate-100";
+                wrap.innerText = text;
+            } else {
+                wrap.className = "mr-2 px-3 py-2 rounded-lg bg-slate-800/70 border border-slate-700 text-slate-200 fade-in";
+                wrap.innerHTML = askAiFormat(text);
+                if (toolsUsed && toolsUsed.length) {
+                    wrap.insertAdjacentHTML("beforeend",
+                        `<div class="mt-2 text-[10px] text-slate-500">🔍 ${toolsUsed.map(toolCallLabel).join(" · ")}</div>`);
+                }
+                if (backendsUsed && backendsUsed.length) {
+                    // Only worth surfacing when a fallback actually happened (more than one
+                    // backend was needed) -- otherwise it's just noise on every message.
+                    if (backendsUsed.length > 1) {
+                        wrap.insertAdjacentHTML("beforeend",
+                            `<div class="mt-1 text-[10px] text-amber-400">⇄ fell back across: ${backendsUsed.join(" → ")}</div>`);
+                    }
+                }
+                if (sources && sources.length) {
+                    const srcHtml = sources.map(u =>
+                        `<a href="${u}" target="_blank" rel="noopener" class="text-sky-400 hover:underline truncate block">${u}</a>`
+                    ).join("");
+                    wrap.insertAdjacentHTML("beforeend",
+                        `<div class="mt-2 pt-2 border-t border-slate-700 text-[10px] text-slate-500">Sources:<div class="mt-1 space-y-0.5">${srcHtml}</div></div>`);
+                }
+            }
+            box.appendChild(wrap);
+            box.scrollTop = box.scrollHeight;
+            return wrap;
+        }
+
+        async function sendAskAi() {
+            const input = $("askAiInput");
+            const q = input.value.trim();
+            if (!q) return;
+            input.value = "";
+            appendAskAiMessage("user", q);
+            askAiHistory.push({ role: "user", content: q });
+            const loadingEl = appendAskAiMessage("assistant", "Thinking…");
+
+            let res;
+            try {
+                res = await fetch(ASK_AI_ENDPOINT, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        symbol: current ? current.symbol : null,
+                        question: q,
+                        history: askAiHistory.slice(-6),
+                    }),
+                });
+            } catch (err) {
+                // fetch() itself threw -- the backend process genuinely isn't reachable
+                // (not running, wrong port, CORS block), as opposed to it running fine but
+                // returning an error from further upstream (e.g. Groq).
+                loadingEl.remove();
+                appendAskAiMessage("assistant",
+                    `Couldn't reach the Ask AI backend (${err.message}). Make sure it's running: ` +
+                    `\`cd backend; python chat_server.py\` — and that backend/.env has a GROQ_API_KEY.`);
+                return;
+            }
+
+            try {
+                const data = await res.json();
+                loadingEl.remove();
+                if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+                appendAskAiMessage("assistant", data.answer, data.sources, data.tools_used, data.backends_used);
+                askAiHistory.push({ role: "assistant", content: data.answer });
+            } catch (err) {
+                loadingEl.remove();
+                appendAskAiMessage("assistant", `Ask AI hit an error: ${err.message}. Try asking again.`);
+            }
         }
 
         function renderAnalog(s) {
@@ -544,10 +865,12 @@
                 stats.insertAdjacentHTML("beforeend",
                     `<div class="text-center"><div class="text-[9px] text-slate-500 uppercase">${lbl}</div>${pill(v)}</div>`);
             });
+            // Muted, not a verdict: this single day's outcome is only weakly predictive
+            // (backtested +3.7pts), so it must not read like the aggregate track record.
             if (a.worked === true)
-                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-bold text-emerald-400 ml-1">✓ followed through</span>`);
+                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-medium text-slate-400 ml-1">· that day worked out</span>`);
             else if (a.worked === false)
-                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-bold text-rose-400 ml-1">✗ faded</span>`);
+                stats.insertAdjacentHTML("beforeend", `<span class="text-[10px] font-medium text-slate-500 ml-1">· that day didn't follow through</span>`);
         }
 
         function holdingsRow(label, val, colorCls, indent) {
@@ -700,6 +1023,8 @@
             let explain;
             if (s.breakout.today) {
                 explain = `${s.name} is breaking out today — closing above its resistance of ₹${s.resistance.level?.toLocaleString("en-IN")} on strong volume.`;
+            } else if (s.readiness.signal === "relative_strength") {
+                explain = `${s.name} is outperforming the Nifty by a widening margin — its price-to-Nifty ratio just hit a fresh 50-day high, a "relative strength" signal that often precedes further outperformance.`;
             } else if (s.readiness.score === "high") {
                 explain = `Price is ${s.resistance.distance_pct}% below resistance (₹${s.resistance.level?.toLocaleString("en-IN")}) and the range is tightening — the kind of setup that often precedes a move.`;
             } else if (s.readiness.score === "medium") {
