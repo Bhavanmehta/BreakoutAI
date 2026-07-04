@@ -97,6 +97,56 @@ MIN_HISTORY_BARS = max(TREND_EMA_LONG + EMA200_SLOPE_LOOKBACK, 252)
 FOLLOWTHROUGH_WINDOW = 10
 STOP_LOSS_FRACTION = 0.94   # stop = resistance * this (~6% below); defines 1R = entry - stop
 
+# --- Alternative breakout-detection methods (research/comparison only — see
+# backend/methods.py and analyze_reliability.py; NOT part of run_scan.py / the served
+# site). Each is a genuinely different trigger definition from Method A above, graded
+# against the SAME followthrough/r_multiple outcome rule (already computed in
+# add_indicators) so the comparison is fair: which trigger condition better predicts
+# hitting +1R before the stop, not whose own preferred stop is best.
+# B — true multi-leg VCP: a sequence of progressively smaller pivot-high-to-trough
+# contractions, each on declining volume, then a break above the final pivot high.
+VCP_PIVOT_K = 5              # bars each side for a swing pivot (see patterns.find_pivots)
+VCP_MIN_LEGS = 2              # need at least this many contracting legs to qualify
+VCP_MAX_LOOKBACK_LEGS = 4     # only consider the most recent N legs into a pivot
+VCP_BREAKOUT_SEARCH_DAYS = 20 # how many days after the final pivot high to look for the break
+VCP_VOL_CONFIRM_MULT = 1.3    # breakout day volume must exceed this multiple of the pre-base average
+
+# C — volatility-squeeze breakout: Bollinger Band width compresses to a multi-month low,
+# then expands with a directional close (a la the TTM Squeeze). Orthogonal to A/B: this
+# triggers on the volatility regime expanding, not on a specific price level.
+SQUEEZE_BB_WINDOW = 20
+SQUEEZE_RANGE_LOOKBACK = 120   # trailing days used to judge "near the low end of its own range"
+SQUEEZE_POSITION_MAX = 0.15    # band width must sit in the bottom 15% of that trailing range
+SQUEEZE_CONFIRM_DAYS = 3       # the squeeze must have been active within this many days of the break
+SQUEEZE_VOL_CONFIRM_MULT = 1.3
+
+# D — trend-inception / momentum: +DI crosses above -DI while ADX is rising through a
+# threshold and the EMA stack is aligned. Catches the START of a trend, no price level
+# (resistance) involved at all.
+DI_ADX_THRESHOLD = 20
+DI_ADX_RISING_LOOKBACK = 10
+# D2 — same DI-cross-up "inception" idea, but loosened: a lower ADX bar and the
+# broader `uptrend` filter (already computed in add_indicators) instead of requiring
+# the full 4-EMA stack in perfect order. Tests whether D's edge survives with a
+# bigger sample or was a strict-filter fluke.
+DI_ADX_THRESHOLD_LOOSE = 15
+
+# E — relative-strength breakout: stock-price ÷ Nifty ratio line makes a new N-day high,
+# independent of the stock's own absolute chart (classic IBD-style "RS line" signal).
+# No longer research-only: the uptrend-gated variant (E2) backs a production readiness
+# tier in find_breakouts.build_summary(), via run_scan.py — see methods.py's docstring.
+RS_BENCHMARK = "^NSEI"        # Nifty 50 index
+RS_LOOKBACK = 50
+
+# F — episodic pivot: a massive gap up on extreme volume (the technical proxy for a
+# fundamental-catalyst move, e.g. an earnings surprise). NOTE: this only tests the gap +
+# volume shock itself — confirming it against an actual earnings/catalyst calendar needs
+# a new data source (no earnings-date feed exists in this pipeline yet), so treat this as
+# stage 1 of the method, not the full "confirmed by a known catalyst" definition.
+EP_MIN_GAP_PCT = 5.0           # minimum opening gap (%) to count as an episodic pivot
+EP_MIN_VOL_MULT = 5.0          # volume must be >= this multiple of the 50-day average (user's 5x-10x floor)
+EP_VOL_AVG_WINDOW = 50
+
 # --- Indicator windows -------------------------------------------------------
 # 8 & 21 are the responsive Fibonacci "momentum/trend" EMAs (catch moves early);
 # 50 & 200 are the structural/institutional anchors (macro trend + breakout filter).

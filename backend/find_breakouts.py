@@ -19,6 +19,7 @@ import pandas as pd
 import settings
 from patterns import detect_pattern
 from analogs import detect_analog
+from score import reliability_estimate, conviction
 
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -53,6 +54,8 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     minus_di = 100 * pd.Series(minus_dm, index=df.index).ewm(alpha=alpha, adjust=False).mean() / atr_w
     dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
     df["adx"] = dx.ewm(alpha=alpha, adjust=False).mean()
+    df["plus_di"] = plus_di
+    df["minus_di"] = minus_di
 
     # --- Trend filter (Stage 2): above a rising long EMA and above the mid EMA ---
     long_ema = df[f"ema{settings.TREND_EMA_LONG}"]
@@ -154,6 +157,33 @@ def _sentiment(latest, adx_val) -> str:
     return "Neutral"
 
 
+# Minimum past events before we'll make ANY negative reliability claim. One or two
+# breakouts can't establish that a stock is "unreliable" — this is the fix for a single
+# bad occurrence flashing a red flag. Below this we say "limited history" instead.
+RELIABILITY_MIN_SAMPLE = 3
+
+
+def _reliability_note(worked: int, total: int, kind: str = "breakouts"):
+    """Turn a stock's own past follow-through record into (text, reliable_flag) using a
+    Bayesian-shrunk estimate (score.reliability_estimate) so a tiny sample can neither
+    over- nor under-sell. The shrinkage means 0-of-1 reads ~31% (neutral), not 0%.
+    Returns (None, None) when there's no history at all."""
+    if total <= 0:
+        return None, None
+    if total < RELIABILITY_MIN_SAMPLE:
+        return (f"Limited history — only {total} past {kind} on record, "
+                f"not enough to judge reliability yet.", None)
+    rel = reliability_estimate(worked, total)
+    pct = round(rel * 100)
+    if rel < 0.33:
+        return (f"Caution: a weak track record — about {pct}% of its {total} past "
+                f"{kind} followed through.", False)
+    if rel >= 0.45:
+        return (f"Reliable — about {pct}% of its {total} past {kind} followed through.", True)
+    return (f"About {pct}% of its {total} past {kind} have followed through — "
+            f"roughly the market average.", None)
+
+
 def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     """Roll a fully-indicated frame into the compact record the website consumes."""
     if len(df) < settings.MIN_HISTORY_BARS:
@@ -190,12 +220,21 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     # Historical breakout scoring for THIS stock. "Worked" = followed through:
     # price hit +1R before -1R (stop) within FOLLOWTHROUGH_WINDOW days (see add_indicators).
     events = df[(df["is_breakout"] == True) & (df["followthrough"].notna())]
-    if len(events) > 0:
+    worked_a, total_a = int(events["followthrough"].astype(bool).sum()), len(events)
+    if total_a > 0:
         followthrough_rate = round(float(events["followthrough"].astype(bool).mean()), 3)
         avg_fwd_20d = round(float(events["fwd_ret_20d"].dropna().mean()) * 100, 2) if events["fwd_ret_20d"].notna().any() else None
     else:
         followthrough_rate = None
         avg_fwd_20d = None
+
+    # Same follow-through stat, but for this stock's own relative-strength-vs-Nifty
+    # breakouts (Method E2, see methods.py) — kept separate from Method A's history
+    # above so the readiness caution below never mixes the two signals' track records.
+    events_rs = df[(df.get("is_breakout_e2", False) == True) & (df["followthrough"].notna())]
+    worked_rs, total_rs = int(events_rs["followthrough"].astype(bool).sum()), len(events_rs)
+    rs_followthrough_rate = (round(float(events_rs["followthrough"].astype(bool).mean()), 3)
+                              if total_rs > 0 else None)
     followthrough_label = (f"hit +1R (a risk-defined target, not a fixed %) before the stop, "
                            f"within {settings.FOLLOWTHROUGH_WINDOW} trading days")
 
@@ -224,10 +263,19 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     # A coil below resistance only counts as "primed" if the stock is actually trending up.
     coiling = (vc is not None and vc < 1)
     near = (dist_pct is not None and 0 <= dist_pct <= 3)   # within 3% below resistance
+    rs_breakout_today = bool(latest.get("is_breakout_e2", False))
     if broke_out_today:
         readiness = {"label": "Breaking out now", "watch": True, "score": "high"}
     elif not in_uptrend:
         readiness = {"label": "Not in an uptrend — breakouts unreliable here", "watch": False, "score": "low"}
+    elif rs_breakout_today:
+        # Independent of the resistance/coiling ladder below — a stock's price÷Nifty
+        # ratio just hit a fresh 50-day high (Method E2). Backtested standalone
+        # (whole-market, 2026-07-04): 41.6% follow-through hit rate vs Method A's
+        # 38.8%, only 22% event-overlap with A, so it's kept as its own tier rather
+        # than blended into "Primed"/"Approaching resistance" (see methods.py).
+        readiness = {"label": "Outperforming the market — new relative-strength high vs Nifty",
+                     "watch": True, "score": "high", "signal": "relative_strength"}
     elif near and coiling:
         readiness = {"label": "Primed — coiling below resistance in an uptrend", "watch": True, "score": "high"}
     elif near:
@@ -236,21 +284,40 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         readiness = {"label": "Coiling — building a base", "watch": False, "score": "medium"}
     else:
         readiness = {"label": "In an uptrend, no setup yet", "watch": False, "score": "low"}
+    readiness.setdefault("signal", None)
 
-    # Fold the historical follow-through rate into the read, so "primed" never
-    # oversells: a setup on a stock whose breakouts rarely work gets a caution.
-    if readiness["watch"] and followthrough_rate is not None:
-        pct = round(followthrough_rate * 100)
-        if followthrough_rate < 0.4:
-            readiness["reliability"] = (f"Caution: only {pct}% of this stock's past breakouts "
-                                        f"followed through — historically unreliable.")
-            readiness["reliable"] = False
-        else:
-            readiness["reliability"] = f"{pct}% of its past breakouts followed through historically."
-            readiness["reliable"] = True
+    # Fold the historical follow-through rate into the read, so a flagged setup never
+    # oversells: a stock whose breakouts rarely work gets a caution — but only with
+    # enough sample to justify it (see _reliability_note; a single bad breakout no
+    # longer flashes red). The relative-strength tier uses ITS OWN history, never
+    # Method A's — mixing the two would misrepresent which signal is actually on watch.
+    if readiness["signal"] == "relative_strength":
+        note, flag = _reliability_note(worked_rs, total_rs, "relative-strength breakouts")
+    elif readiness["watch"]:
+        note, flag = _reliability_note(worked_a, total_a, "breakouts")
     else:
-        readiness["reliability"] = None
-        readiness["reliable"] = None
+        note, flag = None, None
+    readiness["reliability"], readiness["reliable"] = note, flag
+
+    # Single 0..100 "conviction" the UI ranks on: how imminent the setup is (readiness
+    # tier) blended with how reliable it is if it triggers (the validated composite
+    # score — shrunk track record + base depth + signal confirmation, see score.py).
+    # Backtested: the quality half stratifies follow-through 34.5%->41.0% across buckets.
+    if broke_out_today:
+        imminence = "breaking"
+    elif readiness["score"] == "high":
+        imminence = "high"
+    elif readiness["score"] == "medium" and readiness["watch"]:
+        imminence = "medium_watch"
+    elif readiness["score"] == "medium":
+        imminence = "medium"
+    else:
+        imminence = "low"
+    rel_for_score = (reliability_estimate(worked_rs, total_rs)
+                     if readiness["signal"] == "relative_strength"
+                     else reliability_estimate(worked_a, total_a))
+    readiness["conviction"] = conviction(rel_for_score, base_depth, imminence,
+                                         rs_on=rs_breakout_today)
 
     # Named chart pattern (real geometry — see patterns.py)
     pattern = detect_pattern(df)
