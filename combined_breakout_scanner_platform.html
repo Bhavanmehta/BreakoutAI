@@ -64,6 +64,10 @@
                     <div>Source: <span id="dataSource" class="text-slate-300">—</span> · daily</div>
                 </div>
                 <span id="marketMoodBadge" class="hidden px-2.5 py-1 text-xs font-semibold rounded-md border whitespace-nowrap"></span>
+                <div id="marketToggle" class="flex items-center rounded-lg border border-borderCl bg-slate-800 p-0.5 text-xs font-semibold">
+                    <button id="marketBtnIN" type="button" class="px-2.5 py-1 rounded-md transition-all">🇮🇳 India</button>
+                    <button id="marketBtnUS" type="button" class="px-2.5 py-1 rounded-md transition-all">🇺🇸 US</button>
+                </div>
                 <span class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md">Live Data</span>
             </div>
         </div>
@@ -485,9 +489,23 @@
     <script type="text/javascript" src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <script>
         let STOCKS = [];
+        let STOCKS_IN = [];
+        let STOCKS_US = [];
         let current = null;
         let MY_WATCHLIST = [];
         const $ = (id) => document.getElementById(id);
+
+        // --- Market switch: India (default) vs US. Both markets' breakouts.json are
+        // fetched unconditionally on page load (small, gzip-cached) so the My Watchlist
+        // popup can resolve current price/return for a tracked item regardless of which
+        // market is actively toggled -- see addToWatchlist/renderMyWatchlist below.
+        const MARKET_KEY = "breakoutai_market";
+        let MARKET = localStorage.getItem(MARKET_KEY) === "US" ? "US" : "IN";
+        const curSymbol = () => MARKET === "US" ? "$" : "₹";
+        function fmtPrice(value) {
+            if (value == null || Number.isNaN(value)) return "—";
+            return curSymbol() + Number(value).toLocaleString(MARKET === "US" ? "en-US" : "en-IN");
+        }
 
         const READINESS_STYLE = {
             high:   { dot: "bg-emerald-400 shadow-[0_0_8px_#34d399]", glow: "bg-emerald-500/15", text: "text-emerald-300" },
@@ -620,10 +638,10 @@
         };
         const COLLECTIONS = [
             { key: "", label: "All stocks" },
-            { key: "nifty50", label: "Nifty 50", tip: "Nifty 50 large-cap constituents (curated bluechip list; resynced at index reviews).", match: s => NIFTY50.has(s.symbol) },
-            { key: "large", label: "Large cap", tip: "Top 100 by market cap (SEBI large-cap).", match: s => rankIn(s, 1, 100) },
-            { key: "mid", label: "Mid cap", tip: "Ranks 101–250 by market cap (SEBI mid-cap).", match: s => rankIn(s, 101, 250) },
-            { key: "small", label: "Small cap", tip: "Rank 251+ by market cap (SEBI small-cap).", match: s => rankIn(s, 251, Infinity) },
+            { key: "nifty50", label: "Nifty 50", tip: "Nifty 50 large-cap constituents (curated bluechip list; resynced at index reviews).", match: s => NIFTY50.has(s.symbol), inOnly: true },
+            { key: "large", label: "Large cap", tip: "Top 100 by market cap (SEBI large-cap).", match: s => rankIn(s, 1, 100), inOnly: true },
+            { key: "mid", label: "Mid cap", tip: "Ranks 101–250 by market cap (SEBI mid-cap).", match: s => rankIn(s, 101, 250), inOnly: true },
+            { key: "small", label: "Small cap", tip: "Rank 251+ by market cap (SEBI small-cap).", match: s => rankIn(s, 251, Infinity), inOnly: true },
             { key: "primedProven", label: "Primed & proven", tip: "On-watch setups with a conviction score of 60 or more.", match: s => s.readiness && s.readiness.watch && (s.readiness.conviction ?? 0) >= 60 },
             { key: "qualityGrowth", label: "Quality growth", tip: "ROE ≥ 15% and positive profit growth — solid businesses, not just chart setups.", match: s => { const f = s.fundamentals; return f && f.roe_pct != null && f.roe_pct >= 15 && f.profit_growth_pct != null && f.profit_growth_pct > 0; } },
         ];
@@ -678,36 +696,18 @@
             return SECTOR_ALIAS[g] || g;
         }
 
+        let DATA_IN = null;
+        let DATA_US = null;
+
         async function loadData() {
             showStatus("Loading latest scan…");
             try {
                 const res = await fetch("data/breakouts.json", { cache: "no-store" });
                 if (!res.ok) throw new Error("HTTP " + res.status);
-                const data = await res.json();
-                STOCKS = data.stocks || [];
-                $("asOfDate").innerText = data.as_of_date || "—";
-                $("dataSource").innerText = data.source || "—";
-                $("disclaimer").innerText = "⚠️ " + (data.disclaimer || "");
-                renderMarketMood(data.market_mood);
-                if (!STOCKS.length) throw new Error("No stocks in data file.");
-
-                STOCKS.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
-
-                computeMcapRank();
-                buildSectorOptions();
-                renderCollections();
-                renderSetupBreakdown();
-                renderSectorRadar();
-                renderFundPanel();
-                wireControls();
-                wireChartToggle();
-                initTooltips();
-                initAskAi();
-                await initMyWatchlist();
-                applyFilters();
-                selectStock(STOCKS[0].symbol);
-                $("statusPane").classList.add("hidden");
-                $("app").classList.remove("hidden");
+                DATA_IN = await res.json();
+                STOCKS_IN = DATA_IN.stocks || [];
+                if (!STOCKS_IN.length) throw new Error("No stocks in data file.");
+                STOCKS_IN.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
             } catch (err) {
                 showStatus(
                     `<div class="text-lg font-semibold text-white mb-2">Couldn't load the data file</div>
@@ -718,7 +718,28 @@
                      then open <code class="text-purple-300">http://localhost:8000/combined_breakout_scanner_platform.html</code>.
                      <br><br>When deployed (Vercel / GitHub Pages) it works automatically.</div>`
                 );
+                return;
             }
+
+            // US data is optional -- a 404 (not deployed yet, or the daily-scan-us.yml
+            // hasn't run) is non-fatal, the US toggle just shows an empty state.
+            try {
+                const resUs = await fetch("data/us/breakouts.json", { cache: "no-store" });
+                if (resUs.ok) {
+                    DATA_US = await resUs.json();
+                    STOCKS_US = DATA_US.stocks || [];
+                    STOCKS_US.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
+                }
+            } catch (e) { /* no US data yet -- non-fatal */ }
+
+            wireControls();
+            wireChartToggle();
+            initTooltips();
+            initAskAi();
+            await initMyWatchlist();
+            switchMarket(MARKET);
+            $("statusPane").classList.add("hidden");
+            $("app").classList.remove("hidden");
         }
 
         function showStatus(html) {
@@ -727,7 +748,49 @@
             $("statusMsg").innerHTML = html;
         }
 
+        function switchMarket(m) {
+            MARKET = m;
+            localStorage.setItem(MARKET_KEY, m);
+            STOCKS = m === "US" ? STOCKS_US : STOCKS_IN;
+            const data = m === "US" ? DATA_US : DATA_IN;
+
+            const ACTIVE = "bg-purple-600 text-white", INACTIVE = "text-slate-400 hover:text-slate-200";
+            $("marketBtnIN").className = "px-2.5 py-1 rounded-md transition-all " + (m === "IN" ? ACTIVE : INACTIVE);
+            $("marketBtnUS").className = "px-2.5 py-1 rounded-md transition-all " + (m === "US" ? ACTIVE : INACTIVE);
+
+            $("asOfDate").innerText = (data && data.as_of_date) || "—";
+            $("dataSource").innerText = (data && data.source) || "—";
+            $("disclaimer").innerText = data ? "⚠️ " + (data.disclaimer || "") : "";
+            renderMarketMood(data && data.market_mood);
+
+            // Sector taxonomy and India-only collection chips (Nifty 50, SEBI cap tiers)
+            // don't carry over between markets -- a stale value would silently zero out
+            // every match instead of erroring, so clear it rather than leave it dangling.
+            filters.sector = "";
+            filters.collection = "";
+
+            if (!STOCKS.length) {
+                $("watchlist").innerHTML = `<span class="text-sm text-slate-500 py-2">No ${m === "US" ? "US" : "India"} scan data yet.</span>`;
+                $("fltCount").innerText = "no data";
+                $("watchlistCount").innerText = "0 of 0";
+                $("metaTitle").innerText = "—";
+                current = null;
+                return;
+            }
+
+            computeMcapRank();
+            buildSectorOptions();
+            renderCollections();
+            renderSetupBreakdown();
+            renderSectorRadar();
+            renderFundPanel();
+            applyFilters();
+            selectStock(STOCKS[0].symbol);
+        }
+
         function wireControls() {
+            $("marketBtnIN").onclick = () => { if (MARKET !== "IN") switchMarket("IN"); };
+            $("marketBtnUS").onclick = () => { if (MARKET !== "US") switchMarket("US"); };
             $("fltSearch").oninput = (e) => { filters.query = e.target.value; applyFilters(); };
             $("fltSector").onchange = (e) => { filters.sector = e.target.value; applyFilters(); };
             $("fltSort").onchange = (e) => { filters.sort = e.target.value; applyFilters(); };
@@ -815,6 +878,7 @@
             const groups = Object.keys(stat).filter(g => g !== "Unclassified").sort();
             if (stat["Unclassified"]) groups.push("Unclassified");
             const sel = $("fltSector");
+            sel.innerHTML = '<option value="">All sectors</option>';   // re-callable on market switch
             groups.forEach(g => {
                 const b = stat[g];
                 const o = document.createElement("option");
@@ -883,7 +947,7 @@
                 wl.innerHTML = `<span class="text-sm text-slate-500 py-2">No stock matches these filters.</span>`;
                 return;
             }
-            const trackedSet = new Set(MY_WATCHLIST.map(it => it.symbol));
+            const trackedSet = new Set(MY_WATCHLIST.filter(it => it.market === MARKET).map(it => it.symbol));
             list.slice(0, MAX_RESULTS).forEach(s => {
                 const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
                 const dist = s.resistance && s.resistance.distance_pct;
@@ -916,13 +980,13 @@
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
                     <div class="flex items-center justify-between gap-2 mt-1">
-                        <span class="text-[11px] text-slate-400">₹${(s.price ?? 0).toLocaleString("en-IN")}</span>
+                        <span class="text-[11px] text-slate-400">${fmtPrice(s.price ?? 0)}</span>
                         <span class="text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
                         <span class="text-[10px] ${rs.text}">${distTxt}</span>
                     </div>`;
                 row.querySelector(".wl-quick-track").onclick = (e) => {
                     e.stopPropagation();
-                    if (tracked) removeFromWatchlist(s.symbol); else addToWatchlist(s);
+                    if (tracked) removeFromWatchlist(s.symbol, MARKET); else addToWatchlist(s);
                 };
                 wl.appendChild(row);
             });
@@ -986,7 +1050,7 @@
         function renderCollections() {
             const host = $("collectionChips");
             host.innerHTML = "";
-            COLLECTIONS.forEach(c => {
+            COLLECTIONS.filter(c => !c.inOnly || MARKET === "IN").forEach(c => {
                 const active = filters.collection === c.key;
                 const btn = document.createElement("button");
                 btn.type = "button";
@@ -1016,7 +1080,7 @@
             const tips = {
                 "Breaking out": "Closing above resistance today on strong volume — the trigger has fired.",
                 "Primed": "In an uptrend and coiling right below resistance — the highest-readiness pre-breakout stage.",
-                "Relative strength": "Outperforming the Nifty at a fresh relative-strength high — often precedes further outperformance.",
+                "Relative strength": `Outperforming the ${MARKET === "US" ? "S&P 500" : "Nifty"} at a fresh relative-strength high — often precedes further outperformance.`,
                 "Coiling / basing": "Building a base / approaching resistance — earlier in the lifecycle, not primed yet.",
             };
             SETUP_TYPES.forEach(t => {
@@ -1046,7 +1110,7 @@
 
             $("metaTitle").innerText = s.name;
             $("metaSector").innerText = s.sector || "Unclassified";
-            $("metaPrice").innerText = "₹" + s.price.toLocaleString("en-IN");
+            $("metaPrice").innerText = fmtPrice(s.price);
             $("metaMcap").innerText = fmtMarketCap(s.fundamentals && s.fundamentals.market_cap_cr);
             const chg = s.change_pct;
             const chgEl = $("metaChange");
@@ -1124,11 +1188,11 @@
                 const res = await fetch("/api/watchlist", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "X-Watchlist-Secret": secret },
-                    body: JSON.stringify({ symbol: stock.symbol, entry_price: stock.price }),
+                    body: JSON.stringify({ symbol: stock.symbol, market: MARKET, entry_price: stock.price }),
                 });
                 if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
                 const item = await res.json();
-                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== item.symbol);
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => !(it.symbol === item.symbol && it.market === item.market));
                 MY_WATCHLIST.unshift(item);
                 refreshWatchlistUI();
             } catch (err) {
@@ -1136,16 +1200,16 @@
             }
         }
 
-        async function removeFromWatchlist(symbol) {
+        async function removeFromWatchlist(symbol, market) {
             const secret = getWatchlistSecret(true);
             if (!secret) return;
             try {
-                const res = await fetch("/api/watchlist?symbol=" + encodeURIComponent(symbol), {
+                const res = await fetch(`/api/watchlist?symbol=${encodeURIComponent(symbol)}&market=${encodeURIComponent(market)}`, {
                     method: "DELETE",
                     headers: { "X-Watchlist-Secret": secret },
                 });
                 if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
-                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== symbol);
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => !(it.symbol === symbol && it.market === market));
                 refreshWatchlistUI();
             } catch (err) {
                 alert("Couldn't remove from watchlist: " + err.message);
@@ -1155,13 +1219,22 @@
         function updateTrackButton() {
             const btn = $("trackBtn");
             if (!btn || !current) return;
-            const tracked = MY_WATCHLIST.some(it => it.symbol === current.symbol);
+            const tracked = MY_WATCHLIST.some(it => it.symbol === current.symbol && it.market === MARKET);
             btn.innerText = tracked ? "✓ Tracking" : "+ Track";
             btn.className = "ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
                 (tracked
                     ? "bg-emerald-600/20 border-emerald-500 text-emerald-300"
                     : "bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500");
-            btn.onclick = () => tracked ? removeFromWatchlist(current.symbol) : addToWatchlist(current);
+            btn.onclick = () => tracked ? removeFromWatchlist(current.symbol, MARKET) : addToWatchlist(current);
+        }
+
+        // A tracked item can belong to either market, so the popup joins each row's
+        // price against ITS OWN market's stock list, not just the currently-active one --
+        // that's what lets both an India and a US pick show correct data at the same time.
+        function selectWatchlistItem(symbol, market) {
+            if (market !== MARKET) switchMarket(market);
+            selectStock(symbol);
+            $("myWatchlistPanel").classList.add("hidden");
         }
 
         function renderMyWatchlist() {
@@ -1174,23 +1247,29 @@
                 return;
             }
             el.innerHTML = MY_WATCHLIST.map(it => {
-                const s = STOCKS.find(x => x.symbol === it.symbol);
+                const list = it.market === "US" ? STOCKS_US : STOCKS_IN;
+                const s = list.find(x => x.symbol === it.symbol);
                 const curPrice = s ? s.price : null;
+                const sym = it.market === "US" ? "$" : "₹";
+                const locale = it.market === "US" ? "en-US" : "en-IN";
                 const retPct = curPrice != null ? (curPrice - it.entry_price) / it.entry_price * 100 : null;
                 const days = Math.max(0, Math.floor((Date.now() - new Date(it.date_added)) / 86400000));
                 const retCls = retPct == null ? "text-slate-500" : (retPct >= 0 ? "text-emerald-400" : "text-rose-400");
                 const retTxt = retPct == null ? "—" : (retPct >= 0 ? "+" : "") + retPct.toFixed(1) + "%";
                 return `<div class="py-2.5 border-b border-borderCl/50 last:border-0 text-xs">
                     <div class="flex items-center justify-between gap-2">
-                        <button class="min-w-0 text-left truncate font-semibold text-sm text-slate-200 hover:text-purple-300" onclick="selectStock('${it.symbol}')">${it.symbol}</button>
+                        <button class="min-w-0 text-left truncate font-semibold text-sm text-slate-200 hover:text-purple-300 flex items-center gap-1.5"
+                                onclick="selectWatchlistItem('${it.symbol}', '${it.market}')">
+                            <span>${it.market === "US" ? "🇺🇸" : "🇮🇳"}</span>${it.symbol}
+                        </button>
                         <div class="flex items-center gap-2 flex-none">
                             <span class="font-bold ${retCls}">${retTxt}</span>
-                            <button class="text-slate-500 hover:text-rose-400 text-sm leading-none" onclick="removeFromWatchlist('${it.symbol}')" title="Remove">✕</button>
+                            <button class="text-slate-500 hover:text-rose-400 text-sm leading-none" onclick="removeFromWatchlist('${it.symbol}', '${it.market}')" title="Remove">✕</button>
                         </div>
                     </div>
                     <div class="flex items-center justify-between gap-2 mt-1 text-[11px] text-slate-500">
                         <span>${it.date_added} · ${days}d</span>
-                        <span>₹${it.entry_price.toLocaleString("en-IN")} → ${curPrice != null ? "₹" + curPrice.toLocaleString("en-IN") : "—"}</span>
+                        <span>${sym}${it.entry_price.toLocaleString(locale)} → ${curPrice != null ? sym + curPrice.toLocaleString(locale) : "—"}</span>
                     </div>
                 </div>`;
             }).join("");
@@ -1338,7 +1417,7 @@
             const d = s.resistance && s.resistance.distance_pct;
             if (d != null && d >= 0 && d <= 8) h.push(`${d}% below resistance`);
             if (s.adx && s.adx.value != null && s.adx.value >= 25) h.push(`strong trend · ADX ${s.adx.value}`);
-            if (s.readiness && s.readiness.signal === "relative_strength") h.push("outperforming the Nifty");
+            if (s.readiness && s.readiness.signal === "relative_strength") h.push(`outperforming the ${MARKET === "US" ? "S&P 500" : "Nifty"}`);
             return h.slice(0, 3);   // keep it to the top few so the line stays readable
         }
 
@@ -1424,9 +1503,9 @@
                 if (q.estimate != null) {
                     const yE = yAt(q.estimate);
                     svg += `<line x1="${x}" y1="${yE}" x2="${x}" y2="${yA}" stroke="#475569" stroke-width="1.5"/>`;
-                    svg += dot(x, yE, EARNINGS_ESTIMATE, `${q.quarter} · Estimated ₹${q.estimate}`);
+                    svg += dot(x, yE, EARNINGS_ESTIMATE, `${q.quarter} · Estimated ${curSymbol()}${q.estimate}`);
                 }
-                svg += dot(x, yA, EARNINGS_ACTUAL, `${q.quarter} · Actual ₹${q.actual}`);
+                svg += dot(x, yA, EARNINGS_ACTUAL, `${q.quarter} · Actual ${curSymbol()}${q.actual}`);
                 svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">${q.quarter.replace(" FY", "'")}</text>`;
             });
             // The next, unreported quarter: a hollow dashed ring for its estimate only
@@ -1434,7 +1513,7 @@
             if (hasNext) {
                 const x = xAt(quarters.length);
                 const y = yAt(e.next.estimate);
-                svg += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${EARNINGS_ACTUAL}" stroke-width="1.5" stroke-dasharray="2,2"><title>${escapeHtml(`Next (${e.next.date}) · est. ₹${e.next.estimate}`)}</title></circle>`;
+                svg += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${EARNINGS_ACTUAL}" stroke-width="1.5" stroke-dasharray="2,2"><title>${escapeHtml(`Next (${e.next.date}) · est. ${curSymbol()}${e.next.estimate}`)}</title></circle>`;
                 svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">Next</text>`;
             }
             svg += `</svg>`;
@@ -1445,7 +1524,7 @@
                 `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${EARNINGS_ACTUAL}"></span> Actual</span>`;
             if (e.next) {
                 const d = new Date(e.next.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-                legend += `<span class="text-slate-500">· Next: ${d}${e.next.estimate != null ? ` (est. ₹${e.next.estimate})` : ""}</span>`;
+                legend += `<span class="text-slate-500">· Next: ${d}${e.next.estimate != null ? ` (est. ${curSymbol()}${e.next.estimate})` : ""}</span>`;
             }
             $("earningsLegend").innerHTML = legend;
         }
@@ -1807,12 +1886,13 @@
             }
 
             let explain;
+            const benchName = MARKET === "US" ? "S&P 500" : "Nifty";
             if (s.breakout.today) {
-                explain = `${s.name} is breaking out today — closing above its resistance of ₹${s.resistance.level?.toLocaleString("en-IN")} on strong volume.`;
+                explain = `${s.name} is breaking out today — closing above its resistance of ${fmtPrice(s.resistance.level)} on strong volume.`;
             } else if (s.readiness.signal === "relative_strength") {
-                explain = `${s.name} is outperforming the Nifty by a widening margin — its price-to-Nifty ratio just hit a fresh 50-day high, a "relative strength" signal that often precedes further outperformance.`;
+                explain = `${s.name} is outperforming the ${benchName} by a widening margin — its price-to-${benchName} ratio just hit a fresh 50-day high, a "relative strength" signal that often precedes further outperformance.`;
             } else if (s.readiness.score === "high") {
-                explain = `Price is ${s.resistance.distance_pct}% below resistance (₹${s.resistance.level?.toLocaleString("en-IN")}) and the range is tightening — the kind of setup that often precedes a move.`;
+                explain = `Price is ${s.resistance.distance_pct}% below resistance (${fmtPrice(s.resistance.level)}) and the range is tightening — the kind of setup that often precedes a move.`;
             } else if (s.readiness.score === "medium") {
                 explain = `${s.name} is building a base. Some breakout ingredients are present, but it isn't primed at the resistance line yet.`;
             } else {
@@ -1872,7 +1952,7 @@
                 row.innerHTML = `
                     <div class="min-w-0">
                         <div class="text-sm font-semibold text-slate-200">${fmtDate(ex.date)}</div>
-                        <div class="text-[11px] text-slate-500">broke out at ₹${ex.price_then.toLocaleString("en-IN")}</div>
+                        <div class="text-[11px] text-slate-500">broke out at ${fmtPrice(ex.price_then)}</div>
                         <div class="mt-0.5">${tag}</div>
                     </div>
                     <div class="flex items-center gap-1.5 flex-none">
@@ -1887,7 +1967,7 @@
 
         function renderLevels(s) {
             const lv = s.levels || {};
-            $("levelsPrice").innerText = "₹" + s.price.toLocaleString("en-IN");
+            $("levelsPrice").innerText = fmtPrice(s.price);
 
             // How a zone renders its touch/kind sub-label: "3× tested ✓ confirmed",
             // "2× tested", or "dynamic (rising 50-day EMA)" for the EMA fallback.
@@ -1904,7 +1984,7 @@
                     $(touchId).innerText = "";
                     return;
                 }
-                $(lineId).innerText = "₹" + z.level.toLocaleString("en-IN");
+                $(lineId).innerText = fmtPrice(z.level);
                 const d = z.distance_pct;
                 $(distId).innerText = d != null ? `${Math.abs(d)}% ${d >= 0 ? aboveWord : belowWord}` : "—";
                 $(touchId).innerText = touchLabel(z);
@@ -2012,7 +2092,7 @@
                 strip.insertAdjacentHTML("beforeend", `
                     <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[100px]" title="${e.label} · price is ${e.position} this average">
                         <span class="text-[9px] text-slate-400 uppercase tracking-wider flex items-center">${e.period} EMA · ${e.label} ${tip}</span>
-                        <span class="text-sm font-bold text-slate-200">₹${e.value.toLocaleString("en-IN")} <span class="${col} text-[11px]">${arrow}</span></span>
+                        <span class="text-sm font-bold text-slate-200">${fmtPrice(e.value)} <span class="${col} text-[11px]">${arrow}</span></span>
                     </div>`);
             });
         }
@@ -2047,9 +2127,13 @@
                 const frame = $("tv-chart-frame");
                 frame.classList.remove("hidden");
                 frame.innerHTML = "";
+                const tvSymbol = MARKET === "US"
+                    ? (current && current.exchange ? current.exchange : "NASDAQ") + ":" + symbol
+                    : "BSE:" + symbol;
                 new TradingView.widget({
-                    autosize: true, symbol: "BSE:" + symbol, interval: "D",
-                    timezone: "Asia/Kolkata", theme: "dark", style: "1", locale: "in",
+                    autosize: true, symbol: tvSymbol, interval: "D",
+                    timezone: MARKET === "US" ? "America/New_York" : "Asia/Kolkata",
+                    theme: "dark", style: "1", locale: MARKET === "US" ? "en" : "in",
                     enable_publishing: false, backgroundColor: "#1e293b", gridColor: "#334155",
                     hide_top_toolbar: false, hide_legend: false, save_image: false,
                     container_id: "tv-chart-frame",
@@ -2068,7 +2152,8 @@
             $("chartLegend").classList.add("hidden");
             let data;
             try {
-                const res = await fetch(`data/ohlc/${safeName(symbol)}.json`, { cache: "no-store" });
+                const ohlcBase = MARKET === "US" ? "data/us/ohlc" : "data/ohlc";
+                const res = await fetch(`${ohlcBase}/${safeName(symbol)}.json`, { cache: "no-store" });
                 if (!res.ok) throw new Error("no ohlc");
                 data = await res.json();
             } catch (e) {

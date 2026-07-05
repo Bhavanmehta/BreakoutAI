@@ -25,7 +25,7 @@ import settings
 def fetch_prices_yfinance(symbol: str, years: int = settings.HISTORY_YEARS) -> pd.DataFrame | None:
     import yfinance as yf
     start = (date.today() - timedelta(days=int(years * 365.25) + 5)).isoformat()
-    df = yf.download(f"{symbol}.NS", start=start, interval="1d",
+    df = yf.download(f"{symbol}{settings.TICKER_SUFFIX}", start=start, interval="1d",
                      auto_adjust=True, progress=False)
     if df is None or len(df) == 0:
         return None
@@ -76,7 +76,7 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
 
     for i in range(0, len(symbols), chunk_size):
         chunk = symbols[i:i + chunk_size]
-        tickers = [f"{s}.NS" for s in chunk]
+        tickers = [f"{s}{settings.TICKER_SUFFIX}" for s in chunk]
         try:
             data = yf.download(tickers, start=start, interval="1d", auto_adjust=True,
                                group_by="ticker", progress=False, threads=True)
@@ -87,7 +87,7 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
             continue
 
         for sym in chunk:
-            tkr = f"{sym}.NS"
+            tkr = f"{sym}{settings.TICKER_SUFFIX}"
             try:
                 # For a single-ticker chunk yfinance omits the ticker column level.
                 sub = data[tkr] if isinstance(data.columns, pd.MultiIndex) else data

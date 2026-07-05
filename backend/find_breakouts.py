@@ -300,7 +300,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         # (whole-market, 2026-07-04): 41.6% follow-through hit rate vs Method A's
         # 38.8%, only 22% event-overlap with A, so it's kept as its own tier rather
         # than blended into "Primed"/"Approaching resistance" (see methods.py).
-        readiness = {"label": "Outperforming the market — new relative-strength high vs Nifty",
+        readiness = {"label": f"Outperforming the market — new relative-strength high vs {settings.RS_BENCHMARK_LABEL}",
                      "watch": True, "score": "high", "signal": "relative_strength"}
     elif near and coiling:
         readiness = {"label": "Primed — coiling below resistance in an uptrend", "watch": True, "score": "high"}
@@ -360,12 +360,13 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     levels = resolve_display_levels(df)
 
     # Plain-English guidance derived from the computed state
+    cur = settings.CURRENCY_SYMBOL
     if resistance:
-        trigger = (f"Watch for a close above ₹{resistance:,.2f} on above-average volume "
+        trigger = (f"Watch for a close above {cur}{resistance:,.2f} on above-average volume "
                    f"to confirm a breakout.")
-        suggested_entry = f"₹{resistance:,.2f}+ (breakout close on volume)"
+        suggested_entry = f"{cur}{resistance:,.2f}+ (breakout close on volume)"
         stop = round(resistance * settings.STOP_LOSS_FRACTION, 2)
-        stop_loss = f"₹{stop:,.2f} (~-6% below the trigger)"
+        stop_loss = f"{cur}{stop:,.2f} (~-6% below the trigger)"
     else:
         trigger = "Not enough history to define a clear resistance level yet."
         suggested_entry = "—"
@@ -376,6 +377,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "name": meta.get("name", symbol),
         "sector": meta.get("sector", ""),
         "industry": meta.get("industry", ""),
+        "exchange": meta.get("exchange", ""),
         "as_of": latest["date"].strftime("%Y-%m-%d"),
         "price": price,
         "change_pct": change_pct,

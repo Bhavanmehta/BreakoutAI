@@ -6,13 +6,15 @@ only one real user, so this just needs to keep randoms from writing to the store
 they find the URL, not protect a multi-tenant system. The frontend sends the secret
 as an X-Watchlist-Secret header, cached in localStorage after a one-time prompt.
 
-Storage is one Upstash Redis hash, key "watchlist", field = symbol, value = a JSON
-string {"symbol", "date_added", "entry_price"}. A hash (not one big JSON blob) means
-add/remove is a single atomic HSET/HDEL, no read-modify-write race. Name/current
-price are deliberately NOT stored -- the frontend joins them from the already-loaded
-data/breakouts.json at render time. Talks to Upstash over its plain REST API (POST
-the command as a JSON array to the base URL) so this has zero dependencies beyond
-`requests` (see root requirements.txt).
+Storage is one Upstash Redis hash, key "watchlist", field = "{market}:{symbol}" (e.g.
+"US:AAPL" vs "IN:TCS" -- prefixed so the same ticker string in two different markets
+can never collide), value = a JSON string {"symbol", "market", "date_added",
+"entry_price"}. A hash (not one big JSON blob) means add/remove is a single atomic
+HSET/HDEL, no read-modify-write race. Name/current price are deliberately NOT stored
+-- the frontend joins them from the already-loaded data/breakouts.json (or
+data/us/breakouts.json) at render time. Talks to Upstash over its plain REST API
+(POST the command as a JSON array to the base URL) so this has zero dependencies
+beyond `requests` (see root requirements.txt).
 
 Everything lives in this one file, including the storage helpers, rather than
 importing a sibling api/_watchlist_store.py -- confirmed via a real deploy that
@@ -71,21 +73,25 @@ def _upstash(*command: str):
 
 
 def list_items() -> list[dict]:
-    """[{symbol, date_added, entry_price}, ...], newest-added first."""
+    """[{symbol, market, date_added, entry_price}, ...], newest-added first. Items
+    stored before the market-prefix migration have no "market" key -- default them
+    to "IN" (the only market that existed then) rather than drop them."""
     raw = _upstash("HGETALL", HASH_KEY) or []
     items = [json.loads(raw[i + 1]) for i in range(0, len(raw), 2)]
+    for it in items:
+        it.setdefault("market", "IN")
     items.sort(key=lambda it: it["date_added"], reverse=True)
     return items
 
 
-def add_item(symbol: str, date_added: str, entry_price: float) -> dict:
-    item = {"symbol": symbol, "date_added": date_added, "entry_price": entry_price}
-    _upstash("HSET", HASH_KEY, symbol, json.dumps(item))
+def add_item(symbol: str, market: str, date_added: str, entry_price: float) -> dict:
+    item = {"symbol": symbol, "market": market, "date_added": date_added, "entry_price": entry_price}
+    _upstash("HSET", HASH_KEY, f"{market}:{symbol}", json.dumps(item))
     return item
 
 
-def remove_item(symbol: str) -> None:
-    _upstash("HDEL", HASH_KEY, symbol)
+def remove_item(symbol: str, market: str) -> None:
+    _upstash("HDEL", HASH_KEY, f"{market}:{symbol}")
 
 
 class handler(BaseHTTPRequestHandler):
@@ -139,11 +145,14 @@ class handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(length) or b"{}")
             symbol = str(body.get("symbol") or "").strip().upper()
+            market = str(body.get("market") or "IN").strip().upper()
             entry_price = float(body.get("entry_price"))
             if not symbol:
                 raise ValueError("symbol is required")
+            if market not in ("IN", "US"):
+                raise ValueError("market must be 'IN' or 'US'")
             today = datetime.now(IST).strftime("%Y-%m-%d")
-            item = add_item(symbol, today, entry_price)
+            item = add_item(symbol, market, today, entry_price)
             self._send_json(200, item)
         except (ValueError, TypeError) as exc:
             self._send_json(400, {"error": str(exc)})
@@ -160,11 +169,13 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(401, {"error": "invalid or missing X-Watchlist-Secret"})
             return
         try:
-            symbol = (parse_qs(urlparse(self.path).query).get("symbol") or [""])[0].strip().upper()
+            qs = parse_qs(urlparse(self.path).query)
+            symbol = (qs.get("symbol") or [""])[0].strip().upper()
+            market = (qs.get("market") or ["IN"])[0].strip().upper()
             if not symbol:
                 raise ValueError("symbol query param is required")
-            remove_item(symbol)
-            self._send_json(200, {"removed": symbol})
+            remove_item(symbol, market)
+            self._send_json(200, {"removed": symbol, "market": market})
         except (ValueError, TypeError) as exc:
             self._send_json(400, {"error": str(exc)})
         except ConfigError as exc:
@@ -192,17 +203,20 @@ if __name__ == "__main__":
     _load_env_file()
     print("Smoke test -- add/list/remove a throwaway entry against the real Upstash store.\n")
     try:
-        print("Adding _TEST_...")
-        print(" ", add_item("_TEST_", "2026-01-01", 100.0))
-        print("Listing (should include _TEST_)...")
+        print("Adding _TEST_ (IN) and _TEST_ (US) -- must not collide...")
+        print(" ", add_item("_TEST_", "IN", "2026-01-01", 100.0))
+        print(" ", add_item("_TEST_", "US", "2026-01-01", 200.0))
+        print("Listing (should include both, distinctly)...")
         items = list_items()
-        print(" ", items)
-        assert any(it["symbol"] == "_TEST_" for it in items), "round-trip add->list failed"
-        print("Removing _TEST_...")
-        remove_item("_TEST_")
+        mine = [it for it in items if it["symbol"] == "_TEST_"]
+        print(" ", mine)
+        assert len(mine) == 2 and {it["market"] for it in mine} == {"IN", "US"}, "market-prefixed round-trip failed"
+        print("Removing both...")
+        remove_item("_TEST_", "IN")
+        remove_item("_TEST_", "US")
         items = list_items()
         assert not any(it["symbol"] == "_TEST_" for it in items), "remove failed"
-        print(" OK -- add/list/remove all round-tripped cleanly.")
+        print(" OK -- add/list/remove all round-tripped cleanly, IN/US kept distinct.")
     except ConfigError as e:
         print("SKIPPED --", e, "-- set UPSTASH_REDIS_REST_URL/TOKEN in backend/.env first.")
     except Exception as e:

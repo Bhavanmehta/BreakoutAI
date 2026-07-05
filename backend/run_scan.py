@@ -56,13 +56,16 @@ def run():
     print(f"  benchmark ({settings.RS_BENCHMARK}): "
           f"{'ok, ' + str(len(benchmark)) + ' bars' if benchmark is not None else 'FAILED - relative-strength trigger will be empty'}\n")
 
-    # --- Market Mood inputs: India VIX (Nifty itself is the `benchmark` above) and ---
-    # today's NSE-published FII/DII aggregate flow. Both best-effort -- a failure here
-    # just drops that component from the mood score, never aborts the scan.
-    vix = fetch_benchmark("^INDIAVIX", years=1)
-    fii_today = market_mood.fetch_fii_dii_today()
-    print(f"  India VIX: {'ok, ' + str(len(vix)) + ' bars' if vix is not None else 'unavailable'} | "
-          f"FII/DII today: {fii_today if fii_today else 'unavailable'}\n")
+    # --- Market Mood inputs: VIX (the benchmark index itself is `benchmark` above) and,
+    # India only, today's NSE-published FII/DII aggregate flow. Both best-effort -- a
+    # failure here just drops that component from the mood score, never aborts the scan.
+    # HAS_FII_DII_FLOW gates the FII/DII call for US: left ungated, fetch_fii_dii_today()
+    # would still succeed against nseindia.com and silently splice real INDIA capital-flow
+    # data into a US scan's mood score -- a wrong-output bug, not a missing-data one.
+    vix = fetch_benchmark(settings.VIX_TICKER, years=1)
+    fii_today = market_mood.fetch_fii_dii_today() if settings.HAS_FII_DII_FLOW else None
+    print(f"  VIX ({settings.VIX_TICKER}): {'ok, ' + str(len(vix)) + ' bars' if vix is not None else 'unavailable'} | "
+          f"FII/DII today: {fii_today if fii_today else 'unavailable' if settings.HAS_FII_DII_FLOW else 'n/a for this market'}\n")
 
     no_data = short_history = 0
     breakouts_today = []

@@ -17,6 +17,8 @@ for that pattern).
 """
 from __future__ import annotations
 
+import settings
+
 
 def fetch_fundamentals(symbol: str) -> dict | None:
     """Return market cap / P-E / growth / ROE / D-E for one NSE symbol via yfinance's
@@ -30,7 +32,7 @@ def fetch_fundamentals(symbol: str) -> dict | None:
     """
     try:
         import yfinance as yf
-        info = yf.Ticker(f"{symbol}.NS").info or {}
+        info = yf.Ticker(f"{symbol}{settings.TICKER_SUFFIX}").info or {}
     except Exception:
         return None
     if not info.get("marketCap"):
