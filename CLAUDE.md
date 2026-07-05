@@ -111,14 +111,16 @@ A Python pipeline now exists and produces real computed data (replacing the hand
   (no indent) since it's a machine-read artifact regenerated daily at ~1,800 stocks — ~3.1 MB on
   disk, but ~300 KB gzipped over the wire (Vercel/GH Pages gzip automatically), so a single fetch is
   fine and we deliberately did *not* shard it into per-stock files. Schema: top-level
-  `generated_at`/`as_of_date`/`source`/`disclaimer`/`stocks[]`; each stock has `price`, `ema_stack`
+  `generated_at`/`as_of_date`/`source`/`disclaimer`/`market_mood` (the market-wide gauge, see the
+  Market Mood Index bullet below — NOT per-stock)/`stocks[]`; each stock has `price`, `ema_stack`
   (each EMA: period/value/position/label), `adx`, `resistance`, `volatility`, `trend` (in_uptrend),
   `breakout` (today + sentiment), `readiness` (label/watch/score — powers the "breakout soon?" cue),
   `history` (past_breakouts, followthrough_rate, followthrough_label, avg_fwd_return_20d_pct,
   examples[] with per-event `worked` flag), and `entry` (trigger/entry/stop text). Enrichment fields
   merged in from the standalone fetch scripts: `sector`/`industry` (from `sectors.json`), `analog`
-  (from `analogs.py`), and `holdings` (from `holdings.json`, incl. a quarterly `history[]` series
-  once re-scraped).
+  (from `analogs.py`), `holdings` (from `holdings.json`, incl. a quarterly `history[]` series
+  once re-scraped), `news` (from `news.json`, see the News + sentiment bullet below), and `social`
+  (from `social.json`).
 - **Frontend is now wired to `breakouts.json`** (no more hardcoded dataset). Watchlist builds itself
   and sorts by readiness; cards: verdict/readiness + trend badge, historical precedents (with
   worked/faded tags), resistance proximity, VCP, entry guidance; indicator strip (ADX + EMA values)
@@ -185,6 +187,47 @@ A Python pipeline now exists and produces real computed data (replacing the hand
   only these quarterly holdings + threshold bulk/block deals exist. **`holdings.json` is being
   re-scraped from screener** (readiness-prioritized, resumable) — top ~few-hundred done, run
   `python fetch_holdings.py` to finish the whole market.
+- **News + sentiment** (`fetch_news.py` → `data/news.json`, merged into each stock's `news` field):
+  headlines from four providers run in this priority order, each skipping whatever an earlier one
+  already refreshed today so they extend coverage rather than duplicate it — **GNews** (phase 1, 100
+  free req/day, undelayed, spent on the highest-conviction names first), **Marketaux** (phase 2, ~100
+  free req/day), **NewsData.io** (phase 3, ~12h-delayed but 200 free credits/day so it reaches
+  furthest), and **Google News RSS** (phase 4, no key/quota — `news_providers.fetch_gnews` /
+  `fetch_marketaux` / `fetch_newsdata` / `fetch_rss`). RSS is the one source that reaches small/
+  micro-caps the three budgeted APIs return nothing for (confirmed live). NOTE: Google's RSS feed
+  terms restrict it to personal/non-commercial use in a feed reader — fine for this project's
+  current free/educational use, revisit if ever monetized. Finnhub is deliberately not used (US-only
+  free tier). Sentiment is never taken from a provider — `sentiment.py` scores every cached headline
+  itself (VADER + a hand-picked `FINANCE_LEXICON`) uniformly regardless of source, so coverage
+  doesn't depend on a provider's own (fragile) entity-tagging. Layered on top:
+  **`event_classifier.py`** — ~19 ordered keyword categories (order win, SEBI penalty, rating up/
+  downgrade, earnings beat/miss, buyback, promoter pledge, management exit, ...) each with a small
+  signed bias, blended with the VADER score (weighted toward VADER when it's already confident,
+  toward the event when VADER reads near-neutral — that's exactly where a word-level scorer has
+  nothing useful to say). `sentiment.score_texts()` returns `{score, label, event}`; `event` is
+  whichever headline's classified event swung the blended score most, surfaced in the frontend next
+  to the sentiment badge so "Bullish" isn't a black box. News is time-sensitive (unlike holdings/
+  sectors/fundamentals) so it refreshes daily rather than skip-if-present. GitHub Action needs
+  `GNEWS_API_KEY`/`MARKETAUX_API_KEY`/`NEWSDATA_API_KEY` as repo secrets (RSS always runs regardless).
+- **Social buzz** (`fetch_social.py` → `data/social.json`, merged into each stock's `social` field):
+  Reddit mention count + `sentiment.py` score across India-trading subreddits (needs a free Reddit
+  script-app key — not yet obtained, so this phase is currently inactive) plus a Google Trends
+  search-interest score (pytrends, unofficial, no key). StockTwits skipped (near-zero NSE/BSE
+  coverage). Same conviction-ordered, resumable, incremental-save pattern as fetch_news.py.
+- **Market Mood Index** (`market_mood.py`, runs *inside* `run_scan.py` — not a separate script,
+  since it's cheap and time-sensitive unlike holdings/sectors/fundamentals): a single market-wide
+  0–100 fear/greed gauge in `breakouts.json`'s top-level `market_mood` field (NOT per-stock — shown
+  as a header badge, `renderMarketMood()`). Four equally-weighted components, any of which drops out
+  and the rest reweight proportionally if it fails to fetch: **trend** (Nifty close vs its 20-day
+  SMA — reuses the `benchmark` already fetched for Method E, no extra call), **vix** (India VIX,
+  `^INDIAVIX` via yfinance, inverted), **fii_flow** (today's NSE-published market-*wide* aggregate
+  FII/FPI net equity flow, `nseindia.com/api/fiidiiTradeReact` via a plain `requests.Session()` —
+  no cookies/auth needed in practice; z-scored against its own trailing 21-day history persisted in
+  `data/fii_dii_history.json`, capped to 90 days), **breadth** (% of the whole scanned universe that
+  closed up today — classic advance/decline, reuses data the scan already computes rather than
+  fetching separate NSE sector indices). NOTE: this is market-wide aggregate flow only — per-stock
+  daily FII/DII is not public anywhere in India (see the Ownership bullet above); a genuinely
+  different, coarser data point from the quarterly per-stock holdings.
 - **Reliability validation** (`backend/analyze_reliability.py`, standalone — not part of
   `run_scan.py`, run manually; batch-fetches, ~2min on the whole market): checks whether the
   per-stock "X% of past breakouts followed through" caveat is actually predictive, pooled across the

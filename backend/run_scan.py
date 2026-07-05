@@ -19,6 +19,7 @@ import pandas as pd
 
 import settings
 import export_ohlc
+import market_mood
 from get_prices import get_prices, fetch_prices_yfinance_batch
 from find_breakouts import add_indicators, build_summary
 from methods import add_method_e_relative_strength, add_method_e2_relative_strength_uptrend, fetch_benchmark
@@ -54,6 +55,14 @@ def run():
     benchmark = fetch_benchmark()
     print(f"  benchmark ({settings.RS_BENCHMARK}): "
           f"{'ok, ' + str(len(benchmark)) + ' bars' if benchmark is not None else 'FAILED - relative-strength trigger will be empty'}\n")
+
+    # --- Market Mood inputs: India VIX (Nifty itself is the `benchmark` above) and ---
+    # today's NSE-published FII/DII aggregate flow. Both best-effort -- a failure here
+    # just drops that component from the mood score, never aborts the scan.
+    vix = fetch_benchmark("^INDIAVIX", years=1)
+    fii_today = market_mood.fetch_fii_dii_today()
+    print(f"  India VIX: {'ok, ' + str(len(vix)) + ' bars' if vix is not None else 'unavailable'} | "
+          f"FII/DII today: {fii_today if fii_today else 'unavailable'}\n")
 
     no_data = short_history = 0
     breakouts_today = []
@@ -139,7 +148,7 @@ def run():
             s["fundamentals"] = None
 
     # --- Merge cached news + sentiment (from fetch_news.py) if present ---
-    # Time-sensitive but budget-capped (both free providers cap daily requests), so like
+    # Time-sensitive but budget-capped (all free providers cap daily requests), so like
     # holdings/sectors/fundamentals this is a separate, optional enrichment -- stocks
     # without a fresh-enough entry carry news: null.
     news_path = settings.DATA_DIR / "news.json"
@@ -155,6 +164,21 @@ def run():
         for s in summaries:
             s["news"] = None
 
+    # --- Merge cached social buzz (from fetch_social.py) if present ---
+    # Same optional/graceful pattern as news -- stocks without an entry carry social: null.
+    social_path = settings.DATA_DIR / "social.json"
+    if social_path.exists():
+        with open(social_path, encoding="utf-8") as f:
+            social = json.load(f)
+        matched = 0
+        for s in summaries:
+            s["social"] = social.get(s["symbol"])
+            matched += 1 if s["social"] else 0
+        print(f"  merged social buzz for {matched}/{len(summaries)} stocks")
+    else:
+        for s in summaries:
+            s["social"] = None
+
     # --- Store into DuckDB (local research layer) ---
     prices_df = pd.concat(all_prices, ignore_index=True)
     features_df = pd.concat(all_features, ignore_index=True)
@@ -168,6 +192,11 @@ def run():
     n_ohlc = export_ohlc.export_from_frame(features_df)
     print(f"  wrote {n_ohlc} per-stock OHLC files for the annotated chart")
 
+    # --- Compute the market-wide Mood Index (not per-stock) -- see market_mood.py ---
+    mood = market_mood.compute_market_mood(benchmark, vix, summaries, fii_today)
+    mood_summary = f"{mood['score']} ({mood['label']})" if mood["score"] is not None else "unavailable"
+    print(f"  Market Mood: {mood_summary} -- components: {mood['components']}")
+
     # --- Write breakouts.json (serving layer the website reads) ---
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -176,6 +205,7 @@ def run():
         "count": len(summaries),
         "disclaimer": ("Educational content only, not investment advice. Patterns can fail. "
                        "Always use a stop-loss and consult a SEBI-registered advisor before trading."),
+        "market_mood": mood,
         "stocks": summaries,
     }
     # Compact (no indent): this is a machine-read serving artifact regenerated daily

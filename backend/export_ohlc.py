@@ -1,12 +1,16 @@
 """
-Export compact per-stock OHLC (+ EMA/resistance/breakout overlays) for the frontend's
-annotated chart (lightweight-charts). Reads the `ohlcv_features` table the scan already
-populates and writes one small JSON per symbol to `data/ohlc/<safe-symbol>.json`.
+Export compact per-stock OHLC (+ EMA/RSI/volume/resistance/breakout overlays) for the
+frontend's annotated chart (lightweight-charts). Reads the `ohlcv_features` table the
+scan already populates and writes one small JSON per symbol to
+`data/ohlc/<safe-symbol>.json`.
 
-Why per-stock files: the frontend fetches only the open stock's series on demand (~3–5 KB),
-so the annotated candles + our resistance line / EMAs / breakout markers can be drawn
-without a backend — same static, committed-data model as breakouts.json. See CLAUDE.md
-TODO #8 (chart migration). Committed daily; the git-growth mitigation is TODO #4.
+Why per-stock files: the frontend fetches only the open stock's series on demand, so
+the annotated candles + our resistance line / EMAs / volume / RSI / breakout markers
+can be drawn without a backend — same static, committed-data model as breakouts.json.
+See CLAUDE.md TODO #8 (chart migration). Committed daily; the git-growth mitigation is
+TODO #4 (this file grew from ~12 KB avg at 150 bars/2 EMAs to a fair bit more once
+volume/ema8/ema21/rsi were added at 220 bars — still small per-fetch, just worth
+knowing if the daily commit size becomes a problem).
 
 Usage:
     python export_ohlc.py                 # standalone: reads the DuckDB
@@ -22,16 +26,17 @@ import pandas as pd
 import settings
 from levels import resolve_display_levels
 
-# ~7 months of daily context — enough to show the base and the breakout without bloating
-# each file. Bump if the charts feel too short.
-BARS = 150
+# ~10 months of daily context -- enough to give the 200-day EMA real runway to show its
+# own trend (not just a flat-looking tail) without bloating each file too much further.
+BARS = 220
 OHLC_DIR = settings.DATA_DIR / "ohlc"
 
-# Columns pulled from ohlcv_features. ema50/ema200 are the two overlays we draw; ema21 +
-# volume feed the swing-pivot support/resistance detection (levels.py); is_breakout marks
-# the days we flag with a marker.
+# Columns pulled from ohlcv_features. ema8/ema21/ema50/ema200 are all drawn as chart
+# overlays (ema21/ema50 also feed the swing-pivot + dynamic-support detection in
+# levels.py); volume backs the volume histogram pane; rsi backs the RSI pane;
+# is_breakout marks the days we flag with a marker.
 _COLS = ["symbol", "date", "open", "high", "low", "close", "volume",
-         "ema21", "ema50", "ema200", "is_breakout"]
+         "ema8", "ema21", "ema50", "ema200", "rsi", "is_breakout"]
 
 
 def _safe(sym: str) -> str:
@@ -61,12 +66,16 @@ def _emit_one(sym: str, g: pd.DataFrame) -> dict:
     # to BARS for the drawn candles.
     levels = resolve_display_levels(g)
     g = g.tail(BARS)
-    bars, ema50, ema200, breakouts = [], [], [], []
+    bars, volume, ema8, ema21, ema50, ema200, rsi, breakouts = [], [], [], [], [], [], [], []
     for _, row in g.iterrows():
         d = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
         bars.append([d, _r(row["open"]), _r(row["high"]), _r(row["low"]), _r(row["close"])])
+        volume.append(None if pd.isna(row.get("volume")) else int(row["volume"]))
+        ema8.append(_r(row.get("ema8")))
+        ema21.append(_r(row.get("ema21")))
         ema50.append(_r(row.get("ema50")))
         ema200.append(_r(row.get("ema200")))
+        rsi.append(_r(row.get("rsi")))
         if bool(row.get("is_breakout")):
             breakouts.append(d)
     return {
@@ -75,8 +84,12 @@ def _emit_one(sym: str, g: pd.DataFrame) -> dict:
         "resistance": _line(levels["resistance"]),
         "support": _line(levels["support"]),
         "bars": bars,
+        "volume": volume,
+        "ema8": ema8,
+        "ema21": ema21,
         "ema50": ema50,
         "ema200": ema200,
+        "rsi": rsi,
         "breakouts": breakouts,
     }
 

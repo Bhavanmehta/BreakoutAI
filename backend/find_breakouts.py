@@ -58,6 +58,19 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["plus_di"] = plus_di
     df["minus_di"] = minus_di
 
+    # --- RSI (Wilder smoothing, same alpha=1/period convention as ADX above) ---
+    # Display-only context on the annotated chart -- not an input to breakout detection
+    # or conviction scoring (not part of the validated feature set in analyze_reliability.py).
+    delta = df["close"].diff()
+    gain = delta.clip(lower=0.0)
+    loss = (-delta).clip(lower=0.0)
+    rsi_alpha = 1.0 / settings.RSI_PERIOD
+    avg_gain = gain.ewm(alpha=rsi_alpha, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=rsi_alpha, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    df["rsi"] = 100 - (100 / (1 + rs))
+    df.loc[avg_loss == 0, "rsi"] = 100.0   # no losses in the window -> maxed out, not undefined
+
     # --- Trend filter (Stage 2): above a rising long EMA and above the mid EMA ---
     long_ema = df[f"ema{settings.TREND_EMA_LONG}"]
     mid_ema = df[f"ema{settings.TREND_EMA_MID}"]
@@ -212,6 +225,17 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     dist_pct = round((resistance / price - 1) * 100, 2) if resistance else None
     touches = _count_touches(df, resistance)
 
+    # Today's volume vs its own VOL_AVG_WINDOW-day average -- context for *why* a
+    # breakout fired (the trigger itself already requires VOL_SURGE_MULT), not a new
+    # standalone signal (analyze_reliability.py found surge magnitude alone isn't
+    # predictive of follow-through).
+    avg_vol = float(latest["avg_vol"]) if not np.isnan(latest["avg_vol"]) else None
+    vol_ratio = round(float(latest["volume"]) / avg_vol, 2) if avg_vol else None
+    volume_today = {
+        "today": int(latest["volume"]), "avg": round(avg_vol) if avg_vol else None,
+        "ratio": vol_ratio, "surge": bool(vol_ratio and vol_ratio >= settings.VOL_SURGE_MULT),
+    }
+
     vc = float(latest["vol_contraction"]) if not np.isnan(latest["vol_contraction"]) else None
     vol_state = "Coiling (squeeze)" if (vc is not None and vc < 1) else "Expanding"
 
@@ -359,6 +383,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "adx": {"value": round(adx_val, 1) if adx_val else None, "label": _adx_label(adx_val)},
         "resistance": {"level": round(resistance, 2) if resistance else None,
                        "distance_pct": dist_pct, "touches": touches},
+        "volume": volume_today,
         "levels": levels,
         "base_depth_pct": base_depth,
         "volatility": {"contraction_ratio": round(vc, 2) if vc else None, "state": vol_state},

@@ -165,21 +165,64 @@ EP_MIN_VOL_MULT = 5.0          # volume must be >= this multiple of the 50-day a
 EP_VOL_AVG_WINDOW = 50
 
 # --- News / sentiment (fetch_news.py -- NOT part of the daily price scan itself; news
-# is separately budgeted since both free providers cap daily requests) ---------------
+# is separately budgeted since all three free providers cap daily requests) ----------
 NEWS_JSON = DATA_DIR / "news.json"
-# Marketaux free tier: ~100 req/day, has entity sentiment -- keep headroom for a --check
-# smoke test and same-day retries. NewsData.io free tier: 200 credits/day, no sentiment,
-# ~12h delayed -- headroom likewise. Finnhub isn't used: its free tier is US-only for
-# company news/sentiment (international needs paid Premium), so it can't cover NSE/BSE.
+# Marketaux free tier: ~100 req/day -- keep headroom for a --check smoke test and
+# same-day retries. NewsData.io free tier: 200 credits/day, ~12h delayed -- headroom
+# likewise. GNews free tier: 100 req/day, headroom likewise. Finnhub isn't used: its
+# free tier is US-only for company news/sentiment (international needs paid Premium),
+# so it can't cover NSE/BSE.
 NEWS_MARKETAUX_DAILY_BUDGET = 90
 NEWS_NEWSDATA_DAILY_BUDGET = 190
-NEWS_SENTIMENT_BULLISH = 0.15    # entity sentiment_score >= this -> "Bullish"
+NEWS_GNEWS_DAILY_BUDGET = 90
+# Google News RSS: no key, no published quota -- these are self-imposed so the daily
+# scan stays polite and bounded rather than hammering every remaining stock in one go.
+NEWS_RSS_DAILY_BUDGET = 300
+NEWS_RSS_MIN_REQUEST_GAP_SEC = 1.0
+# Thresholds for sentiment.py's locally-computed compound score (-1..1), applied
+# uniformly to headline text regardless of which provider it came from -- see
+# sentiment.py and fetch_news.py's docstring for why we stopped trusting Marketaux's
+# own (fragile, low-coverage) entity-tagged sentiment.
+NEWS_SENTIMENT_BULLISH = 0.15    # compound score >= this -> "Bullish"
 NEWS_SENTIMENT_BEARISH = -0.15   # <= this -> "Bearish"; between the two -> "Neutral"
 # Only keep genuinely recent news. Marketaux's free search otherwise happily returns
 # years-old articles for thinly-covered small/mid-caps -- a 2024 headline next to a live
 # breakout is worse than no headline. Enforced at the API query (published_after) so we
 # never even cache stale items, and the results are sorted newest-first.
 NEWS_MAX_AGE_DAYS = 45
+
+# --- Social buzz (fetch_social.py -- NOT part of the daily price scan itself; also
+# separately budgeted). Reddit: mention count + locally-computed sentiment (sentiment.py)
+# over post titles/selftext, from a fixed set of India-trading subreddits. Google
+# Trends (pytrends, unofficial -- no API key): a 0-100 search-interest score, a cheap
+# "how much is this being searched" proxy independent of any single social platform.
+SOCIAL_JSON = DATA_DIR / "social.json"
+SOCIAL_SUBREDDITS = ["IndianStreetBets", "DalalStreetTalks", "IndiaInvestments", "StockMarketIndia"]
+SOCIAL_MENTIONS_TIME_FILTER = "week"   # Reddit search `t` param: hour/day/week/month/year/all
+SOCIAL_REDDIT_DAILY_BUDGET = 300       # generous: free OAuth script apps allow ~60 req/min
+SOCIAL_BUZZ_LOW = 3     # < this many mentions in the window -> "Low" buzz
+SOCIAL_BUZZ_HIGH = 15   # >= this many -> "High" buzz; in between -> "Medium"
+TRENDS_DAILY_BUDGET = 150     # self-imposed; Google Trends has no published free quota,
+                              # but the unofficial API soft-blocks aggressive callers
+TRENDS_MIN_REQUEST_GAP_SEC = 1.5   # spacing between pytrends calls to stay under that radar
+
+# --- Market Mood Index (market_mood.py) -- a single 0-100 market-wide fear/greed
+# gauge, NOT a per-stock signal. Runs INSIDE run_scan.py (unlike holdings/sectors/
+# fundamentals/news/social, which are separate scripts) because it's cheap -- one
+# extra yfinance ticker (India VIX; Nifty itself is already fetched for Method E) plus
+# one lightweight NSE API call -- and time-sensitive, so it needs to be fresh every day
+# rather than slow-changing reference data. Four independent, equally-weighted
+# components; any one that fails to fetch is dropped and the rest reweight
+# proportionally (see market_mood.compute_market_mood).
+FII_DII_HISTORY_JSON = DATA_DIR / "fii_dii_history.json"
+FII_DII_HISTORY_DAYS = 90        # keep this many days on disk; only the trailing
+                                  # MOOD_FII_ROLLING_DAYS are actually used
+MOOD_TREND_SMA_WINDOW = 20       # Nifty close vs its N-day SMA ("trend strength")
+MOOD_TREND_CLAMP_PCT = 10.0      # +/- this % distance from the SMA maps to the full 0-100 range
+MOOD_VIX_CALM = 10.0             # India VIX at/below this -> 100 (calm)
+MOOD_VIX_PANIC = 30.0            # India VIX at/above this -> 0 (panic)
+MOOD_FII_ROLLING_DAYS = 21       # window today's net FII flow is z-scored against
+MOOD_FII_CLAMP_Z = 2.0           # a z-score of +/- this many std-devs maps to the full 0-100 range
 
 # --- Indicator windows -------------------------------------------------------
 # 8 & 21 are the responsive Fibonacci "momentum/trend" EMAs (catch moves early);
@@ -189,3 +232,4 @@ NEWS_MAX_AGE_DAYS = 45
 EMA_WINDOWS = [8, 21, 50, 200]
 EMA_LABELS = {8: "Momentum", 21: "Short-term trend", 50: "Structural", 200: "Macro"}
 ADX_PERIOD = 14
+RSI_PERIOD = 14   # standard Wilder RSI window; feeds the annotated chart's RSI pane

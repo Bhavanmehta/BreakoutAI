@@ -63,6 +63,7 @@
                     <div>Data as of <span id="asOfDate" class="text-slate-200 font-semibold">—</span></div>
                     <div>Source: <span id="dataSource" class="text-slate-300">—</span> · daily</div>
                 </div>
+                <span id="marketMoodBadge" class="hidden px-2.5 py-1 text-xs font-semibold rounded-md border whitespace-nowrap"></span>
                 <span class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md">Live Data</span>
             </div>
         </div>
@@ -232,16 +233,19 @@
                             </div>
                         </div>
                         <!-- Annotated chart (lightweight-charts) draws into #lwChart; TradingView draws into #tv-chart-frame -->
-                        <div id="chartHost" class="relative w-full min-h-[460px] lg:min-h-[560px]">
-                            <div id="lwChart" class="w-full h-[460px] lg:h-[560px]"></div>
+                        <div id="chartHost" class="relative w-full min-h-[560px] lg:min-h-[680px]">
+                            <div id="lwChart" class="w-full h-[560px] lg:h-[680px]"></div>
                             <div id="tv-chart-frame" class="w-full h-[460px] lg:h-[560px] hidden"></div>
                         </div>
                         <div id="chartLegend" class="hidden flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-t border-borderCl bg-slate-900/40 text-[10px] text-slate-400">
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-rose-500"></span> Resistance</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-blue-400"></span> Support</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5" style="background:#38bdf8"></span> 8-day EMA</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5" style="background:#ec4899"></span> 21-day EMA</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-purple-400"></span> 50-day EMA</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-amber-400"></span> 200-day EMA</span>
                             <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout</span>
+                            <span class="flex items-center gap-1">Volume + RSI(14) panes below</span>
                             <span class="text-slate-500">· "3×" = times price reversed there (thicker line = confirmed ≥3 touches)</span>
                         </div>
                     </div>
@@ -336,7 +340,7 @@
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-slate-700/50">
-                                <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth</span><span class="text-sm font-semibold text-slate-200" id="baseDepth">—</span></div>
+                                <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth <span class="info-i" data-tip="How far price fell from its recent high to its lowest low over the last 50 trading days — the depth of the base (or 'cup') it's building before a potential breakout. A deeper base isn't a warning sign here: our own reliability study found deeper bases actually follow through MORE often than shallow ones (41% vs 35%).">i</span></span><span class="text-sm font-semibold text-slate-200" id="baseDepth">—</span></div>
                             </div>
                         </div>
 
@@ -354,7 +358,18 @@
                             <p class="text-[11px] text-slate-500 mt-2 leading-snug">The number is the last 10 days' average price range ÷ its 30-day baseline. <b class="text-emerald-400">Below 1.0</b> = coiling (range tightening, energy building — the setup you want); <b class="text-purple-300">above 1.0</b> = expanding.</p>
                         </div>
 
-                        <!-- News & Sentiment (headlines + entity sentiment where available) -->
+                        <!-- Social Buzz (Reddit mentions + sentiment, Google Trends interest) -->
+                        <div id="socialCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl hidden">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                                    Social Buzz
+                                    <span class="info-i" data-tip="How much this stock is being talked about, and with what tone. Reddit: mention count across India-trading subreddits in the last week, sentiment scored locally from those posts. Google Trends: a 0–100 search-interest score (attention, not sentiment). Educational context, not investment advice — retail chatter can be wrong or manipulated.">i</span>
+                                </h3>
+                                <span id="socialAsOf" class="text-[10px] text-slate-500"></span>
+                            </div>
+                            <div id="socialBody" class="space-y-3"></div>
+                        </div>
+
                         <!-- Entry guidance (full width) -->
                         <div class="md:col-span-2 p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
                             <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">What To Watch For</h3>
@@ -446,6 +461,18 @@
             Bullish: { text: "▲ Bullish", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" },
             Bearish: { text: "▼ Bearish", cls: "text-rose-400 bg-rose-500/10 border-rose-500/30" },
             Neutral: { text: "● Neutral", cls: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
+        };
+        // Human-readable labels for backend/event_classifier.py's event codes, surfaced
+        // next to the news sentiment score so "Bullish" isn't a black box (e.g. "order win").
+        const EVENT_LABELS = {
+            buyback: "buyback", dividend_bonus_split: "dividend/bonus/split", order_win: "order win",
+            earnings_beat: "earnings beat", rating_upgrade: "rating upgrade",
+            regulatory_approval: "regulatory approval", expansion: "expansion",
+            stake_acquisition: "stake acquisition", promoter_buying: "promoter buying",
+            sebi_penalty: "SEBI penalty", fraud_probe: "fraud/probe", rating_downgrade: "rating downgrade",
+            earnings_miss: "earnings miss", contract_loss: "contract loss", debt_stress: "debt stress",
+            management_exit: "management exit", guidance_cut: "guidance cut",
+            promoter_pledge: "promoter pledge", stake_sale: "stake sale",
         };
         const RANK = { high: 0, medium: 1, low: 2 };
 
@@ -608,6 +635,7 @@
                 $("asOfDate").innerText = data.as_of_date || "—";
                 $("dataSource").innerText = data.source || "—";
                 $("disclaimer").innerText = "⚠️ " + (data.disclaimer || "");
+                renderMarketMood(data.market_mood);
                 if (!STOCKS.length) throw new Error("No stocks in data file.");
 
                 STOCKS.sort((a, b) => (b.readiness.conviction ?? -1) - (a.readiness.conviction ?? -1));
@@ -966,6 +994,7 @@
             renderPrecedents(s);
             renderHoldings(s);
             renderNews(s);
+            renderSocial(s);
             renderLevels(s);
             renderVCP(s);
             renderEntry(s);
@@ -1292,6 +1321,31 @@
         // fetch_news.py's daily budget split) + Marketaux's entity sentiment when present.
         // Hidden entirely if this stock has no cached news yet (budget-capped daily, so
         // most of the ~1,800-stock universe won't have an entry on any given day).
+        // Market-wide Mood Index (backend/market_mood.py) — a single header badge, NOT
+        // per-stock, so it renders once from data.market_mood rather than per selectStock().
+        const MOOD_STYLE = {
+            "Extreme Fear": "text-rose-400 bg-rose-500/10 border-rose-500/30",
+            "Fear": "text-orange-400 bg-orange-500/10 border-orange-500/30",
+            "Neutral": "text-slate-300 bg-slate-500/10 border-slate-500/30",
+            "Greed": "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+            "Extreme Greed": "text-emerald-300 bg-emerald-500/20 border-emerald-500/40",
+        };
+        function renderMarketMood(mood) {
+            const el = $("marketMoodBadge");
+            if (!mood || mood.score == null) { el.classList.add("hidden"); return; }
+            const sty = MOOD_STYLE[mood.label] || MOOD_STYLE.Neutral;
+            el.className = `px-2.5 py-1 text-xs font-semibold rounded-md border whitespace-nowrap ${sty}`;
+            el.innerText = `Mood: ${Math.round(mood.score)} · ${mood.label}`;
+            const c = mood.components || {};
+            const fmt = (v) => v == null ? "n/a" : Math.round(v);
+            el.setAttribute("data-tip",
+                `Market-wide fear/greed gauge (0–100), not stock-specific — trend, volatility, ` +
+                `institutional flow and breadth, equally weighted (any that's unavailable is ` +
+                `dropped and the rest reweight).<br>Trend ${fmt(c.trend)} · VIX ${fmt(c.vix)} · ` +
+                `FII flow ${fmt(c.fii_flow)} · Breadth ${fmt(c.breadth)}`);
+            el.classList.remove("hidden");
+        }
+
         function renderNews(s) {
             const card = $("newsCard");
             const grid = $("readNewsGrid");
@@ -1310,10 +1364,11 @@
             if (n.sentiment) {
                 const sty = SENTIMENT_STYLE[n.sentiment.label] || SENTIMENT_STYLE.Neutral;
                 const score = n.sentiment.score;
+                const eventTxt = n.sentiment.event ? ` · ${EVENT_LABELS[n.sentiment.event] || n.sentiment.event}` : "";
                 sentRow.innerHTML =
                     `<span class="text-[10px] uppercase tracking-wider text-slate-500 mr-2">News sentiment</span>` +
                     `<span class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap ${sty.cls}">${sty.text}</span>` +
-                    `<span class="text-[10px] text-slate-500 ml-2">score ${score >= 0 ? "+" : ""}${score} · Marketaux</span>`;
+                    `<span class="text-[10px] text-slate-500 ml-2">score ${score >= 0 ? "+" : ""}${score} · computed from headlines${eventTxt}</span>`;
                 sentRow.classList.remove("hidden");
                 sentRow.classList.add("flex");
             } else {
@@ -1346,9 +1401,10 @@
                 return;
             }
 
+            const PROVIDER_TAG = { marketaux: "Marketaux", newsdata: "NewsData.io", gnews: "GNews", rss: "Google News" };
             $("newsList").innerHTML = sorted.map(h => {
                 const dateTxt = fmtDate(h.published_at);
-                const providerTag = h.provider === "marketaux" ? "Marketaux" : "NewsData.io";
+                const providerTag = PROVIDER_TAG[h.provider] || "News";
                 const href = h.url ? escapeHtml(h.url) : "#";
                 return `
                 <a href="${href}" target="_blank" rel="noopener noreferrer"
@@ -1361,6 +1417,70 @@
                     </div>
                 </a>`;
             }).join("");
+        }
+
+        // Social Buzz card: Reddit mention count + local sentiment (fetch_social.py),
+        // and a Google Trends search-interest score. Hidden entirely if this stock has
+        // neither cached yet (budget-capped daily, like News).
+        function renderSocial(s) {
+            const card = $("socialCard");
+            const soc = s.social;
+            const reddit = soc && soc.reddit;
+            const trends = soc && soc.trends;
+            if (!reddit && !trends) {
+                card.classList.add("hidden");
+                return;
+            }
+            card.classList.remove("hidden");
+
+            const asOfDates = [reddit && reddit.as_of, trends && trends.as_of].filter(Boolean);
+            $("socialAsOf").innerText = asOfDates.length ? "as of " + asOfDates.sort().reverse()[0] : "";
+
+            const BUZZ_CLS = {
+                High: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+                Medium: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+                Low: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+            };
+
+            let html = "";
+
+            if (reddit) {
+                const buzzCls = BUZZ_CLS[reddit.buzz] || BUZZ_CLS.Low;
+                const sentSty = reddit.sentiment ? (SENTIMENT_STYLE[reddit.sentiment.label] || SENTIMENT_STYLE.Neutral) : null;
+                html += `
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-500">Reddit mentions (7d)</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap ${buzzCls}">${reddit.buzz} buzz</span>
+                            ${sentSty ? `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap ${sentSty.cls}">${sentSty.text}</span>` : ""}
+                        </div>
+                    </div>
+                    <div class="text-lg font-bold text-white">${reddit.mentions} <span class="text-xs font-normal text-slate-500">post${reddit.mentions === 1 ? "" : "s"} mentioning this stock</span></div>
+                    ${(reddit.sample || []).slice(0, 2).map(p => `
+                        <a href="${p.url ? escapeHtml(p.url) : "#"}" target="_blank" rel="noopener noreferrer"
+                           class="block mt-1.5 p-2 rounded-lg bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all text-xs text-slate-300 leading-snug">
+                            ${escapeHtml(p.title)}
+                            <span class="text-[10px] text-slate-500 block mt-0.5">r/${escapeHtml(p.subreddit || "")} · ▲ ${p.score}</span>
+                        </a>`).join("")}
+                </div>`;
+            }
+
+            if (trends) {
+                const pct = Math.max(0, Math.min(100, trends.interest));
+                html += `
+                <div class="${reddit ? "pt-3 border-t border-slate-700/50" : ""}">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[10px] uppercase tracking-wider text-slate-500">Google Trends search interest</span>
+                        <span class="text-sm font-bold text-sky-400">${trends.interest}/100</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div class="h-full bg-sky-500" style="width:${pct}%"></div>
+                    </div>
+                </div>`;
+            }
+
+            $("socialBody").innerHTML = html;
         }
 
         function renderVerdict(s) {
@@ -1551,6 +1671,7 @@
         }
         const ADX_TIP = "ADX measures trend <b>strength</b> (0–100), not direction. Above 25 = a strong, sustained trend worth trading; below 20 = choppy / directionless.";
         const EMA_TIP = "EMA = exponential moving average, the stock's average price over a window (weighted to recent days). Price <b>above</b> the line = uptrend on that timeframe; the 200-EMA is the long-term 'macro' trend.";
+        const VOLUME_TIP = "Today's trading volume vs. its own 20-day average. A breakout on this site already <b>requires</b> volume ≥1.5× average to count — this just shows that ratio directly. Context for why today counts as a breakout, not a standalone predictive signal on its own (our reliability study found surge size alone doesn't predict follow-through).";
 
         // Floating tooltip engine: show #floatTip near any [data-tip] element, clamped
         // to the viewport (flips below the element when there isn't room above).
@@ -1589,6 +1710,18 @@
                     <span class="text-[9px] text-slate-400 uppercase tracking-wider flex items-center">Trend · ADX ${infoTip(ADX_TIP)}</span>
                     <span class="text-sm font-bold ${adxCls}">${s.adx.value ?? "—"} <span class="text-[10px] font-semibold">${s.adx.label}</span></span>
                 </div>`);
+
+            // Volume tile: today's ratio to its own 20-day average (context for the
+            // breakout trigger, which already requires a surge — see VOLUME_TIP).
+            const vol = s.volume;
+            if (vol && vol.ratio != null) {
+                const volCls = vol.surge ? "text-emerald-400" : "text-slate-400";
+                strip.insertAdjacentHTML("beforeend", `
+                    <div class="flex flex-col justify-center px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 min-w-[100px]">
+                        <span class="text-[9px] text-slate-400 uppercase tracking-wider flex items-center">Volume ${infoTip(VOLUME_TIP)}</span>
+                        <span class="text-sm font-bold ${volCls}">${vol.ratio}× avg${vol.surge ? " 🔥" : ""}</span>
+                    </div>`);
+            }
 
             const emas = Object.values(s.ema_stack).sort((a, b) => a.period - b.period);
             emas.forEach((e, i) => {
@@ -1680,9 +1813,22 @@
             });
             lwChart = chart;
 
+            // Three stacked bands on one chart (lightweight-charts v4 has no native
+            // multi-pane API — this is the standard v4 pattern: give each group of
+            // series its own priceScaleId, then carve up vertical space with
+            // scaleMargins so they read as separate panes). Candles get the top ~58%,
+            // volume a thin ~13% band, RSI the bottom ~20% (small gaps between for
+            // visual separation).
+            chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.02, bottom: 0.40 } });
+
             const candles = chart.addCandlestickSeries({
                 upColor: "#10b981", downColor: "#ef4444", borderVisible: false,
                 wickUpColor: "#10b981", wickDownColor: "#ef4444",
+                // Without this, lightweight-charts auto-draws its own dashed "last close"
+                // line across the whole chart — easy to mistake for a computed Resistance
+                // line (same dash style, no legend entry). We already show the current
+                // price in the header, so suppress it here to avoid the false signal.
+                priceLineVisible: false,
             });
             candles.setData(data.bars.map(b => ({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] })));
 
@@ -1690,8 +1836,45 @@
                 color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
             });
             const zip = (arr) => data.bars.map((b, i) => arr[i] == null ? null : { time: b[0], value: arr[i] }).filter(Boolean);
+            if (data.ema8) line("#38bdf8").setData(zip(data.ema8));
+            if (data.ema21) line("#ec4899").setData(zip(data.ema21));
             if (data.ema50) line("#a855f7").setData(zip(data.ema50));
             if (data.ema200) line("#f59e0b").setData(zip(data.ema200));
+
+            // Volume pane (thin band just under the candles). Colored the same
+            // green/red as the candle body per day so a surge is visually obvious
+            // without a separate legend entry.
+            if (data.volume) {
+                const volSeries = chart.addHistogramSeries({
+                    priceScaleId: "volume", priceFormat: { type: "volume" },
+                    lastValueVisible: false, priceLineVisible: false,
+                });
+                chart.priceScale("volume").applyOptions({
+                    scaleMargins: { top: 0.62, bottom: 0.25 }, visible: false,
+                });
+                volSeries.setData(data.bars.map((b, i) => (data.volume[i] == null ? null : {
+                    time: b[0], value: data.volume[i],
+                    color: b[4] >= b[1] ? "rgba(16,185,129,0.5)" : "rgba(239,68,68,0.5)",
+                })).filter(Boolean));
+            }
+
+            // RSI pane (bottom band) — 30/70 reference lines mark oversold/overbought.
+            if (data.rsi) {
+                const rsiSeries = chart.addLineSeries({
+                    color: "#22d3ee", lineWidth: 2, priceScaleId: "rsi",
+                    lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+                });
+                chart.priceScale("rsi").applyOptions({
+                    scaleMargins: { top: 0.80, bottom: 0.02 }, visible: false,
+                });
+                rsiSeries.setData(zip(data.rsi));
+                [[70, "#f43f5e"], [30, "#60a5fa"]].forEach(([level, color]) => {
+                    rsiSeries.createPriceLine({
+                        price: level, color, lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false,
+                    });
+                });
+            }
 
             // Support/resistance are now swing-pivot zones (levels.py): {level, touches,
             // confirmed}. Title shows the touch count so the drawn line is self-explanatory

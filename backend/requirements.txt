@@ -4,3 +4,5 @@ duckdb>=1.0
 yfinance>=0.2.40
 jugaad-data>=0.33
 requests>=2.31
+vaderSentiment>=3.3    # local news/social sentiment scoring (sentiment.py)
+pytrends>=4.9           # Google Trends search-interest score (fetch_social.py)

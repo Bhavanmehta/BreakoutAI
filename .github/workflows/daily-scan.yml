@@ -31,19 +31,19 @@ jobs:
         working-directory: backend
         run: python run_scan.py
 
-      - name: Fetch news & sentiment (optional, needs secrets)
-        if: ${{ secrets.MARKETAUX_API_KEY != '' || secrets.NEWSDATA_API_KEY != '' }}
+      - name: Fetch news & sentiment (Google News RSS always runs; APIs are optional, need secrets)
         working-directory: backend
         env:
           MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
           NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
         run: python fetch_news.py
 
       - name: Commit updated results (if changed)
         run: |
           git config user.name "breakoutai-bot"
           git config user.email "actions@github.com"
-          git add data/breakouts.json data/track_record.json data/ohlc data/news.json
+          git add data/breakouts.json data/track_record.json data/ohlc data/news.json data/fii_dii_history.json
           if git diff --cached --quiet; then
             echo "No changes — nothing to commit."
           else
