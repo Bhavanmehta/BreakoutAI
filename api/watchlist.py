@@ -50,9 +50,16 @@ class ConfigError(Exception):
     """UPSTASH_REDIS_REST_URL/TOKEN not set."""
 
 
+def _env(name: str) -> str | None:
+    val = os.environ.get(name)
+    if val and len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+        val = val[1:-1]  # Upstash's own copy-paste button wraps values in quotes; tolerate pasting that verbatim
+    return val
+
+
 def _upstash(*command: str):
-    url = os.environ.get("UPSTASH_REDIS_REST_URL")
-    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    url = _env("UPSTASH_REDIS_REST_URL")
+    token = _env("UPSTASH_REDIS_REST_TOKEN")
     if not url or not token:
         raise ConfigError("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN not set")
     resp = requests.post(url, headers={"Authorization": f"Bearer {token}"}, json=list(command), timeout=10)
