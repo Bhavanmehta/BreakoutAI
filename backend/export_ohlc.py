@@ -20,15 +20,18 @@ import time
 import pandas as pd
 
 import settings
+from levels import resolve_display_levels
 
 # ~7 months of daily context — enough to show the base and the breakout without bloating
 # each file. Bump if the charts feel too short.
 BARS = 150
 OHLC_DIR = settings.DATA_DIR / "ohlc"
 
-# Columns pulled from ohlcv_features. ema50/ema200 are the two overlays we draw; is_breakout
-# marks the days we flag with a marker.
-_COLS = ["symbol", "date", "open", "high", "low", "close", "ema50", "ema200", "resistance", "support", "is_breakout"]
+# Columns pulled from ohlcv_features. ema50/ema200 are the two overlays we draw; ema21 +
+# volume feed the swing-pivot support/resistance detection (levels.py); is_breakout marks
+# the days we flag with a marker.
+_COLS = ["symbol", "date", "open", "high", "low", "close", "volume",
+         "ema21", "ema50", "ema200", "is_breakout"]
 
 
 def _safe(sym: str) -> str:
@@ -41,8 +44,23 @@ def _r(x):
     return None if x is None or pd.isna(x) else round(float(x), 2)
 
 
+def _line(zone: dict | None) -> dict | None:
+    """A support/resistance zone → the compact object the chart draws a horizontal
+    line from. Only *horizontal* zones become a drawn line; a 'dynamic' support (a
+    rising EMA) is already visible as the EMA overlay, so we don't stamp a static
+    line at its momentary value — return None and let the card explain it in words."""
+    if not zone or zone.get("kind") != "horizontal":
+        return None
+    return {"level": zone["level"], "touches": zone.get("touches"),
+            "confirmed": bool(zone.get("confirmed"))}
+
+
 def _emit_one(sym: str, g: pd.DataFrame) -> dict:
-    g = g.sort_values("date").tail(BARS)
+    g = g.sort_values("date")
+    # Detect levels on the full available history (pivots need the context), then tail
+    # to BARS for the drawn candles.
+    levels = resolve_display_levels(g)
+    g = g.tail(BARS)
     bars, ema50, ema200, breakouts = [], [], [], []
     for _, row in g.iterrows():
         d = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
@@ -51,13 +69,11 @@ def _emit_one(sym: str, g: pd.DataFrame) -> dict:
         ema200.append(_r(row.get("ema200")))
         if bool(row.get("is_breakout")):
             breakouts.append(d)
-    res = g["resistance"].dropna()
-    sup = g["support"].dropna()
     return {
         "symbol": sym,
         "as_of": bars[-1][0] if bars else None,
-        "resistance": _r(res.iloc[-1]) if len(res) else None,
-        "support": _r(sup.iloc[-1]) if len(sup) else None,
+        "resistance": _line(levels["resistance"]),
+        "support": _line(levels["support"]),
         "bars": bars,
         "ema50": ema50,
         "ema200": ema200,
@@ -88,8 +104,11 @@ def export_from_duckdb() -> int:
     con = duckdb.connect(str(settings.DUCKDB_PATH), read_only=True)
     symbols = [r[0] for r in con.execute("SELECT DISTINCT symbol FROM ohlcv_features").fetchall()]
     OHLC_DIR.mkdir(parents=True, exist_ok=True)
+    # Pull enough bars for swing-pivot level detection (SR_LOOKBACK), even though only the
+    # last BARS are drawn — _emit_one detects levels on the full slice, then tails to BARS.
+    fetch = max(BARS, settings.SR_LOOKBACK)
     q = (f"SELECT {', '.join(_COLS)} FROM ohlcv_features WHERE symbol = ? "
-         f"ORDER BY date DESC LIMIT {BARS}")
+         f"ORDER BY date DESC LIMIT {fetch}")
     n = failed = 0
     for sym in symbols:
         try:

@@ -182,8 +182,8 @@
                         </div>
                     </div>
 
-                    <!-- The Read + News (side-by-side) -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- The Read + News (side-by-side when news exists; The Read goes full-width otherwise) -->
+                    <div id="readNewsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <!-- The Read (readiness + verdict explainer) -->
                         <div id="verdictCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
                             <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10"></div>
@@ -242,6 +242,7 @@
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-purple-400"></span> 50-day EMA</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-amber-400"></span> 200-day EMA</span>
                             <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout</span>
+                            <span class="text-slate-500">· "3×" = times price reversed there (thicker line = confirmed ≥3 touches)</span>
                         </div>
                     </div>
 
@@ -290,25 +291,51 @@
                             <p class="text-[11px] text-slate-500 mt-3 leading-snug">Past performance doesn't guarantee future results — these are this stock's own prior breakouts, shown for context.</p>
                         </div>
 
-                        <!-- Resistance proximity -->
+                        <!-- Key levels (swing-pivot support & resistance) -->
                         <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4">Resistance Proximity</h3>
-                            <div class="flex justify-between items-end mb-2">
-                                <div>
-                                    <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Calculated Resistance</span>
-                                    <span class="text-lg font-bold text-white" id="resLine">—</span>
+                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-4 flex items-center gap-1.5">
+                                Key Levels
+                                <span class="info-i" data-tip="Support &amp; resistance drawn the way traders do it — not a rolling high/low. We find swing pivots (where price actually turned), then keep the price zones it reversed at repeatedly (the '3-point rule'), weighted by the volume on those touches. '3×' = touched three times (a confirmed level); '2×' = tentative. When a stock has run far above all structure, there's no nearby horizontal support, so we show its rising moving average as dynamic support instead — the level it would realistically fall back to.">i</span>
+                            </h3>
+
+                            <!-- Resistance row -->
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-block w-3 h-0 border-t-2 border-dashed border-rose-500"></span>
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase block leading-tight">Resistance</span>
+                                        <span class="text-lg font-bold text-white" id="resLine">—</span>
+                                    </div>
                                 </div>
                                 <div class="text-right">
-                                    <span class="text-[10px] text-slate-400 uppercase block mb-0.5">Distance</span>
-                                    <span class="text-sm font-bold text-rose-400" id="resDistance">—</span>
+                                    <span class="text-sm font-bold text-rose-400 block" id="resDistance">—</span>
+                                    <span class="text-[10px] text-slate-500" id="resTouches">—</span>
                                 </div>
                             </div>
-                            <div class="w-full h-1.5 rounded-full bg-slate-900 relative mb-4">
-                                <div class="absolute right-0 top-0 bottom-0 w-1 bg-rose-500 rounded-r-full shadow-[0_0_8px_#f43f5e]"></div>
-                                <div id="distBar" class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-700" style="right: 50%"></div>
+
+                            <!-- Price marker between the two levels -->
+                            <div class="flex items-center gap-2 my-2 text-[10px] text-slate-500">
+                                <span class="flex-none">Now</span>
+                                <span class="flex-1 border-t border-dotted border-slate-700"></span>
+                                <span class="flex-none font-semibold text-slate-300" id="levelsPrice">—</span>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-700/50">
-                                <div><span class="text-[10px] text-slate-400 uppercase block">Times Tested</span><span class="text-sm font-semibold text-slate-200" id="resTouches">—</span></div>
+
+                            <!-- Support row -->
+                            <div class="flex justify-between items-center mt-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-block w-3 h-0 border-t-2 border-dashed border-blue-400"></span>
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 uppercase block leading-tight">Support</span>
+                                        <span class="text-lg font-bold text-white" id="supLine">—</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-sm font-bold text-blue-400 block" id="supDistance">—</span>
+                                    <span class="text-[10px] text-slate-500" id="supTouches">—</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-slate-700/50">
                                 <div><span class="text-[10px] text-slate-400 uppercase block">Base Depth</span><span class="text-sm font-semibold text-slate-200" id="baseDepth">—</span></div>
                             </div>
                         </div>
@@ -1267,12 +1294,16 @@
         // most of the ~1,800-stock universe won't have an entry on any given day).
         function renderNews(s) {
             const card = $("newsCard");
+            const grid = $("readNewsGrid");
             const n = s.news;
             if (!n || !n.headlines || !n.headlines.length) {
+                // No news → hide the card and let The Read take the full width.
                 card.classList.add("hidden");
+                grid.classList.remove("md:grid-cols-2");
                 return;
             }
             card.classList.remove("hidden");
+            grid.classList.add("md:grid-cols-2");
             $("newsAsOf").innerText = n.as_of ? "as of " + n.as_of : "";
 
             const sentRow = $("newsSentimentRow");
@@ -1294,9 +1325,28 @@
             const fmtDate = (d) => {
                 if (!d) return "";
                 const dt = new Date(d);
-                return isNaN(dt) ? "" : dt.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                return isNaN(dt) ? "" : dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" });
             };
-            $("newsList").innerHTML = n.headlines.slice(0, 5).map(h => {
+
+            // Newest-first. The backend already constrains to recent news at the API query
+            // (settings.NEWS_MAX_AGE_DAYS), so this is mainly a sort + a generous safety net
+            // that drops anything that somehow slipped through much older than that window.
+            const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+            const sorted = n.headlines
+                .filter(h => {
+                    if (!h.published_at) return true;  // keep if undated
+                    const dt = new Date(h.published_at);
+                    return isNaN(dt) || dt >= cutoff;
+                })
+                .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+                .slice(0, 5);
+
+            if (sorted.length === 0) {
+                $("newsList").innerHTML = `<p class="text-xs text-slate-500">No recent news for this stock.</p>`;
+                return;
+            }
+
+            $("newsList").innerHTML = sorted.map(h => {
                 const dateTxt = fmtDate(h.published_at);
                 const providerTag = h.provider === "marketaux" ? "Marketaux" : "NewsData.io";
                 const href = h.url ? escapeHtml(h.url) : "#";
@@ -1437,13 +1487,33 @@
 
 
         function renderLevels(s) {
-            const r = s.resistance;
-            $("resLine").innerText = r.level != null ? "₹" + r.level.toLocaleString("en-IN") : "—";
-            const dist = r.distance_pct;
-            $("resDistance").innerText = dist != null ? Math.abs(dist) + "% " + (dist >= 0 ? "away" : "above") : "—";
-            const pct = dist != null ? Math.min(Math.max(Math.abs(dist), 0.5), 20) : 50;
-            $("distBar").style.right = pct + "%";
-            $("resTouches").innerText = (r.touches ?? "—") + " times";
+            const lv = s.levels || {};
+            $("levelsPrice").innerText = "₹" + s.price.toLocaleString("en-IN");
+
+            // How a zone renders its touch/kind sub-label: "3× tested ✓ confirmed",
+            // "2× tested", or "dynamic (rising 50-day EMA)" for the EMA fallback.
+            const touchLabel = (z) => {
+                if (!z) return "";
+                if (z.kind === "dynamic") return z.label || "dynamic";
+                if (z.touches == null) return "";
+                return `${z.touches}× tested${z.confirmed ? " ✓" : ""}`;
+            };
+            const setSide = (z, lineId, distId, touchId, aboveWord, belowWord) => {
+                if (!z || z.level == null) {
+                    $(lineId).innerText = "—";
+                    $(distId).innerText = "none nearby";
+                    $(touchId).innerText = "";
+                    return;
+                }
+                $(lineId).innerText = "₹" + z.level.toLocaleString("en-IN");
+                const d = z.distance_pct;
+                $(distId).innerText = d != null ? `${Math.abs(d)}% ${d >= 0 ? aboveWord : belowWord}` : "—";
+                $(touchId).innerText = touchLabel(z);
+            };
+            // Resistance is above price (away ↑); support is below (below ↓).
+            setSide(lv.resistance, "resLine", "resDistance", "resTouches", "away", "below");
+            setSide(lv.support, "supLine", "supDistance", "supTouches", "above", "below");
+
             $("baseDepth").innerText = s.base_depth_pct != null ? s.base_depth_pct + "%" : "—";
         }
 
@@ -1623,16 +1693,27 @@
             if (data.ema50) line("#a855f7").setData(zip(data.ema50));
             if (data.ema200) line("#f59e0b").setData(zip(data.ema200));
 
-            if (data.resistance != null) {
+            // Support/resistance are now swing-pivot zones (levels.py): {level, touches,
+            // confirmed}. Title shows the touch count so the drawn line is self-explanatory
+            // (a "3-touch" line is the article's confirmed level; 2-touch is tentative).
+            const srTitle = (base, z) => {
+                if (z.touches == null) return base;
+                return `${base} · ${z.touches}×${z.confirmed ? " ✓" : ""}`;
+            };
+            const resZone = data.resistance;
+            if (resZone && resZone.level != null) {
                 candles.createPriceLine({
-                    price: data.resistance, color: "#f43f5e", lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Resistance",
+                    price: resZone.level, color: "#f43f5e", lineWidth: resZone.confirmed ? 2 : 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true,
+                    title: srTitle("Resistance", resZone),
                 });
             }
-            if (data.support != null) {
+            const supZone = data.support;
+            if (supZone && supZone.level != null) {
                 candles.createPriceLine({
-                    price: data.support, color: "#60a5fa", lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Support",
+                    price: supZone.level, color: "#60a5fa", lineWidth: supZone.confirmed ? 2 : 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true,
+                    title: srTitle("Support", supZone),
                 });
             }
             if (data.breakouts && data.breakouts.length) {

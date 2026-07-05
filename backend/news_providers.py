@@ -20,10 +20,20 @@ this symbol, keep going -- a single bad/uncovered stock shouldn't abort the run)
 """
 from __future__ import annotations
 import re
+from datetime import datetime, timedelta, timezone
 
 import requests
 
 import settings
+
+
+def _sort_recent_first(headlines: list[dict]) -> list[dict]:
+    """Newest-first by published_at; undated items sink to the bottom. A safety net so
+    the cached order is always sensible even if a provider ignores our sort param."""
+    def key(h):
+        ts = h.get("published_at") or ""
+        return ts  # ISO-8601 strings sort chronologically as text
+    return sorted(headlines, key=key, reverse=True)
 
 _TIMEOUT = 10
 
@@ -55,13 +65,21 @@ def fetch_marketaux(symbol: str, name: str, api_key: str) -> dict | None:
     """One stock's recent India-market news + aggregate entity sentiment, via a
     company-name search. NSE ticker suffixes aren't reliably indexed in Marketaux's
     symbol universe, so a name search with a countries=in filter is more robust than
-    guessing an exchange-suffixed symbol format (e.g. RELIANCE.NSE)."""
+    guessing an exchange-suffixed symbol format (e.g. RELIANCE.NSE).
+
+    `published_after` + `sort=published_desc` are essential: without them the free
+    search returns whatever matches by relevance, which for thinly-covered small-caps
+    is often years-old articles. We constrain to the last NEWS_MAX_AGE_DAYS and take
+    the newest first so a stock either gets genuinely recent news or none."""
+    published_after = (datetime.now(timezone.utc)
+                       - timedelta(days=settings.NEWS_MAX_AGE_DAYS)).strftime("%Y-%m-%dT%H:%M:%S")
     try:
         resp = requests.get(
             "https://api.marketaux.com/v1/news/all",
             params={
                 "search": name, "countries": "in", "language": "en",
                 "filter_entities": "true", "limit": 10, "api_token": api_key,
+                "published_after": published_after, "sort": "published_desc",
             },
             timeout=_TIMEOUT,
         )
@@ -105,7 +123,7 @@ def fetch_marketaux(symbol: str, name: str, api_key: str) -> dict | None:
         avg = round(sum(matched_scores) / len(matched_scores), 2)
         sentiment = {"score": avg, "label": _sentiment_label(avg)}
 
-    return {"headlines": headlines, "sentiment": sentiment}
+    return {"headlines": _sort_recent_first(headlines), "sentiment": sentiment}
 
 
 def fetch_newsdata(symbol: str, name: str, api_key: str) -> dict | None:
@@ -146,4 +164,5 @@ def fetch_newsdata(symbol: str, name: str, api_key: str) -> dict | None:
         })
     if not headlines:
         return None
-    return {"headlines": headlines, "sentiment": None}
+    # NewsData's free "latest" feed is already recent; sort newest-first for consistency.
+    return {"headlines": _sort_recent_first(headlines), "sentiment": None}

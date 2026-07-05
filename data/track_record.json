@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T23:48:23+00:00",
+  "generated_at": "2026-07-05T07:29:08+00:00",
   "horizon_days": 10,
   "stop_loss_fraction": 0.94,
   "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",

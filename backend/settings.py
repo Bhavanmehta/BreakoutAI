@@ -75,6 +75,23 @@ ATR_LONG = 30             # baseline volatility window (ratio < 1 => "coiling")
 RESISTANCE_TOUCH_PCT = 2.0  # a day counts as "touching" resistance if within this % of it
 FORWARD_WINDOWS = [5, 10, 20]  # trading days ahead used to score historical breakouts
 
+# --- Displayed support/resistance zones (levels.py) --------------------------
+# These drive the horizontal lines drawn on the annotated chart and the
+# "Key Levels" card. Unlike the rolling LOOKBACK_HIGH high/low (which fires on a
+# single touch and is only an internal input to is_breakout), these are the
+# trader-style zones: swing pivots that price has reversed at repeatedly. Method
+# follows the common "3-point rule" (a valid level is touched multiple times),
+# weighted by the volume on those touches.
+SR_LOOKBACK = 180          # bars of history scanned for pivots (~9 months of daily)
+SR_PIVOT_K = 5             # a swing pivot is the local extreme within +/- this many bars
+SR_CLUSTER_TOL_PCT = 1.75  # pivots within this % of each other merge into one zone
+SR_MIN_TOUCHES = 2         # a zone must be touched at least this many times to be shown
+SR_STRONG_TOUCHES = 3      # the article's "3-point rule" — zones at/above this are "confirmed"
+SR_MAX_DISTANCE_PCT = 20   # ignore horizontal zones farther than this % from price (a level
+                           # the stock hasn't been near in months isn't an actionable line).
+                           # For a stock that's run away from all structure, the rising EMA is
+                           # reported as *dynamic* support instead (see levels.resolve_display_levels).
+
 # Trend filter (Stage 2). Only count breakouts when the stock is actually trending up.
 REQUIRE_UPTREND = True
 TREND_EMA_LONG = 200          # must be above this EMA, and it must be rising
@@ -158,6 +175,11 @@ NEWS_MARKETAUX_DAILY_BUDGET = 90
 NEWS_NEWSDATA_DAILY_BUDGET = 190
 NEWS_SENTIMENT_BULLISH = 0.15    # entity sentiment_score >= this -> "Bullish"
 NEWS_SENTIMENT_BEARISH = -0.15   # <= this -> "Bearish"; between the two -> "Neutral"
+# Only keep genuinely recent news. Marketaux's free search otherwise happily returns
+# years-old articles for thinly-covered small/mid-caps -- a 2024 headline next to a live
+# breakout is worse than no headline. Enforced at the API query (published_after) so we
+# never even cache stale items, and the results are sorted newest-first.
+NEWS_MAX_AGE_DAYS = 45
 
 # --- Indicator windows -------------------------------------------------------
 # 8 & 21 are the responsive Fibonacci "momentum/trend" EMAs (catch moves early);

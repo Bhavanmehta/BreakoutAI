@@ -19,6 +19,7 @@ import pandas as pd
 import settings
 from patterns import detect_pattern
 from analogs import detect_analog
+from levels import resolve_display_levels
 from score import reliability_estimate, conviction
 
 
@@ -67,9 +68,9 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     high_52w = df["high"].rolling(252, min_periods=50).max()
     df["dist_from_52w_high"] = (high_52w - df["close"]) / high_52w * 100
 
-    # --- Resistance = highest high of prior N days; Support = lowest low of prior N days ---
+    # --- Resistance = highest high of prior N days (internal is_breakout input only;
+    # the support/resistance the user SEES comes from swing-pivot clustering, levels.py) ---
     df["resistance"] = df["high"].rolling(settings.LOOKBACK_HIGH).max().shift(1)
-    df["support"] = df["low"].rolling(settings.LOOKBACK_HIGH).min().shift(1)
     df["avg_vol"] = df["volume"].rolling(settings.VOL_AVG_WINDOW).mean().shift(1)
 
     # --- Breakout = new high + volume surge + (optionally) uptrend + near 52w high ---
@@ -327,6 +328,13 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     # happened next — the evidence behind "The Read" (see analogs.py).
     analog = detect_analog(df)
 
+    # Displayed support/resistance zones (levels.py) — the trader-style horizontal
+    # levels drawn on the chart + shown in the Key Levels card. These are *distinct*
+    # from the rolling `resistance` above (an internal is_breakout input): they're
+    # swing-pivot clusters price has actually reversed at (3-point rule), with a
+    # rising-EMA dynamic-support fallback for stocks extended above their structure.
+    levels = resolve_display_levels(df)
+
     # Plain-English guidance derived from the computed state
     if resistance:
         trigger = (f"Watch for a close above ₹{resistance:,.2f} on above-average volume "
@@ -351,6 +359,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "adx": {"value": round(adx_val, 1) if adx_val else None, "label": _adx_label(adx_val)},
         "resistance": {"level": round(resistance, 2) if resistance else None,
                        "distance_pct": dist_pct, "touches": touches},
+        "levels": levels,
         "base_depth_pct": base_depth,
         "volatility": {"contraction_ratio": round(vc, 2) if vc else None, "state": vol_state},
         "trend": trend,
