@@ -147,6 +147,23 @@ def run():
         for s in summaries:
             s["fundamentals"] = None
 
+    # --- Merge cached earnings (from fetch_earnings.py) if present ---
+    # Quarterly-slow reference data, same optional/graceful pattern as holdings/
+    # sectors/fundamentals -- stocks without an entry carry earnings: null.
+    earnings_path = settings.DATA_DIR / "earnings.json"
+    if earnings_path.exists():
+        with open(earnings_path, encoding="utf-8") as f:
+            earnings = json.load(f)
+        matched = 0
+        for s in summaries:
+            e = earnings.get(s["symbol"])
+            s["earnings"] = e if (e and e.get("quarters")) else None
+            matched += 1 if s["earnings"] else 0
+        print(f"  merged earnings for {matched}/{len(summaries)} stocks")
+    else:
+        for s in summaries:
+            s["earnings"] = None
+
     # --- Merge cached news + sentiment (from fetch_news.py) if present ---
     # Time-sensitive but budget-capped (all free providers cap daily requests), so like
     # holdings/sectors/fundamentals this is a separate, optional enrichment -- stocks

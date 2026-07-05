@@ -104,6 +104,15 @@
                         class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
                     ◎ Primed only
                 </button>
+                <button id="sectorRadarBtn" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500 whitespace-nowrap">
+                    🔥 <span id="sectorRadarHint">Sectors</span>
+                </button>
+                <button id="myWatchlistBtn" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500 flex items-center gap-1.5 whitespace-nowrap">
+                    ★ My Watchlist
+                    <span id="myWatchlistBadge" class="hidden px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[10px] leading-none"></span>
+                </button>
                 <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
             </div>
 
@@ -134,18 +143,8 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- LEFT: sector radar + vertical watchlist -->
+                <!-- LEFT: vertical watchlist (Sector Radar + My Watchlist moved to top-bar popups, see #sectorPopup / #myWatchlistPanel) -->
                 <div class="lg:col-span-3 flex flex-col gap-5">
-
-                    <!-- Sector radar -->
-                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
-                        <button id="radarToggle" type="button" class="w-full flex items-center justify-between mb-1">
-                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Sector Radar</span>
-                            <span class="text-slate-500 text-xs" id="radarChevron">▾</span>
-                        </button>
-                        <p class="text-[11px] text-slate-500 mb-3 leading-snug">Where setups are clustering — sectors with the most primed names first.</p>
-                        <div id="sectorRadar" class="space-y-2"></div>
-                    </div>
 
                     <!-- Watchlist (vertical overview list) -->
                     <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl flex flex-col min-h-0">
@@ -181,6 +180,10 @@
                             </div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
                         </div>
+                        <button id="trackBtn" type="button"
+                                class="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500">
+                            + Track
+                        </button>
                     </div>
 
                     <!-- The Read + News (side-by-side when news exists; The Read goes full-width otherwise) -->
@@ -250,16 +253,31 @@
                         </div>
                     </div>
 
-                    <!-- Historical analog — moved below the chart (supporting context, deliberately
-                         de-emphasised vs. The Read; a single closest-match day, not a track record) -->
-                    <div id="analogBox" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <div class="flex items-center gap-2 mb-1.5">
-                            <span class="text-base opacity-70">🕰️</span>
-                            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
+                    <!-- Earnings (left) + historical analog (right, shrunk to half width —
+                         both are supporting context, de-emphasised vs. The Read above) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <!-- Quarterly EPS: estimated vs. actual (earnings.py / fetch_earnings.py) -->
+                        <div id="earningsCard" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                    📊 Earnings
+                                    <span class="info-i" data-tip="Quarterly EPS (earnings per share), Indian fiscal year (Apr–Mar). When analyst estimates aren't available for a quarter (common for small/micro-caps — most don't have analyst coverage), we still show the actual EPS every listed company reports, just without an estimate dot to compare it to.">i</span>
+                                </span>
+                                <span id="earningsSource" class="text-[10px] text-slate-500"></span>
+                            </div>
+                            <div id="earningsChart"></div>
+                            <div id="earningsLegend" class="flex items-center gap-4 mt-1 text-[10px] text-slate-400"></div>
                         </div>
-                        <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
-                        <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
-                        <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
+
+                        <div id="analogBox" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="text-base opacity-70">🕰️</span>
+                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
+                            </div>
+                            <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
+                            <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
+                            <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
+                        </div>
                     </div>
 
                     <!-- Detail cards grid -->
@@ -394,6 +412,40 @@
         </div>
     </main>
 
+    <!-- Sector Radar popup — triggered by #sectorRadarBtn in the top filter bar. Moved out
+         of the always-visible left sidebar to declutter the page; content unchanged. -->
+    <div id="sectorPopup" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div id="sectorPopupBackdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="relative w-full max-w-md max-h-[80vh] flex flex-col bg-cardBg border border-borderCl rounded-xl shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-white">🔥 Sector Radar</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Where setups are clustering — click a sector to filter.</div>
+                </div>
+                <button id="sectorPopupClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+            </div>
+            <div id="sectorRadar" class="p-4 space-y-3 overflow-y-auto wl-scroll"></div>
+        </div>
+    </div>
+
+    <!-- My Watchlist popup — triggered by #myWatchlistBtn in the top filter bar. Personal
+         tracked stocks (date added / entry / current / return %), synced via api/watchlist.py
+         so it follows you across devices; distinct from the "Watchlist" sidebar list, which
+         is the filtered list of ALL matching stocks. -->
+    <div id="myWatchlistPanel" class="hidden fixed inset-0 z-50 flex justify-end">
+        <div id="myWatchlistBackdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="relative w-full max-w-md h-full bg-cardBg border-l border-borderCl flex flex-col shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-white">★ My Watchlist</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Stocks you've personally tracked. Synced across your devices.</div>
+                </div>
+                <button id="myWatchlistClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+            </div>
+            <div id="myWatchlistBody" class="flex-1 overflow-y-auto p-4 flex flex-col wl-scroll"></div>
+        </div>
+    </div>
+
     <!-- Ask AI: floating launcher + slide-over panel. Talks to a local dev server
          (backend/chat_server.py) that proxies Groq so the API key stays server-side. -->
     <button id="askAiFab" type="button"
@@ -434,6 +486,7 @@
     <script>
         let STOCKS = [];
         let current = null;
+        let MY_WATCHLIST = [];
         const $ = (id) => document.getElementById(id);
 
         const READINESS_STYLE = {
@@ -650,6 +703,7 @@
                 wireChartToggle();
                 initTooltips();
                 initAskAi();
+                await initMyWatchlist();
                 applyFilters();
                 selectStock(STOCKS[0].symbol);
                 $("statusPane").classList.add("hidden");
@@ -686,11 +740,9 @@
                         : "bg-slate-800 border-borderCl text-slate-300");
                 applyFilters();
             };
-            $("radarToggle").onclick = () => {
-                const r = $("sectorRadar");
-                r.classList.toggle("hidden");
-                $("radarChevron").innerText = r.classList.contains("hidden") ? "▸" : "▾";
-            };
+            $("sectorRadarBtn").onclick = () => $("sectorPopup").classList.remove("hidden");
+            $("sectorPopupClose").onclick = () => $("sectorPopup").classList.add("hidden");
+            $("sectorPopupBackdrop").onclick = () => $("sectorPopup").classList.add("hidden");
             $("fundReset").onclick = () => {
                 FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
                 renderFundPanel();
@@ -831,6 +883,7 @@
                 wl.innerHTML = `<span class="text-sm text-slate-500 py-2">No stock matches these filters.</span>`;
                 return;
             }
+            const trackedSet = new Set(MY_WATCHLIST.map(it => it.symbol));
             list.slice(0, MAX_RESULTS).forEach(s => {
                 const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
                 const dist = s.resistance && s.resistance.distance_pct;
@@ -840,18 +893,25 @@
                 const chg = s.change_pct ?? 0;
                 const chgCls = chg >= 0 ? "text-emerald-400" : "text-rose-400";
                 const conv = s.readiness.conviction;
-                const row = document.createElement("button");
+                const tracked = trackedSet.has(s.symbol);
+                const row = document.createElement("div");
                 row.id = "wl-" + s.symbol;
+                row.setAttribute("role", "button");
+                row.tabIndex = 0;
                 row.onclick = () => selectStock(s.symbol);
-                row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+                row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500 cursor-pointer";
                 row.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
                         <span class="flex items-center gap-2 min-w-0">
                             <span class="w-2 h-2 rounded-full flex-none ${rs.dot}"></span>
                             <span class="text-sm font-bold text-slate-100 truncate">${s.symbol}</span>
                         </span>
-                        <span class="flex items-baseline gap-1 flex-none" title="Breakout conviction (0–100)">
-                            <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
+                        <span class="flex items-center gap-2 flex-none">
+                            <span class="wl-quick-track w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold leading-none ${tracked ? "text-emerald-400" : "text-slate-500 hover:text-purple-300"}"
+                                  role="button" tabindex="0" title="${tracked ? "Tracking — click to remove" : "Add to My Watchlist"}">${tracked ? "✓" : "+"}</span>
+                            <span class="flex items-baseline gap-1" title="Breakout conviction (0–100)">
+                                <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
+                            </span>
                         </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
@@ -860,6 +920,10 @@
                         <span class="text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
                         <span class="text-[10px] ${rs.text}">${distTxt}</span>
                     </div>`;
+                row.querySelector(".wl-quick-track").onclick = (e) => {
+                    e.stopPropagation();
+                    if (tracked) removeFromWatchlist(s.symbol); else addToWatchlist(s);
+                };
                 wl.appendChild(row);
             });
             highlightActive();
@@ -867,11 +931,11 @@
 
         function highlightActive() {
             document.querySelectorAll(".wl-row").forEach(b => {
-                b.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+                b.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500 cursor-pointer";
             });
             if (current) {
                 const a = $("wl-" + current.symbol);
-                if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)]";
+                if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)] cursor-pointer";
             }
         }
 
@@ -885,6 +949,9 @@
                 if (s.readiness && s.readiness.watch) b.primed++;
                 if (s.breakout && s.breakout.today) b.breaking++;
             });
+            const hotCount = Object.values(byGroup).filter(b => b.primed > 0).length;
+            $("sectorRadarHint").innerText = hotCount ? `${hotCount} sector${hotCount === 1 ? "" : "s"} heating up` : "Sectors";
+
             const rows = Object.entries(byGroup)
                 .sort((a, b) => b[1].primed - a[1].primed || b[1].total - a[1].total)
                 .slice(0, 9);
@@ -900,12 +967,13 @@
                     $("fltSector").value = filters.sector;
                     renderSectorRadar();
                     applyFilters();
+                    $("sectorPopup").classList.add("hidden");
                 };
                 btn.className = "w-full text-left group";
                 btn.innerHTML = `
                     <div class="flex items-center justify-between gap-2 mb-1">
                         <span class="text-[11px] font-semibold truncate ${active ? "text-purple-300" : "text-slate-300"}">${g}</span>
-                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
+                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed · ${b.total} total${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-slate-900">
                         <div class="h-full rounded-full ${active ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-400"}" style="width:${w}%"></div>
@@ -1001,6 +1069,131 @@
             renderIndicatorStrip(s);
             loadChart(s.symbol);
             updateAskAiContext();
+            updateTrackButton();
+        }
+
+        // --- My Watchlist: personal tracked stocks (date added / entry / current /
+        // return %), synced across devices via api/watchlist.py + Upstash Redis. Gated
+        // by a shared secret (there's one real user, not full accounts) cached in
+        // localStorage after a one-time prompt. Current price / name are joined from
+        // STOCKS at render time -- only {symbol, date_added, entry_price} live server-side.
+        const WATCHLIST_SECRET_KEY = "breakoutai_watchlist_secret";
+
+        function getWatchlistSecret(promptIfMissing) {
+            let secret = localStorage.getItem(WATCHLIST_SECRET_KEY) || "";
+            if (!secret && promptIfMissing) {
+                secret = (prompt("Enter your watchlist secret (the WATCHLIST_SECRET you set on Vercel):") || "").trim();
+                if (secret) localStorage.setItem(WATCHLIST_SECRET_KEY, secret);
+            }
+            return secret;
+        }
+
+        async function initMyWatchlist() {
+            $("myWatchlistBtn").onclick = () => $("myWatchlistPanel").classList.remove("hidden");
+            $("myWatchlistClose").onclick = () => $("myWatchlistPanel").classList.add("hidden");
+            $("myWatchlistBackdrop").onclick = () => $("myWatchlistPanel").classList.add("hidden");
+            await fetchMyWatchlist();
+        }
+
+        async function fetchMyWatchlist() {
+            const secret = getWatchlistSecret(false);
+            if (!secret) { renderMyWatchlist(); return; }
+            try {
+                const res = await fetch("/api/watchlist", { headers: { "X-Watchlist-Secret": secret } });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                MY_WATCHLIST = (await res.json()).items || [];
+            } catch (err) {
+                console.warn("My Watchlist: couldn't load —", err.message);
+            }
+            renderMyWatchlist();
+            updateTrackButton();
+        }
+
+        // Refreshes every place tracked/untracked state is shown: the detail-header
+        // button, the popup list + badge, and the quick-track icon on each sidebar row.
+        function refreshWatchlistUI() {
+            updateTrackButton();
+            renderMyWatchlist();
+            renderWatchlist(currentVisible());
+        }
+
+        async function addToWatchlist(stock) {
+            const secret = getWatchlistSecret(true);
+            if (!secret) return;
+            try {
+                const res = await fetch("/api/watchlist", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Watchlist-Secret": secret },
+                    body: JSON.stringify({ symbol: stock.symbol, entry_price: stock.price }),
+                });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                const item = await res.json();
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== item.symbol);
+                MY_WATCHLIST.unshift(item);
+                refreshWatchlistUI();
+            } catch (err) {
+                alert("Couldn't add to watchlist: " + err.message);
+            }
+        }
+
+        async function removeFromWatchlist(symbol) {
+            const secret = getWatchlistSecret(true);
+            if (!secret) return;
+            try {
+                const res = await fetch("/api/watchlist?symbol=" + encodeURIComponent(symbol), {
+                    method: "DELETE",
+                    headers: { "X-Watchlist-Secret": secret },
+                });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== symbol);
+                refreshWatchlistUI();
+            } catch (err) {
+                alert("Couldn't remove from watchlist: " + err.message);
+            }
+        }
+
+        function updateTrackButton() {
+            const btn = $("trackBtn");
+            if (!btn || !current) return;
+            const tracked = MY_WATCHLIST.some(it => it.symbol === current.symbol);
+            btn.innerText = tracked ? "✓ Tracking" : "+ Track";
+            btn.className = "ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
+                (tracked
+                    ? "bg-emerald-600/20 border-emerald-500 text-emerald-300"
+                    : "bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500");
+            btn.onclick = () => tracked ? removeFromWatchlist(current.symbol) : addToWatchlist(current);
+        }
+
+        function renderMyWatchlist() {
+            const badge = $("myWatchlistBadge");
+            if (MY_WATCHLIST.length) { badge.innerText = String(MY_WATCHLIST.length); badge.classList.remove("hidden"); }
+            else { badge.classList.add("hidden"); }
+            const el = $("myWatchlistBody");
+            if (!MY_WATCHLIST.length) {
+                el.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">Nothing tracked yet — click "+ Track" on a stock, or the + on any row in the Watchlist list.</div>`;
+                return;
+            }
+            el.innerHTML = MY_WATCHLIST.map(it => {
+                const s = STOCKS.find(x => x.symbol === it.symbol);
+                const curPrice = s ? s.price : null;
+                const retPct = curPrice != null ? (curPrice - it.entry_price) / it.entry_price * 100 : null;
+                const days = Math.max(0, Math.floor((Date.now() - new Date(it.date_added)) / 86400000));
+                const retCls = retPct == null ? "text-slate-500" : (retPct >= 0 ? "text-emerald-400" : "text-rose-400");
+                const retTxt = retPct == null ? "—" : (retPct >= 0 ? "+" : "") + retPct.toFixed(1) + "%";
+                return `<div class="py-2.5 border-b border-borderCl/50 last:border-0 text-xs">
+                    <div class="flex items-center justify-between gap-2">
+                        <button class="min-w-0 text-left truncate font-semibold text-sm text-slate-200 hover:text-purple-300" onclick="selectStock('${it.symbol}')">${it.symbol}</button>
+                        <div class="flex items-center gap-2 flex-none">
+                            <span class="font-bold ${retCls}">${retTxt}</span>
+                            <button class="text-slate-500 hover:text-rose-400 text-sm leading-none" onclick="removeFromWatchlist('${it.symbol}')" title="Remove">✕</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 mt-1 text-[11px] text-slate-500">
+                        <span>${it.date_added} · ${days}d</span>
+                        <span>₹${it.entry_price.toLocaleString("en-IN")} → ${curPrice != null ? "₹" + curPrice.toLocaleString("en-IN") : "—"}</span>
+                    </div>
+                </div>`;
+            }).join("");
         }
 
         // --- Ask AI: chat panel that can look up any stock (not just the one open),
@@ -1170,6 +1363,91 @@
             if (!parts.length) { wrap.classList.add("hidden"); return; }
             host.innerHTML = parts.join(`<span class="text-slate-600">·</span>`);
             wrap.classList.remove("hidden");
+        }
+
+        // Earnings: quarterly EPS estimated-vs-actual dumbbell/dot-plot (earnings.py /
+        // fetch_earnings.py). One hue, two shades — dim = Estimated, bright = Actual
+        // (a "before/after per item" comparison, not distinct series identities), so a
+        // beat/miss reads directly from how far apart the two dots sit. When a quarter
+        // has no analyst estimate (common for small/micro-caps — most aren't covered),
+        // we still plot the actual EPS every listed company reports; we just skip that
+        // quarter's estimate dot and connector rather than leaving a gap.
+        const EARNINGS_ACTUAL = "#f97316";
+        const EARNINGS_ESTIMATE = "rgba(249,115,22,0.4)";
+
+        function renderEarnings(s) {
+            const card = $("earningsCard");
+            const e = s.earnings;
+            if (!e || !e.quarters || !e.quarters.length) { card.classList.add("hidden"); return; }
+            card.classList.remove("hidden");
+            $("earningsSource").innerText = e.source === "estimate"
+                ? "vs. analyst estimate" : "actual EPS · no analyst coverage";
+
+            const quarters = e.quarters;
+            const hasNext = !!(e.next && e.next.estimate != null);
+            const n = quarters.length + (hasNext ? 1 : 0);
+            const W = 560, H = 180, padL = 42, padR = 16, padT = 14, padB = 24;
+            const plotW = W - padL - padR, plotH = H - padT - padB;
+
+            const vals = [];
+            quarters.forEach(q => { vals.push(q.actual); if (q.estimate != null) vals.push(q.estimate); });
+            if (hasNext) vals.push(e.next.estimate);
+            let lo = Math.min(...vals), hi = Math.max(...vals);
+            if (lo === hi) { lo -= 1; hi += 1; }
+            const pad = (hi - lo) * 0.18;
+            lo -= pad; hi += pad;
+
+            const xStep = n > 1 ? plotW / (n - 1) : 0;
+            const xAt = (i) => padL + (n > 1 ? i * xStep : plotW / 2);
+            const yAt = (v) => padT + plotH - ((v - lo) / (hi - lo)) * plotH;
+            const dot = (x, y, color, tip) => `<g>
+                <circle cx="${x}" cy="${y}" r="12" fill="transparent"></circle>
+                <circle cx="${x}" cy="${y}" r="5" fill="${color}" stroke="#1e293b" stroke-width="2"><title>${escapeHtml(tip)}</title></circle>
+            </g>`;
+
+            let svg = `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" style="max-height:210px">`;
+            // Gridlines: hi/mid/lo, solid hairline, recessive — plus a brighter zero baseline
+            // when EPS crosses zero (common for these small/loss-making names).
+            [hi, (hi + lo) / 2, lo].forEach(v => {
+                const y = yAt(v);
+                svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#26324a" stroke-width="1"/>`;
+                svg += `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="#64748b">${v.toFixed(2)}</text>`;
+            });
+            if (lo < 0 && hi > 0) {
+                const y0 = yAt(0);
+                svg += `<line x1="${padL}" y1="${y0}" x2="${W - padR}" y2="${y0}" stroke="#475569" stroke-width="1"/>`;
+            }
+
+            quarters.forEach((q, i) => {
+                const x = xAt(i);
+                const yA = yAt(q.actual);
+                if (q.estimate != null) {
+                    const yE = yAt(q.estimate);
+                    svg += `<line x1="${x}" y1="${yE}" x2="${x}" y2="${yA}" stroke="#475569" stroke-width="1.5"/>`;
+                    svg += dot(x, yE, EARNINGS_ESTIMATE, `${q.quarter} · Estimated ₹${q.estimate}`);
+                }
+                svg += dot(x, yA, EARNINGS_ACTUAL, `${q.quarter} · Actual ₹${q.actual}`);
+                svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">${q.quarter.replace(" FY", "'")}</text>`;
+            });
+            // The next, unreported quarter: a hollow dashed ring for its estimate only
+            // (there's no actual yet) — mirrors the reference "expected" callout.
+            if (hasNext) {
+                const x = xAt(quarters.length);
+                const y = yAt(e.next.estimate);
+                svg += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${EARNINGS_ACTUAL}" stroke-width="1.5" stroke-dasharray="2,2"><title>${escapeHtml(`Next (${e.next.date}) · est. ₹${e.next.estimate}`)}</title></circle>`;
+                svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">Next</text>`;
+            }
+            svg += `</svg>`;
+            $("earningsChart").innerHTML = svg;
+
+            let legend =
+                `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${EARNINGS_ESTIMATE}"></span> Estimated</span>` +
+                `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${EARNINGS_ACTUAL}"></span> Actual</span>`;
+            if (e.next) {
+                const d = new Date(e.next.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                legend += `<span class="text-slate-500">· Next: ${d}${e.next.estimate != null ? ` (est. ₹${e.next.estimate})` : ""}</span>`;
+            }
+            $("earningsLegend").innerHTML = legend;
         }
 
         function renderAnalog(s) {
@@ -1511,6 +1789,7 @@
             $("readinessSub").className = "text-xs font-medium mb-3 " + rs.text;
 
             renderAnalog(s);
+            renderEarnings(s);
             renderFundLine(s);
 
             // Detected chart pattern (decorative context, not a signal — see reliability study)
