@@ -67,8 +67,9 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     high_52w = df["high"].rolling(252, min_periods=50).max()
     df["dist_from_52w_high"] = (high_52w - df["close"]) / high_52w * 100
 
-    # --- Resistance = highest high of prior N days ---
+    # --- Resistance = highest high of prior N days; Support = lowest low of prior N days ---
     df["resistance"] = df["high"].rolling(settings.LOOKBACK_HIGH).max().shift(1)
+    df["support"] = df["low"].rolling(settings.LOOKBACK_HIGH).min().shift(1)
     df["avg_vol"] = df["volume"].rolling(settings.VOL_AVG_WINDOW).mean().shift(1)
 
     # --- Breakout = new high + volume surge + (optionally) uptrend + near 52w high ---

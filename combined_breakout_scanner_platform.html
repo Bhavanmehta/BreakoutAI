@@ -182,29 +182,44 @@
                         </div>
                     </div>
 
-                    <!-- The Read (readiness + historical analog hero) -->
-                    <div id="verdictCard" class="p-6 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
-                        <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                        <div class="flex items-start justify-between gap-3 mb-3">
-                            <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">The Read</h3>
-                            <div class="flex items-center gap-2 flex-wrap justify-end">
-                                <span id="trendBadge" class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap">—</span>
-                                <span id="sentimentBadge" class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap">—</span>
+                    <!-- The Read + News (side-by-side) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <!-- The Read (readiness + verdict explainer) -->
+                        <div id="verdictCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
+                            <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                            <div class="flex items-start justify-between gap-2 mb-3">
+                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">The Read</h3>
+                                <div class="flex items-center gap-1 flex-wrap justify-end">
+                                    <span id="trendBadge" class="px-2 py-1 text-[10px] font-bold rounded-full border whitespace-nowrap">—</span>
+                                    <span id="sentimentBadge" class="px-2 py-1 text-[10px] font-bold rounded-full border whitespace-nowrap">—</span>
+                                </div>
                             </div>
+                            <div id="readinessLabel" class="text-xl font-black text-white tracking-tight mb-1">—</div>
+                            <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-2">—</div>
+
+                            <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50"></p>
+
+                            <!-- Fundamentals snapshot (one line) — the business behind the setup -->
+                            <div id="fundLine" class="hidden mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+                                <span class="text-[9px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Fundamentals<span class="info-i ml-1" data-tip="A quick snapshot of the underlying business (from yfinance): valuation (P/E), growth (revenue &amp; profit YoY), profitability (ROE) and leverage (D/E). Context for the price setup — the conviction score above is technical only and does not include these.">i</span></span>
+                                <span id="fundLineItems" class="flex flex-wrap items-center gap-x-2 gap-y-1"></span>
+                            </div>
+
+                            <p id="patternLine" class="text-xs text-slate-500 mt-2">—</p>
+                            <p id="reliabilityLine" class="text-xs mt-2 hidden"></p>
                         </div>
-                        <div id="readinessLabel" class="text-2xl font-black text-white tracking-tight mb-1">—</div>
-                        <div id="readinessSub" class="text-xs text-purple-300 font-medium mb-3">—</div>
 
-                        <p id="verdictExplainer" class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"></p>
-
-                        <!-- Fundamentals snapshot (one line) — the business behind the setup -->
-                        <div id="fundLine" class="hidden mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Fundamentals<span class="info-i ml-1" data-tip="A quick snapshot of the underlying business (from yfinance): valuation (P/E), growth (revenue &amp; profit YoY), profitability (ROE) and leverage (D/E). Context for the price setup — the conviction score above is technical only and does not include these.">i</span></span>
-                            <span id="fundLineItems" class="flex flex-wrap items-center gap-x-3 gap-y-1"></span>
+                        <!-- News (recent headlines + sentiment) -->
+                        <div id="newsCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl hidden">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                                    News &amp; Sentiment
+                                </h3>
+                                <span id="newsAsOf" class="text-[10px] text-slate-500"></span>
+                            </div>
+                            <div id="newsSentimentRow" class="hidden items-center mb-3"></div>
+                            <div id="newsList" class="space-y-2 max-h-[350px] overflow-y-auto"></div>
                         </div>
-
-                        <p id="patternLine" class="text-xs text-slate-500 mt-2">—</p>
-                        <p id="reliabilityLine" class="text-xs mt-2 hidden"></p>
                     </div>
 
                     <!-- Chart + indicator strip -->
@@ -221,12 +236,12 @@
                             <div id="lwChart" class="w-full h-[460px] lg:h-[560px]"></div>
                             <div id="tv-chart-frame" class="w-full h-[460px] lg:h-[560px] hidden"></div>
                         </div>
-                        <div id="chartLegend" class="hidden flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-t border-borderCl bg-slate-900/40 text-[10px] text-slate-400">
+                        <div id="chartLegend" class="hidden flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 border-t border-borderCl bg-slate-900/40 text-[10px] text-slate-400">
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-rose-500"></span> Resistance</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-blue-400"></span> Support</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-purple-400"></span> 50-day EMA</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-amber-400"></span> 200-day EMA</span>
-                            <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout day</span>
-                            <span class="text-slate-500">· green/red candles = up/down days</span>
+                            <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout</span>
                         </div>
                     </div>
 
@@ -313,18 +328,6 @@
                         </div>
 
                         <!-- News & Sentiment (headlines + entity sentiment where available) -->
-                        <div id="newsCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl hidden">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-                                    News &amp; Sentiment
-                                    <span class="info-i" data-tip="Recent headlines mentioning this company, from Marketaux (has sentiment) and/or NewsData.io (headline-only, ~12h delayed) — whichever had budget left today. The News sentiment badge, when shown, is Marketaux's entity-level score from matched mentions; it's separate from this stock's price-based Sentiment badge in The Read above. Educational context, not investment advice — always check the source before acting.">i</span>
-                                </h3>
-                                <span id="newsAsOf" class="text-[10px] text-slate-500"></span>
-                            </div>
-                            <div id="newsSentimentRow" class="hidden items-center mb-3"></div>
-                            <div id="newsList" class="space-y-2"></div>
-                        </div>
-
                         <!-- Entry guidance (full width) -->
                         <div class="md:col-span-2 p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
                             <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3">What To Watch For</h3>
@@ -1432,6 +1435,7 @@
             });
         }
 
+
         function renderLevels(s) {
             const r = s.resistance;
             $("resLine").innerText = r.level != null ? "₹" + r.level.toLocaleString("en-IN") : "—";
@@ -1623,6 +1627,12 @@
                 candles.createPriceLine({
                     price: data.resistance, color: "#f43f5e", lineWidth: 1,
                     lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Resistance",
+                });
+            }
+            if (data.support != null) {
+                candles.createPriceLine({
+                    price: data.support, color: "#60a5fa", lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Support",
                 });
             }
             if (data.breakouts && data.breakouts.length) {

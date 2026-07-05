@@ -28,7 +28,7 @@ OHLC_DIR = settings.DATA_DIR / "ohlc"
 
 # Columns pulled from ohlcv_features. ema50/ema200 are the two overlays we draw; is_breakout
 # marks the days we flag with a marker.
-_COLS = ["symbol", "date", "open", "high", "low", "close", "ema50", "ema200", "resistance", "is_breakout"]
+_COLS = ["symbol", "date", "open", "high", "low", "close", "ema50", "ema200", "resistance", "support", "is_breakout"]
 
 
 def _safe(sym: str) -> str:
@@ -52,10 +52,12 @@ def _emit_one(sym: str, g: pd.DataFrame) -> dict:
         if bool(row.get("is_breakout")):
             breakouts.append(d)
     res = g["resistance"].dropna()
+    sup = g["support"].dropna()
     return {
         "symbol": sym,
         "as_of": bars[-1][0] if bars else None,
         "resistance": _r(res.iloc[-1]) if len(res) else None,
+        "support": _r(sup.iloc[-1]) if len(sup) else None,
         "bars": bars,
         "ema50": ema50,
         "ema200": ema200,
