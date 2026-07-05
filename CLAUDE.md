@@ -119,8 +119,8 @@ A Python pipeline now exists and produces real computed data (replacing the hand
   examples[] with per-event `worked` flag), and `entry` (trigger/entry/stop text). Enrichment fields
   merged in from the standalone fetch scripts: `sector`/`industry` (from `sectors.json`), `analog`
   (from `analogs.py`), `holdings` (from `holdings.json`, incl. a quarterly `history[]` series
-  once re-scraped), `news` (from `news.json`, see the News + sentiment bullet below), and `social`
-  (from `social.json`).
+  once re-scraped), `news` (from `news.json`, see the News + sentiment bullet below), `social`
+  (from `social.json`), and `earnings` (from `earnings.json`, see the Earnings bullet below).
 - **Frontend is now wired to `breakouts.json`** (no more hardcoded dataset). Watchlist builds itself
   and sorts by readiness; cards: verdict/readiness + trend badge, historical precedents (with
   worked/faded tags), resistance proximity, VCP, entry guidance; indicator strip (ADX + EMA values)
@@ -228,6 +228,27 @@ A Python pipeline now exists and produces real computed data (replacing the hand
   fetching separate NSE sector indices). NOTE: this is market-wide aggregate flow only — per-stock
   daily FII/DII is not public anywhere in India (see the Ownership bullet above); a genuinely
   different, coarser data point from the quarterly per-stock holdings.
+- **Earnings** (`earnings.py` + `fetch_earnings.py` → `data/earnings.json`, merged into each
+  stock's `earnings` field): quarterly EPS estimated-vs-actual, shown as a dumbbell/dot-plot card
+  (one hue, two shades — dim "Estimated", bright "Actual" — left of "one similar-looking day",
+  which was shrunk to half-width to make room). Two sources, never blended within one stock's
+  history: (1) yfinance's earnings calendar (`get_earnings_dates`) — analyst-comparable EPS
+  estimate/actual/surprise%, but only ~40-50% of this project's actual watchlist has ANY analyst
+  coverage (tested against the top-30 conviction list — micro-caps like CUPID/NPST had none); (2)
+  fallback to the quarterly income statement's "Basic EPS" line — unadjusted GAAP EPS, available
+  for ~100% of stocks (every listed company reports EPS regardless of analyst coverage), no
+  forward estimate. When a quarter/stock has no estimate, the actual EPS still gets plotted rather
+  than leaving a gap — only the estimate dot is skipped. **Known gotcha**: `get_earnings_dates()`
+  can return genuinely **stale** data for a stock even when it returns real-looking rows — SUVEN's
+  freshest row there was from Feb 2020 (six years old) despite it reporting quarterly ever since;
+  ~31% of stocks tested had a last-quarter-reported date over a year old. `earnings.py` guards
+  against this (`STALE_DAYS`) by falling back to the income-statement source when the calendar's
+  most recent reported quarter is too old to trust. Quarterly-slow reference data like holdings/
+  sectors/fundamentals — fetched by the standalone script, not the daily scan; whole-market
+  populate takes ~25-30 min (yfinance per-symbol calls), and a fraction of stocks land on
+  `actual_only` from transient yfinance flakiness during a mass run even when richer estimate data
+  is really available (re-fetching that single symbol later usually recovers it — not worth a
+  special retry mechanism for what's a minor completeness gap, not a correctness bug).
 - **Reliability validation** (`backend/analyze_reliability.py`, standalone — not part of
   `run_scan.py`, run manually; batch-fetches, ~2min on the whole market): checks whether the
   per-stock "X% of past breakouts followed through" caveat is actually predictive, pooled across the

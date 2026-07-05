@@ -132,6 +132,21 @@
                 </div>
             </div>
 
+            <!-- My Watchlist — personal tracked stocks (date added / entry / current / return %), synced via api/watchlist.py so it follows you across devices; distinct from the "Watchlist" sidebar below, which is the filtered list of ALL matching stocks. -->
+            <div class="mb-5 p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
+                <button id="myWatchlistToggle" type="button" class="w-full flex items-center justify-between">
+                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-2">
+                        ★ My Watchlist
+                        <span id="myWatchlistCount" class="text-[10px] text-slate-500 font-normal normal-case"></span>
+                    </span>
+                    <span class="text-slate-500 text-xs" id="myWatchlistChevron">▸</span>
+                </button>
+                <div id="myWatchlistPanel" class="hidden mt-3">
+                    <p class="text-[11px] text-slate-500 mb-3 leading-snug">Stocks you've personally tracked — open one and click "+ Track" above to add it here. Synced across your devices.</p>
+                    <div id="myWatchlistBody" class="flex flex-col"></div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
                 <!-- LEFT: sector radar + vertical watchlist -->
@@ -181,6 +196,10 @@
                             </div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
                         </div>
+                        <button id="trackBtn" type="button"
+                                class="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500">
+                            + Track
+                        </button>
                     </div>
 
                     <!-- The Read + News (side-by-side when news exists; The Read goes full-width otherwise) -->
@@ -250,16 +269,31 @@
                         </div>
                     </div>
 
-                    <!-- Historical analog — moved below the chart (supporting context, deliberately
-                         de-emphasised vs. The Read; a single closest-match day, not a track record) -->
-                    <div id="analogBox" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
-                        <div class="flex items-center gap-2 mb-1.5">
-                            <span class="text-base opacity-70">🕰️</span>
-                            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
+                    <!-- Earnings (left) + historical analog (right, shrunk to half width —
+                         both are supporting context, de-emphasised vs. The Read above) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <!-- Quarterly EPS: estimated vs. actual (earnings.py / fetch_earnings.py) -->
+                        <div id="earningsCard" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                    📊 Earnings
+                                    <span class="info-i" data-tip="Quarterly EPS (earnings per share), Indian fiscal year (Apr–Mar). When analyst estimates aren't available for a quarter (common for small/micro-caps — most don't have analyst coverage), we still show the actual EPS every listed company reports, just without an estimate dot to compare it to.">i</span>
+                                </span>
+                                <span id="earningsSource" class="text-[10px] text-slate-500"></span>
+                            </div>
+                            <div id="earningsChart"></div>
+                            <div id="earningsLegend" class="flex items-center gap-4 mt-1 text-[10px] text-slate-400"></div>
                         </div>
-                        <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
-                        <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
-                        <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
+
+                        <div id="analogBox" class="hidden p-4 border rounded-xl bg-cardBg border-borderCl shadow-xl">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="text-base opacity-70">🕰️</span>
+                                <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">One similar-looking day in the past · for reference</span>
+                            </div>
+                            <p id="analogHeadline" class="text-sm text-slate-300 leading-relaxed"></p>
+                            <div id="analogStats" class="flex items-center gap-2 mt-2"></div>
+                            <p class="text-[10px] text-slate-500 mt-2 leading-snug">A single closest-match day — an illustration, not a reliability measure. The conviction score and track record above are what to weigh.</p>
+                        </div>
                     </div>
 
                     <!-- Detail cards grid -->
@@ -434,6 +468,7 @@
     <script>
         let STOCKS = [];
         let current = null;
+        let MY_WATCHLIST = [];
         const $ = (id) => document.getElementById(id);
 
         const READINESS_STYLE = {
@@ -650,6 +685,7 @@
                 wireChartToggle();
                 initTooltips();
                 initAskAi();
+                await initMyWatchlist();
                 applyFilters();
                 selectStock(STOCKS[0].symbol);
                 $("statusPane").classList.add("hidden");
@@ -1001,6 +1037,121 @@
             renderIndicatorStrip(s);
             loadChart(s.symbol);
             updateAskAiContext();
+            updateTrackButton();
+        }
+
+        // --- My Watchlist: personal tracked stocks (date added / entry / current /
+        // return %), synced across devices via api/watchlist.py + Upstash Redis. Gated
+        // by a shared secret (there's one real user, not full accounts) cached in
+        // localStorage after a one-time prompt. Current price / name are joined from
+        // STOCKS at render time -- only {symbol, date_added, entry_price} live server-side.
+        const WATCHLIST_SECRET_KEY = "breakoutai_watchlist_secret";
+
+        function getWatchlistSecret(promptIfMissing) {
+            let secret = localStorage.getItem(WATCHLIST_SECRET_KEY) || "";
+            if (!secret && promptIfMissing) {
+                secret = (prompt("Enter your watchlist secret (the WATCHLIST_SECRET you set on Vercel):") || "").trim();
+                if (secret) localStorage.setItem(WATCHLIST_SECRET_KEY, secret);
+            }
+            return secret;
+        }
+
+        async function initMyWatchlist() {
+            $("myWatchlistToggle").onclick = () => {
+                const p = $("myWatchlistPanel");
+                p.classList.toggle("hidden");
+                $("myWatchlistChevron").innerText = p.classList.contains("hidden") ? "▸" : "▾";
+            };
+            await fetchMyWatchlist();
+        }
+
+        async function fetchMyWatchlist() {
+            const secret = getWatchlistSecret(false);
+            if (!secret) { renderMyWatchlist(); return; }
+            try {
+                const res = await fetch("/api/watchlist", { headers: { "X-Watchlist-Secret": secret } });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                MY_WATCHLIST = (await res.json()).items || [];
+            } catch (err) {
+                console.warn("My Watchlist: couldn't load —", err.message);
+            }
+            renderMyWatchlist();
+            updateTrackButton();
+        }
+
+        async function addToWatchlist(stock) {
+            const secret = getWatchlistSecret(true);
+            if (!secret) return;
+            try {
+                const res = await fetch("/api/watchlist", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Watchlist-Secret": secret },
+                    body: JSON.stringify({ symbol: stock.symbol, entry_price: stock.price }),
+                });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                const item = await res.json();
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== item.symbol);
+                MY_WATCHLIST.unshift(item);
+                renderMyWatchlist();
+                updateTrackButton();
+            } catch (err) {
+                alert("Couldn't add to watchlist: " + err.message);
+            }
+        }
+
+        async function removeFromWatchlist(symbol) {
+            const secret = getWatchlistSecret(true);
+            if (!secret) return;
+            try {
+                const res = await fetch("/api/watchlist?symbol=" + encodeURIComponent(symbol), {
+                    method: "DELETE",
+                    headers: { "X-Watchlist-Secret": secret },
+                });
+                if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
+                MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== symbol);
+                renderMyWatchlist();
+                updateTrackButton();
+            } catch (err) {
+                alert("Couldn't remove from watchlist: " + err.message);
+            }
+        }
+
+        function updateTrackButton() {
+            const btn = $("trackBtn");
+            if (!btn || !current) return;
+            const tracked = MY_WATCHLIST.some(it => it.symbol === current.symbol);
+            btn.innerText = tracked ? "✓ Tracking" : "+ Track";
+            btn.className = "ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
+                (tracked
+                    ? "bg-emerald-600/20 border-emerald-500 text-emerald-300"
+                    : "bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500");
+            btn.onclick = () => tracked ? removeFromWatchlist(current.symbol) : addToWatchlist(current);
+        }
+
+        function renderMyWatchlist() {
+            $("myWatchlistCount").innerText = MY_WATCHLIST.length ? String(MY_WATCHLIST.length) : "";
+            const el = $("myWatchlistBody");
+            if (!MY_WATCHLIST.length) {
+                el.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">Nothing tracked yet — open a stock and click "+ Track" above.</div>`;
+                return;
+            }
+            el.innerHTML = MY_WATCHLIST.map(it => {
+                const s = STOCKS.find(x => x.symbol === it.symbol);
+                const curPrice = s ? s.price : null;
+                const retPct = curPrice != null ? (curPrice - it.entry_price) / it.entry_price * 100 : null;
+                const days = Math.max(0, Math.floor((Date.now() - new Date(it.date_added)) / 86400000));
+                const retCls = retPct == null ? "text-slate-500" : (retPct >= 0 ? "text-emerald-400" : "text-rose-400");
+                const retTxt = retPct == null ? "—" : (retPct >= 0 ? "+" : "") + retPct.toFixed(1) + "%";
+                return `<div class="flex items-center gap-3 py-1.5 border-b border-borderCl/50 last:border-0 text-xs">
+                    <button class="flex-1 min-w-0 text-left truncate font-semibold text-slate-200 hover:text-purple-300" onclick="selectStock('${it.symbol}')">${it.symbol}</button>
+                    <span class="w-20 flex-none text-slate-500">${it.date_added}</span>
+                    <span class="w-10 flex-none text-slate-500 text-right">${days}d</span>
+                    <span class="w-20 flex-none text-slate-400 text-right">₹${it.entry_price.toLocaleString("en-IN")}</span>
+                    <span class="w-20 flex-none text-slate-300 text-right">${curPrice != null ? "₹" + curPrice.toLocaleString("en-IN") : "—"}</span>
+                    <span class="w-16 flex-none font-bold text-right ${retCls}">${retTxt}</span>
+                    <button class="flex-none text-slate-500 hover:text-rose-400" onclick="removeFromWatchlist('${it.symbol}')" title="Remove">✕</button>
+                </div>`;
+            }).join("");
         }
 
         // --- Ask AI: chat panel that can look up any stock (not just the one open),
@@ -1170,6 +1321,91 @@
             if (!parts.length) { wrap.classList.add("hidden"); return; }
             host.innerHTML = parts.join(`<span class="text-slate-600">·</span>`);
             wrap.classList.remove("hidden");
+        }
+
+        // Earnings: quarterly EPS estimated-vs-actual dumbbell/dot-plot (earnings.py /
+        // fetch_earnings.py). One hue, two shades — dim = Estimated, bright = Actual
+        // (a "before/after per item" comparison, not distinct series identities), so a
+        // beat/miss reads directly from how far apart the two dots sit. When a quarter
+        // has no analyst estimate (common for small/micro-caps — most aren't covered),
+        // we still plot the actual EPS every listed company reports; we just skip that
+        // quarter's estimate dot and connector rather than leaving a gap.
+        const EARNINGS_ACTUAL = "#f97316";
+        const EARNINGS_ESTIMATE = "rgba(249,115,22,0.4)";
+
+        function renderEarnings(s) {
+            const card = $("earningsCard");
+            const e = s.earnings;
+            if (!e || !e.quarters || !e.quarters.length) { card.classList.add("hidden"); return; }
+            card.classList.remove("hidden");
+            $("earningsSource").innerText = e.source === "estimate"
+                ? "vs. analyst estimate" : "actual EPS · no analyst coverage";
+
+            const quarters = e.quarters;
+            const hasNext = !!(e.next && e.next.estimate != null);
+            const n = quarters.length + (hasNext ? 1 : 0);
+            const W = 560, H = 180, padL = 42, padR = 16, padT = 14, padB = 24;
+            const plotW = W - padL - padR, plotH = H - padT - padB;
+
+            const vals = [];
+            quarters.forEach(q => { vals.push(q.actual); if (q.estimate != null) vals.push(q.estimate); });
+            if (hasNext) vals.push(e.next.estimate);
+            let lo = Math.min(...vals), hi = Math.max(...vals);
+            if (lo === hi) { lo -= 1; hi += 1; }
+            const pad = (hi - lo) * 0.18;
+            lo -= pad; hi += pad;
+
+            const xStep = n > 1 ? plotW / (n - 1) : 0;
+            const xAt = (i) => padL + (n > 1 ? i * xStep : plotW / 2);
+            const yAt = (v) => padT + plotH - ((v - lo) / (hi - lo)) * plotH;
+            const dot = (x, y, color, tip) => `<g>
+                <circle cx="${x}" cy="${y}" r="12" fill="transparent"></circle>
+                <circle cx="${x}" cy="${y}" r="5" fill="${color}" stroke="#1e293b" stroke-width="2"><title>${escapeHtml(tip)}</title></circle>
+            </g>`;
+
+            let svg = `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" style="max-height:210px">`;
+            // Gridlines: hi/mid/lo, solid hairline, recessive — plus a brighter zero baseline
+            // when EPS crosses zero (common for these small/loss-making names).
+            [hi, (hi + lo) / 2, lo].forEach(v => {
+                const y = yAt(v);
+                svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#26324a" stroke-width="1"/>`;
+                svg += `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="#64748b">${v.toFixed(2)}</text>`;
+            });
+            if (lo < 0 && hi > 0) {
+                const y0 = yAt(0);
+                svg += `<line x1="${padL}" y1="${y0}" x2="${W - padR}" y2="${y0}" stroke="#475569" stroke-width="1"/>`;
+            }
+
+            quarters.forEach((q, i) => {
+                const x = xAt(i);
+                const yA = yAt(q.actual);
+                if (q.estimate != null) {
+                    const yE = yAt(q.estimate);
+                    svg += `<line x1="${x}" y1="${yE}" x2="${x}" y2="${yA}" stroke="#475569" stroke-width="1.5"/>`;
+                    svg += dot(x, yE, EARNINGS_ESTIMATE, `${q.quarter} · Estimated ₹${q.estimate}`);
+                }
+                svg += dot(x, yA, EARNINGS_ACTUAL, `${q.quarter} · Actual ₹${q.actual}`);
+                svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">${q.quarter.replace(" FY", "'")}</text>`;
+            });
+            // The next, unreported quarter: a hollow dashed ring for its estimate only
+            // (there's no actual yet) — mirrors the reference "expected" callout.
+            if (hasNext) {
+                const x = xAt(quarters.length);
+                const y = yAt(e.next.estimate);
+                svg += `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${EARNINGS_ACTUAL}" stroke-width="1.5" stroke-dasharray="2,2"><title>${escapeHtml(`Next (${e.next.date}) · est. ₹${e.next.estimate}`)}</title></circle>`;
+                svg += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#64748b">Next</text>`;
+            }
+            svg += `</svg>`;
+            $("earningsChart").innerHTML = svg;
+
+            let legend =
+                `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${EARNINGS_ESTIMATE}"></span> Estimated</span>` +
+                `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${EARNINGS_ACTUAL}"></span> Actual</span>`;
+            if (e.next) {
+                const d = new Date(e.next.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                legend += `<span class="text-slate-500">· Next: ${d}${e.next.estimate != null ? ` (est. ₹${e.next.estimate})` : ""}</span>`;
+            }
+            $("earningsLegend").innerHTML = legend;
         }
 
         function renderAnalog(s) {
@@ -1511,6 +1747,7 @@
             $("readinessSub").className = "text-xs font-medium mb-3 " + rs.text;
 
             renderAnalog(s);
+            renderEarnings(s);
             renderFundLine(s);
 
             // Detected chart pattern (decorative context, not a signal — see reliability study)
