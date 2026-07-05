@@ -104,6 +104,15 @@
                         class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300">
                     ◎ Primed only
                 </button>
+                <button id="sectorRadarBtn" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500 whitespace-nowrap">
+                    🔥 <span id="sectorRadarHint">Sectors</span>
+                </button>
+                <button id="myWatchlistBtn" type="button"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all bg-slate-800 border-borderCl text-slate-300 hover:border-purple-500 flex items-center gap-1.5 whitespace-nowrap">
+                    ★ My Watchlist
+                    <span id="myWatchlistBadge" class="hidden px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[10px] leading-none"></span>
+                </button>
                 <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
             </div>
 
@@ -132,35 +141,10 @@
                 </div>
             </div>
 
-            <!-- My Watchlist — personal tracked stocks (date added / entry / current / return %), synced via api/watchlist.py so it follows you across devices; distinct from the "Watchlist" sidebar below, which is the filtered list of ALL matching stocks. -->
-            <div class="mb-5 p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
-                <button id="myWatchlistToggle" type="button" class="w-full flex items-center justify-between">
-                    <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-2">
-                        ★ My Watchlist
-                        <span id="myWatchlistCount" class="text-[10px] text-slate-500 font-normal normal-case"></span>
-                    </span>
-                    <span class="text-slate-500 text-xs" id="myWatchlistChevron">▸</span>
-                </button>
-                <div id="myWatchlistPanel" class="hidden mt-3">
-                    <p class="text-[11px] text-slate-500 mb-3 leading-snug">Stocks you've personally tracked — open one and click "+ Track" above to add it here. Synced across your devices.</p>
-                    <div id="myWatchlistBody" class="flex flex-col"></div>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- LEFT: sector radar + vertical watchlist -->
+                <!-- LEFT: vertical watchlist (Sector Radar + My Watchlist moved to top-bar popups, see #sectorPopup / #myWatchlistPanel) -->
                 <div class="lg:col-span-3 flex flex-col gap-5">
-
-                    <!-- Sector radar -->
-                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
-                        <button id="radarToggle" type="button" class="w-full flex items-center justify-between mb-1">
-                            <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Sector Radar</span>
-                            <span class="text-slate-500 text-xs" id="radarChevron">▾</span>
-                        </button>
-                        <p class="text-[11px] text-slate-500 mb-3 leading-snug">Where setups are clustering — sectors with the most primed names first.</p>
-                        <div id="sectorRadar" class="space-y-2"></div>
-                    </div>
 
                     <!-- Watchlist (vertical overview list) -->
                     <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl flex flex-col min-h-0">
@@ -427,6 +411,40 @@
             <p id="disclaimer" class="text-[11px] text-slate-500 leading-snug italic mt-6 text-center max-w-3xl mx-auto"></p>
         </div>
     </main>
+
+    <!-- Sector Radar popup — triggered by #sectorRadarBtn in the top filter bar. Moved out
+         of the always-visible left sidebar to declutter the page; content unchanged. -->
+    <div id="sectorPopup" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div id="sectorPopupBackdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="relative w-full max-w-md max-h-[80vh] flex flex-col bg-cardBg border border-borderCl rounded-xl shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-white">🔥 Sector Radar</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Where setups are clustering — click a sector to filter.</div>
+                </div>
+                <button id="sectorPopupClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+            </div>
+            <div id="sectorRadar" class="p-4 space-y-3 overflow-y-auto wl-scroll"></div>
+        </div>
+    </div>
+
+    <!-- My Watchlist popup — triggered by #myWatchlistBtn in the top filter bar. Personal
+         tracked stocks (date added / entry / current / return %), synced via api/watchlist.py
+         so it follows you across devices; distinct from the "Watchlist" sidebar list, which
+         is the filtered list of ALL matching stocks. -->
+    <div id="myWatchlistPanel" class="hidden fixed inset-0 z-50 flex justify-end">
+        <div id="myWatchlistBackdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="relative w-full max-w-md h-full bg-cardBg border-l border-borderCl flex flex-col shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-white">★ My Watchlist</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Stocks you've personally tracked. Synced across your devices.</div>
+                </div>
+                <button id="myWatchlistClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+            </div>
+            <div id="myWatchlistBody" class="flex-1 overflow-y-auto p-4 flex flex-col wl-scroll"></div>
+        </div>
+    </div>
 
     <!-- Ask AI: floating launcher + slide-over panel. Talks to a local dev server
          (backend/chat_server.py) that proxies Groq so the API key stays server-side. -->
@@ -722,11 +740,9 @@
                         : "bg-slate-800 border-borderCl text-slate-300");
                 applyFilters();
             };
-            $("radarToggle").onclick = () => {
-                const r = $("sectorRadar");
-                r.classList.toggle("hidden");
-                $("radarChevron").innerText = r.classList.contains("hidden") ? "▸" : "▾";
-            };
+            $("sectorRadarBtn").onclick = () => $("sectorPopup").classList.remove("hidden");
+            $("sectorPopupClose").onclick = () => $("sectorPopup").classList.add("hidden");
+            $("sectorPopupBackdrop").onclick = () => $("sectorPopup").classList.add("hidden");
             $("fundReset").onclick = () => {
                 FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
                 renderFundPanel();
@@ -867,6 +883,7 @@
                 wl.innerHTML = `<span class="text-sm text-slate-500 py-2">No stock matches these filters.</span>`;
                 return;
             }
+            const trackedSet = new Set(MY_WATCHLIST.map(it => it.symbol));
             list.slice(0, MAX_RESULTS).forEach(s => {
                 const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
                 const dist = s.resistance && s.resistance.distance_pct;
@@ -876,18 +893,25 @@
                 const chg = s.change_pct ?? 0;
                 const chgCls = chg >= 0 ? "text-emerald-400" : "text-rose-400";
                 const conv = s.readiness.conviction;
-                const row = document.createElement("button");
+                const tracked = trackedSet.has(s.symbol);
+                const row = document.createElement("div");
                 row.id = "wl-" + s.symbol;
+                row.setAttribute("role", "button");
+                row.tabIndex = 0;
                 row.onclick = () => selectStock(s.symbol);
-                row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+                row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500 cursor-pointer";
                 row.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
                         <span class="flex items-center gap-2 min-w-0">
                             <span class="w-2 h-2 rounded-full flex-none ${rs.dot}"></span>
                             <span class="text-sm font-bold text-slate-100 truncate">${s.symbol}</span>
                         </span>
-                        <span class="flex items-baseline gap-1 flex-none" title="Breakout conviction (0–100)">
-                            <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
+                        <span class="flex items-center gap-2 flex-none">
+                            <span class="wl-quick-track w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold leading-none ${tracked ? "text-emerald-400" : "text-slate-500 hover:text-purple-300"}"
+                                  role="button" tabindex="0" title="${tracked ? "Tracking — click to remove" : "Add to My Watchlist"}">${tracked ? "✓" : "+"}</span>
+                            <span class="flex items-baseline gap-1" title="Breakout conviction (0–100)">
+                                <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
+                            </span>
                         </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
@@ -896,6 +920,10 @@
                         <span class="text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
                         <span class="text-[10px] ${rs.text}">${distTxt}</span>
                     </div>`;
+                row.querySelector(".wl-quick-track").onclick = (e) => {
+                    e.stopPropagation();
+                    if (tracked) removeFromWatchlist(s.symbol); else addToWatchlist(s);
+                };
                 wl.appendChild(row);
             });
             highlightActive();
@@ -903,11 +931,11 @@
 
         function highlightActive() {
             document.querySelectorAll(".wl-row").forEach(b => {
-                b.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500";
+                b.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500 cursor-pointer";
             });
             if (current) {
                 const a = $("wl-" + current.symbol);
-                if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)]";
+                if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)] cursor-pointer";
             }
         }
 
@@ -921,6 +949,9 @@
                 if (s.readiness && s.readiness.watch) b.primed++;
                 if (s.breakout && s.breakout.today) b.breaking++;
             });
+            const hotCount = Object.values(byGroup).filter(b => b.primed > 0).length;
+            $("sectorRadarHint").innerText = hotCount ? `${hotCount} sector${hotCount === 1 ? "" : "s"} heating up` : "Sectors";
+
             const rows = Object.entries(byGroup)
                 .sort((a, b) => b[1].primed - a[1].primed || b[1].total - a[1].total)
                 .slice(0, 9);
@@ -936,12 +967,13 @@
                     $("fltSector").value = filters.sector;
                     renderSectorRadar();
                     applyFilters();
+                    $("sectorPopup").classList.add("hidden");
                 };
                 btn.className = "w-full text-left group";
                 btn.innerHTML = `
                     <div class="flex items-center justify-between gap-2 mb-1">
                         <span class="text-[11px] font-semibold truncate ${active ? "text-purple-300" : "text-slate-300"}">${g}</span>
-                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
+                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed · ${b.total} total${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-slate-900">
                         <div class="h-full rounded-full ${active ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-400"}" style="width:${w}%"></div>
@@ -1057,11 +1089,9 @@
         }
 
         async function initMyWatchlist() {
-            $("myWatchlistToggle").onclick = () => {
-                const p = $("myWatchlistPanel");
-                p.classList.toggle("hidden");
-                $("myWatchlistChevron").innerText = p.classList.contains("hidden") ? "▸" : "▾";
-            };
+            $("myWatchlistBtn").onclick = () => $("myWatchlistPanel").classList.remove("hidden");
+            $("myWatchlistClose").onclick = () => $("myWatchlistPanel").classList.add("hidden");
+            $("myWatchlistBackdrop").onclick = () => $("myWatchlistPanel").classList.add("hidden");
             await fetchMyWatchlist();
         }
 
@@ -1079,6 +1109,14 @@
             updateTrackButton();
         }
 
+        // Refreshes every place tracked/untracked state is shown: the detail-header
+        // button, the popup list + badge, and the quick-track icon on each sidebar row.
+        function refreshWatchlistUI() {
+            updateTrackButton();
+            renderMyWatchlist();
+            renderWatchlist(currentVisible());
+        }
+
         async function addToWatchlist(stock) {
             const secret = getWatchlistSecret(true);
             if (!secret) return;
@@ -1092,8 +1130,7 @@
                 const item = await res.json();
                 MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== item.symbol);
                 MY_WATCHLIST.unshift(item);
-                renderMyWatchlist();
-                updateTrackButton();
+                refreshWatchlistUI();
             } catch (err) {
                 alert("Couldn't add to watchlist: " + err.message);
             }
@@ -1109,8 +1146,7 @@
                 });
                 if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("HTTP " + res.status));
                 MY_WATCHLIST = MY_WATCHLIST.filter(it => it.symbol !== symbol);
-                renderMyWatchlist();
-                updateTrackButton();
+                refreshWatchlistUI();
             } catch (err) {
                 alert("Couldn't remove from watchlist: " + err.message);
             }
@@ -1129,10 +1165,12 @@
         }
 
         function renderMyWatchlist() {
-            $("myWatchlistCount").innerText = MY_WATCHLIST.length ? String(MY_WATCHLIST.length) : "";
+            const badge = $("myWatchlistBadge");
+            if (MY_WATCHLIST.length) { badge.innerText = String(MY_WATCHLIST.length); badge.classList.remove("hidden"); }
+            else { badge.classList.add("hidden"); }
             const el = $("myWatchlistBody");
             if (!MY_WATCHLIST.length) {
-                el.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">Nothing tracked yet — open a stock and click "+ Track" above.</div>`;
+                el.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">Nothing tracked yet — click "+ Track" on a stock, or the + on any row in the Watchlist list.</div>`;
                 return;
             }
             el.innerHTML = MY_WATCHLIST.map(it => {
@@ -1142,14 +1180,18 @@
                 const days = Math.max(0, Math.floor((Date.now() - new Date(it.date_added)) / 86400000));
                 const retCls = retPct == null ? "text-slate-500" : (retPct >= 0 ? "text-emerald-400" : "text-rose-400");
                 const retTxt = retPct == null ? "—" : (retPct >= 0 ? "+" : "") + retPct.toFixed(1) + "%";
-                return `<div class="flex items-center gap-3 py-1.5 border-b border-borderCl/50 last:border-0 text-xs">
-                    <button class="flex-1 min-w-0 text-left truncate font-semibold text-slate-200 hover:text-purple-300" onclick="selectStock('${it.symbol}')">${it.symbol}</button>
-                    <span class="w-20 flex-none text-slate-500">${it.date_added}</span>
-                    <span class="w-10 flex-none text-slate-500 text-right">${days}d</span>
-                    <span class="w-20 flex-none text-slate-400 text-right">₹${it.entry_price.toLocaleString("en-IN")}</span>
-                    <span class="w-20 flex-none text-slate-300 text-right">${curPrice != null ? "₹" + curPrice.toLocaleString("en-IN") : "—"}</span>
-                    <span class="w-16 flex-none font-bold text-right ${retCls}">${retTxt}</span>
-                    <button class="flex-none text-slate-500 hover:text-rose-400" onclick="removeFromWatchlist('${it.symbol}')" title="Remove">✕</button>
+                return `<div class="py-2.5 border-b border-borderCl/50 last:border-0 text-xs">
+                    <div class="flex items-center justify-between gap-2">
+                        <button class="min-w-0 text-left truncate font-semibold text-sm text-slate-200 hover:text-purple-300" onclick="selectStock('${it.symbol}')">${it.symbol}</button>
+                        <div class="flex items-center gap-2 flex-none">
+                            <span class="font-bold ${retCls}">${retTxt}</span>
+                            <button class="text-slate-500 hover:text-rose-400 text-sm leading-none" onclick="removeFromWatchlist('${it.symbol}')" title="Remove">✕</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 mt-1 text-[11px] text-slate-500">
+                        <span>${it.date_added} · ${days}d</span>
+                        <span>₹${it.entry_price.toLocaleString("en-IN")} → ${curPrice != null ? "₹" + curPrice.toLocaleString("en-IN") : "—"}</span>
+                    </div>
                 </div>`;
             }).join("");
         }
