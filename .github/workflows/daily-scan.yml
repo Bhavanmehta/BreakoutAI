@@ -31,13 +31,21 @@ jobs:
         working-directory: backend
         run: python run_scan.py
 
+      - name: Fetch news & sentiment (optional, needs secrets)
+        if: ${{ secrets.MARKETAUX_API_KEY != '' || secrets.NEWSDATA_API_KEY != '' }}
+        working-directory: backend
+        env:
+          MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
+          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+        run: python fetch_news.py
+
       - name: Commit updated results (if changed)
         run: |
           git config user.name "breakoutai-bot"
           git config user.email "actions@github.com"
-          git add data/breakouts.json
+          git add data/breakouts.json data/track_record.json data/ohlc data/news.json
           if git diff --cached --quiet; then
-            echo "No changes in breakouts.json — nothing to commit."
+            echo "No changes — nothing to commit."
           else
             git commit -m "chore: daily breakout scan $(date -u +'%Y-%m-%d')"
             git push

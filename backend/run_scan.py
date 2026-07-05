@@ -138,6 +138,23 @@ def run():
         for s in summaries:
             s["fundamentals"] = None
 
+    # --- Merge cached news + sentiment (from fetch_news.py) if present ---
+    # Time-sensitive but budget-capped (both free providers cap daily requests), so like
+    # holdings/sectors/fundamentals this is a separate, optional enrichment -- stocks
+    # without a fresh-enough entry carry news: null.
+    news_path = settings.DATA_DIR / "news.json"
+    if news_path.exists():
+        with open(news_path, encoding="utf-8") as f:
+            news = json.load(f)
+        matched = 0
+        for s in summaries:
+            s["news"] = news.get(s["symbol"])
+            matched += 1 if s["news"] else 0
+        print(f"  merged news for {matched}/{len(summaries)} stocks")
+    else:
+        for s in summaries:
+            s["news"] = None
+
     # --- Store into DuckDB (local research layer) ---
     prices_df = pd.concat(all_prices, ignore_index=True)
     features_df = pd.concat(all_features, ignore_index=True)

@@ -147,6 +147,18 @@ EP_MIN_GAP_PCT = 5.0           # minimum opening gap (%) to count as an episodic
 EP_MIN_VOL_MULT = 5.0          # volume must be >= this multiple of the 50-day average (user's 5x-10x floor)
 EP_VOL_AVG_WINDOW = 50
 
+# --- News / sentiment (fetch_news.py -- NOT part of the daily price scan itself; news
+# is separately budgeted since both free providers cap daily requests) ---------------
+NEWS_JSON = DATA_DIR / "news.json"
+# Marketaux free tier: ~100 req/day, has entity sentiment -- keep headroom for a --check
+# smoke test and same-day retries. NewsData.io free tier: 200 credits/day, no sentiment,
+# ~12h delayed -- headroom likewise. Finnhub isn't used: its free tier is US-only for
+# company news/sentiment (international needs paid Premium), so it can't cover NSE/BSE.
+NEWS_MARKETAUX_DAILY_BUDGET = 90
+NEWS_NEWSDATA_DAILY_BUDGET = 190
+NEWS_SENTIMENT_BULLISH = 0.15    # entity sentiment_score >= this -> "Bullish"
+NEWS_SENTIMENT_BEARISH = -0.15   # <= this -> "Bearish"; between the two -> "Neutral"
+
 # --- Indicator windows -------------------------------------------------------
 # 8 & 21 are the responsive Fibonacci "momentum/trend" EMAs (catch moves early);
 # 50 & 200 are the structural/institutional anchors (macro trend + breakout filter).

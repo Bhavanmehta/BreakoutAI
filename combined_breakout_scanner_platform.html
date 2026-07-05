@@ -29,6 +29,17 @@
             letter-spacing: normal; box-shadow: 0 8px 24px rgba(0,0,0,.55); pointer-events: none;
         }
         [data-tip] { cursor: help; }
+        /* Consistent info marker used everywhere (replaces the tiny raw ⓘ glyph): a small
+           circular "i" badge, uniform size, subtle until hovered so it reads as intentional
+           rather than cluttered. */
+        .info-i {
+            display: inline-flex; align-items: center; justify-content: center; flex: none;
+            width: 15px; height: 15px; border: 1px solid #475569; border-radius: 9999px;
+            color: #94a3b8; font-size: 10px; font-weight: 700; font-style: normal;
+            line-height: 1; cursor: help; vertical-align: middle; user-select: none;
+            transition: color .15s, border-color .15s, background-color .15s;
+        }
+        .info-i:hover { color: #e2e8f0; border-color: #94a3b8; background: rgba(148,163,184,.15); }
         .wl-scroll::-webkit-scrollbar { width: 6px; }
         .wl-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
@@ -99,7 +110,7 @@
             <div id="fundPanel" class="mb-5 px-3 py-2.5 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-x-4 gap-y-2">
                 <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center whitespace-nowrap">
                     ⚙ Fundamentals
-                    <span class="text-slate-500 ml-1.5" data-tip="Filter by the company's valuation &amp; quality (from yfinance), on top of the price setup. Hover the ⓘ on any filter to learn what it means. This data refreshes separately from the daily price scan — a few newly-listed or thinly-covered stocks may not have it yet, and those are hidden by any active fundamentals filter.">ⓘ</span>
+                    <span class="info-i ml-1.5" data-tip="Filter by the company's valuation &amp; quality (from yfinance), on top of the price setup. Hover the info marker on any filter to learn what it means. This data refreshes separately from the daily price scan — a few newly-listed or thinly-covered stocks may not have it yet, and those are hidden by any active fundamentals filter.">i</span>
                 </span>
                 <div id="fundRows" class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
                 <button id="fundReset" type="button"
@@ -108,23 +119,22 @@
                 </button>
             </div>
 
-            <!-- Curated collections — one-click baskets (index membership, cap tier, smart screens) -->
-            <div class="mb-5 flex flex-wrap items-center gap-2">
-                <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mr-1 flex items-center">Collections<span class="text-slate-500 ml-1" data-tip="One-click curated baskets layered on top of your filters: index membership (Nifty 50), SEBI market-cap tiers, and smart screens that combine setup + fundamentals.">ⓘ</span></span>
-                <div id="collectionChips" class="flex flex-wrap items-center gap-2"></div>
+            <!-- Curated collections + setup-type — one-click horizontal quick filters -->
+            <div class="mb-5 flex flex-col gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="w-24 flex-none text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Collections<span class="info-i ml-1" data-tip="One-click curated baskets layered on top of your filters: index membership (Nifty 50), SEBI market-cap tiers, and smart screens that combine setup + fundamentals. Hover any chip for what it selects.">i</span></span>
+                    <div id="collectionChips" class="flex flex-wrap items-center gap-2"></div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="w-24 flex-none text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Setup type<span class="info-i ml-1" data-tip="Where each name sits in the breakout lifecycle, across the four validated setup stages (the readiness tiers the conviction score is built on — unlike named chart patterns, these are backed by the reliability study). The number is how many stocks are in each stage; click to filter.">i</span></span>
+                    <div id="setupChips" class="flex flex-wrap items-center gap-2"></div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- LEFT: setup breakdown + sector radar + vertical watchlist -->
+                <!-- LEFT: sector radar + vertical watchlist -->
                 <div class="lg:col-span-3 flex flex-col gap-5">
-
-                    <!-- Setup-type breakdown (validated axes: how the universe splits by setup) -->
-                    <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
-                        <span class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center">Setup Type<span class="text-slate-500 ml-1 font-normal" data-tip="How the whole universe splits across the four validated setup stages, most-actionable first. Click one to filter the list. (These are the readiness tiers the conviction score is built on — unlike named chart patterns, they're backed by the reliability study.)">ⓘ</span></span>
-                        <p class="text-[11px] text-slate-500 mb-3 leading-snug">Where names sit in the breakout lifecycle. Click to filter.</p>
-                        <div id="setupBreakdown" class="space-y-2"></div>
-                    </div>
 
                     <!-- Sector radar -->
                     <div class="p-4 rounded-xl bg-cardBg border border-borderCl shadow-xl">
@@ -157,7 +167,7 @@
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
                         <div class="flex-none text-center">
-                            <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center" data-tip="A single 0–100 score the whole list ranks by. It blends two things a whole-market study found actually predict follow-through: (1) <b>imminence</b> — how close this stock is to breaking out (its readiness tier, ~55%), and (2) <b>reliability</b> — how well this stock's own past breakouts followed through, plus base depth and relative-strength / trend confirmation (~45%). It deliberately ignores ADX, chart-pattern names and the single historical analog (which didn't hold up in testing). <b>Technical only</b> — it does not yet factor in fundamentals like P/E or profit growth.">Conviction<span class="text-slate-500 ml-1 text-[9px]">ⓘ</span></span>
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center" data-tip="A single 0–100 score the whole list ranks by. It blends two things a whole-market study found actually predict follow-through: (1) <b>imminence</b> — how close this stock is to breaking out (its readiness tier, ~55%), and (2) <b>reliability</b> — how well this stock's own past breakouts followed through, plus base depth and relative-strength / trend confirmation (~45%). It deliberately ignores ADX, chart-pattern names and the single historical analog (which didn't hold up in testing). <b>Technical only</b> — it does not yet factor in fundamentals like P/E or profit growth.">Conviction<span class="info-i ml-1">i</span></span>
                             <span id="metaConviction" class="text-2xl font-black leading-none">—</span>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
@@ -165,7 +175,7 @@
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
                             <div>
-                                <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center" data-tip="Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.">Mkt Cap<span class="text-slate-500 ml-1">ⓘ</span></span>
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center" data-tip="Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.">Mkt Cap<span class="info-i ml-1">i</span></span>
                                 <span id="metaMcap" class="text-sm font-semibold text-slate-200">—</span>
                             </div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
@@ -189,7 +199,7 @@
 
                         <!-- Fundamentals snapshot (one line) — the business behind the setup -->
                         <div id="fundLine" class="hidden mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Fundamentals<span class="text-slate-500 ml-1" data-tip="A quick snapshot of the underlying business (from yfinance): valuation (P/E), growth (revenue &amp; profit YoY), profitability (ROE) and leverage (D/E). Context for the price setup — the conviction score above is technical only and does not include these.">ⓘ</span></span>
+                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center">Fundamentals<span class="info-i ml-1" data-tip="A quick snapshot of the underlying business (from yfinance): valuation (P/E), growth (revenue &amp; profit YoY), profitability (ROE) and leverage (D/E). Context for the price setup — the conviction score above is technical only and does not include these.">i</span></span>
                             <span id="fundLineItems" class="flex flex-wrap items-center gap-x-3 gap-y-1"></span>
                         </div>
 
@@ -240,7 +250,7 @@
                             <div class="flex items-center justify-between mb-3">
                                 <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
                                     Ownership
-                                    <span class="text-slate-500" data-tip="Who owns the stock, from quarterly shareholding filings. Rising promoter / FII / DII holding = accumulation behind the setup.">ⓘ</span>
+                                    <span class="info-i" data-tip="Who owns the stock, from quarterly shareholding filings. Rising promoter / FII / DII holding = accumulation behind the setup.">i</span>
                                 </h3>
                                 <span id="holdingsAsOf" class="text-[10px] text-slate-500"></span>
                             </div>
@@ -292,7 +302,7 @@
                         <div class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl">
                             <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 flex items-center gap-1.5">
                                 Volatility Contraction (VCP)
-                                <span class="text-slate-500" data-tip="Compares the recent daily range to its longer baseline. A tightening range (coiling) stores energy that often precedes a strong move.">ⓘ</span>
+                                <span class="info-i" data-tip="Compares the recent daily range to its longer baseline. A tightening range (coiling) stores energy that often precedes a strong move.">i</span>
                             </h3>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-slate-300">Range vs. baseline</span>
@@ -300,6 +310,19 @@
                             </div>
                             <p id="vcpExplain" class="text-xs text-slate-300 mt-2 leading-snug"></p>
                             <p class="text-[11px] text-slate-500 mt-2 leading-snug">The number is the last 10 days' average price range ÷ its 30-day baseline. <b class="text-emerald-400">Below 1.0</b> = coiling (range tightening, energy building — the setup you want); <b class="text-purple-300">above 1.0</b> = expanding.</p>
+                        </div>
+
+                        <!-- News & Sentiment (headlines + entity sentiment where available) -->
+                        <div id="newsCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl hidden">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                                    News &amp; Sentiment
+                                    <span class="info-i" data-tip="Recent headlines mentioning this company, from Marketaux (has sentiment) and/or NewsData.io (headline-only, ~12h delayed) — whichever had budget left today. The News sentiment badge, when shown, is Marketaux's entity-level score from matched mentions; it's separate from this stock's price-based Sentiment badge in The Read above. Educational context, not investment advice — always check the source before acting.">i</span>
+                                </h3>
+                                <span id="newsAsOf" class="text-[10px] text-slate-500"></span>
+                            </div>
+                            <div id="newsSentimentRow" class="hidden items-center mb-3"></div>
+                            <div id="newsList" class="space-y-2"></div>
                         </div>
 
                         <!-- Entry guidance (full width) -->
@@ -519,13 +542,30 @@
             return null;
         }
 
+        // A handful of stocks come through with an alternate sector taxonomy (GICS-style
+        // labels) that duplicates the dominant yfinance one — e.g. "Financials" vs
+        // "Financial Services". Fold those stragglers into the canonical name so the dropdown
+        // and radar don't show near-duplicate groups.
+        const SECTOR_ALIAS = {
+            "Financials": "Financial Services",
+            "Health Care": "Healthcare",
+            "Communications": "Communication Services",
+            "Materials": "Basic Materials",
+            "Consumer Discretionary": "Consumer Cyclical",
+            "Consumer Services": "Consumer Cyclical",
+            "Consumer Staples": "Consumer Defensive",
+            "Technology Services": "Technology",
+            "Information Technology": "Technology",
+        };
+
         // The broad sector "group" (before the " · industry" part) — used for the
         // filter dropdown and the sector radar so we group by e.g. "Financial Services"
         // rather than every fine-grained industry.
         function sectorGroup(s) {
             const sec = (s.sector || "").trim();
             if (!sec) return "Unclassified";
-            return sec.split(" · ")[0].trim() || "Unclassified";
+            const g = sec.split(" · ")[0].trim() || "Unclassified";
+            return SECTOR_ALIAS[g] || g;
         }
 
         async function loadData() {
@@ -653,13 +693,23 @@
         }
 
         function buildSectorOptions() {
-            const all = new Set(STOCKS.map(sectorGroup));
-            const groups = [...all].filter(g => g !== "Unclassified").sort();
-            if (all.has("Unclassified")) groups.push("Unclassified");
+            // Count total + primed per sector so the dropdown carries the radar's "heat"
+            // signal even while it's collapsed.
+            const stat = {};
+            STOCKS.forEach(s => {
+                const g = sectorGroup(s);
+                const b = stat[g] || (stat[g] = { total: 0, primed: 0 });
+                b.total++;
+                if (s.readiness && s.readiness.watch) b.primed++;
+            });
+            const groups = Object.keys(stat).filter(g => g !== "Unclassified").sort();
+            if (stat["Unclassified"]) groups.push("Unclassified");
             const sel = $("fltSector");
             groups.forEach(g => {
+                const b = stat[g];
                 const o = document.createElement("option");
-                o.value = g; o.innerText = g;
+                o.value = g;
+                o.innerText = g === "Unclassified" ? g : `${g} (${b.primed} primed · ${b.total})`;
                 sel.appendChild(o);
             });
         }
@@ -814,12 +864,13 @@
                 const active = filters.collection === c.key;
                 const btn = document.createElement("button");
                 btn.type = "button";
-                btn.className = "px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all flex items-center " +
+                // The whole chip is the tooltip target (no separate ⓘ glyph on each) — hovering
+                // the chip explains what it selects, which keeps the row uncluttered.
+                if (c.tip) btn.setAttribute("data-tip", c.tip);
+                btn.className = "px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all " +
                     (active ? "bg-purple-600/25 border-purple-500 text-purple-200" : "bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500");
-                btn.innerHTML = c.label + (c.tip ? `<span class="ml-1 text-slate-500" data-tip="${c.tip.replace(/"/g, "&quot;")}">ⓘ</span>` : "");
-                btn.onclick = (e) => {
-                    // let the ⓘ show its tooltip without also toggling the chip
-                    if (e.target.closest("[data-tip]")) return;
+                btn.textContent = c.label;
+                btn.onclick = () => {
                     filters.collection = active ? "" : c.key;
                     renderCollections();
                     applyFilters();
@@ -828,33 +879,35 @@
             });
         }
 
+        // Setup-type quick filters — horizontal chips (mirrors Collections), each a coloured
+        // dot + stage name + count. Whole chip is the tooltip target.
         function renderSetupBreakdown() {
             const counts = {};
             SETUP_TYPES.forEach(t => counts[t.key] = 0);
             STOCKS.forEach(s => { const t = setupType(s); if (t != null) counts[t]++; });
-            const max = Math.max(1, ...SETUP_TYPES.map(t => counts[t.key]));
-            const host = $("setupBreakdown");
+            const host = $("setupChips");
             host.innerHTML = "";
+            const tips = {
+                "Breaking out": "Closing above resistance today on strong volume — the trigger has fired.",
+                "Primed": "In an uptrend and coiling right below resistance — the highest-readiness pre-breakout stage.",
+                "Relative strength": "Outperforming the Nifty at a fresh relative-strength high — often precedes further outperformance.",
+                "Coiling / basing": "Building a base / approaching resistance — earlier in the lifecycle, not primed yet.",
+            };
             SETUP_TYPES.forEach(t => {
                 const n = counts[t.key];
-                const w = Math.round((n / max) * 100);
                 const active = filters.setup === t.key;
                 const btn = document.createElement("button");
                 btn.type = "button";
-                btn.className = "w-full text-left group";
+                if (tips[t.key]) btn.setAttribute("data-tip", tips[t.key]);
+                btn.className = "px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-all flex items-center gap-1.5 " +
+                    (active ? "bg-slate-700 border-slate-400 text-white" : "bg-slate-800 border-borderCl text-slate-300 hover:border-slate-500");
+                btn.innerHTML = `<span class="inline-block w-2 h-2 rounded-full ${t.color} flex-none"></span>${t.key}` +
+                    `<span class="text-slate-500 font-normal">${n}</span>`;
                 btn.onclick = () => {
                     filters.setup = active ? "" : t.key;
                     renderSetupBreakdown();
                     applyFilters();
                 };
-                btn.innerHTML = `
-                    <div class="flex items-center justify-between gap-2 mb-1">
-                        <span class="text-[11px] font-semibold truncate ${active ? t.text : "text-slate-300"}">${t.key}</span>
-                        <span class="text-[10px] text-slate-500 flex-none">${n}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-slate-900">
-                        <div class="h-full rounded-full ${t.color} ${active ? "" : "opacity-60 group-hover:opacity-100"}" style="width:${w}%"></div>
-                    </div>`;
                 host.appendChild(btn);
             });
         }
@@ -882,6 +935,7 @@
             renderVerdict(s);
             renderPrecedents(s);
             renderHoldings(s);
+            renderNews(s);
             renderLevels(s);
             renderVCP(s);
             renderEntry(s);
@@ -1204,6 +1258,58 @@
             renderOwnTrend();
         }
 
+        // News & Sentiment card: recent headlines (Marketaux and/or NewsData.io, per
+        // fetch_news.py's daily budget split) + Marketaux's entity sentiment when present.
+        // Hidden entirely if this stock has no cached news yet (budget-capped daily, so
+        // most of the ~1,800-stock universe won't have an entry on any given day).
+        function renderNews(s) {
+            const card = $("newsCard");
+            const n = s.news;
+            if (!n || !n.headlines || !n.headlines.length) {
+                card.classList.add("hidden");
+                return;
+            }
+            card.classList.remove("hidden");
+            $("newsAsOf").innerText = n.as_of ? "as of " + n.as_of : "";
+
+            const sentRow = $("newsSentimentRow");
+            if (n.sentiment) {
+                const sty = SENTIMENT_STYLE[n.sentiment.label] || SENTIMENT_STYLE.Neutral;
+                const score = n.sentiment.score;
+                sentRow.innerHTML =
+                    `<span class="text-[10px] uppercase tracking-wider text-slate-500 mr-2">News sentiment</span>` +
+                    `<span class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap ${sty.cls}">${sty.text}</span>` +
+                    `<span class="text-[10px] text-slate-500 ml-2">score ${score >= 0 ? "+" : ""}${score} · Marketaux</span>`;
+                sentRow.classList.remove("hidden");
+                sentRow.classList.add("flex");
+            } else {
+                sentRow.classList.add("hidden");
+                sentRow.classList.remove("flex");
+                sentRow.innerHTML = "";
+            }
+
+            const fmtDate = (d) => {
+                if (!d) return "";
+                const dt = new Date(d);
+                return isNaN(dt) ? "" : dt.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+            };
+            $("newsList").innerHTML = n.headlines.slice(0, 5).map(h => {
+                const dateTxt = fmtDate(h.published_at);
+                const providerTag = h.provider === "marketaux" ? "Marketaux" : "NewsData.io";
+                const href = h.url ? escapeHtml(h.url) : "#";
+                return `
+                <a href="${href}" target="_blank" rel="noopener noreferrer"
+                   class="block p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all">
+                    <div class="text-sm text-slate-200 leading-snug">${escapeHtml(h.title)}</div>
+                    <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                        <span>${escapeHtml(h.source || "Unknown source")}</span>
+                        ${dateTxt ? `<span>· ${dateTxt}</span>` : ""}
+                        <span class="ml-auto uppercase tracking-wider">${providerTag}</span>
+                    </div>
+                </a>`;
+            }).join("");
+        }
+
         function renderVerdict(s) {
             const sty = SENTIMENT_STYLE[s.breakout.sentiment] || SENTIMENT_STYLE.Neutral;
             const badge = $("sentimentBadge");
@@ -1270,6 +1376,16 @@
             } else {
                 rel.classList.add("hidden");
             }
+        }
+
+        // Escapes text pulled from a third-party source (news headlines/sources) before
+        // it's dropped into innerHTML -- everywhere else in this file renders our own
+        // backend-computed data, but news content is the one place we render raw external
+        // text, so it needs explicit escaping rather than trusting it.
+        function escapeHtml(text) {
+            return String(text ?? "")
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
 
         function pill(v) {
@@ -1353,11 +1469,11 @@
             $("stopLoss").innerText = s.entry.stop_loss;
         }
 
-        // Reusable ⓘ marker — the actual tooltip is the single body-level #floatTip,
+        // Reusable info marker — the actual tooltip is the single body-level #floatTip,
         // positioned by initTooltips() so no card overflow can clip it.
         function infoTip(text) {
             const safe = text.replace(/"/g, "&quot;");
-            return `<span class="text-slate-500 ml-1" data-tip="${safe}">ⓘ</span>`;
+            return `<span class="info-i ml-1" data-tip="${safe}">i</span>`;
         }
         const ADX_TIP = "ADX measures trend <b>strength</b> (0–100), not direction. Above 25 = a strong, sustained trend worth trading; below 20 = choppy / directionless.";
         const EMA_TIP = "EMA = exponential moving average, the stock's average price over a window (weighted to recent days). Price <b>above</b> the line = uptrend on that timeframe; the 200-EMA is the long-term 'macro' trend.";
