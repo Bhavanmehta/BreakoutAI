@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T10:30:10+00:00",
+  "generated_at": "2026-07-06T14:10:08+00:00",
   "horizon_days": 10,
   "stop_loss_fraction": 0.94,
   "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",
@@ -7,7 +7,7 @@
   "followed_through": 6,
   "hit_rate": 0.214,
   "pending": 265,
-  "live_calls_logged": 3648,
+  "live_calls_logged": 3656,
   "note": "Includes a walk-forward simulation of recent history (source=simulated); live daily calls accumulate from now on.",
   "recent": [
     {
