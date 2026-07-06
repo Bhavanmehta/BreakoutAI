@@ -68,7 +68,8 @@
                     <button id="marketBtnIN" type="button" class="px-2.5 py-1 rounded-md transition-all">🇮🇳 India</button>
                     <button id="marketBtnUS" type="button" class="px-2.5 py-1 rounded-md transition-all">🇺🇸 US</button>
                 </div>
-                <span class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md">Live Data</span>
+                <span id="liveBadge" class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md"
+                      data-tip="Price + day-move for the names on screen refreshes every ~90s during market hours (api/quotes.py). The breakout/readiness analysis below it is still computed once daily after close — this badge only covers live price.">Live Data</span>
             </div>
         </div>
     </header>
@@ -92,6 +93,11 @@
                     <select id="fltSector" class="px-2.5 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 focus:outline-none focus:border-purple-500 max-w-[200px]">
                         <option value="">All sectors</option>
                     </select>
+                    <button id="industryChip" type="button"
+                            class="hidden items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-full border border-purple-500 bg-purple-600/25 text-purple-200"
+                            title="Clear industry filter (keeps the sector)">
+                        <span id="industryChipLabel"></span><span class="text-purple-300">×</span>
+                    </button>
                 </label>
                 <label class="flex items-center gap-2 text-xs text-slate-400">
                     <span class="uppercase tracking-wider">Sort</span>
@@ -173,13 +179,14 @@
                         <div class="flex-none text-center">
                             <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center" data-tip="A single 0–100 score the whole list ranks by. It blends two things a whole-market study found actually predict follow-through: (1) <b>imminence</b> — how close this stock is to breaking out (its readiness tier, ~55%), and (2) <b>reliability</b> — how well this stock's own past breakouts followed through, plus base depth and relative-strength / trend confirmation (~45%). It deliberately ignores ADX, chart-pattern names and the single historical analog (which didn't hold up in testing). <b>Technical only</b> — it does not yet factor in fundamentals like P/E or profit growth.">Conviction<span class="info-i ml-1">i</span></span>
                             <span id="metaConviction" class="text-2xl font-black leading-none">—</span>
+                            <span id="metaHighConvBadge" class="hidden" title="This scanner's single strongest, most selective backtested signal — a volatility squeeze releasing into a confirmed breakout, still close to the trigger.">★ High conviction</span>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
                         <div class="flex gap-6 sm:gap-8">
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Price</span><span id="metaPrice" class="text-sm font-semibold text-slate-200">—</span></div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Day Change</span><span id="metaChange" class="text-sm font-semibold text-slate-200">—</span></div>
-                            <div>
-                                <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center" data-tip="Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.">Mkt Cap<span class="info-i ml-1">i</span></span>
+                            <div id="metaMcapRow">
+                                <span id="metaMcapTip" class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center" data-tip="Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.">Mkt Cap<span class="info-i ml-1">i</span></span>
                                 <span id="metaMcap" class="text-sm font-semibold text-slate-200">—</span>
                             </div>
                             <div><span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Setup</span><span id="metaReadiness" class="text-sm font-bold text-purple-300">—</span></div>
@@ -520,10 +527,20 @@
             if (c >= 40) return "text-amber-300";
             return "text-slate-400";
         }
-        // Market cap comes in ₹ crore. Show it human-readably in Indian units: plain crore
-        // with lakh-style grouping up to 1 lakh-crore, then switch to "L Cr" (lakh-crore).
-        function fmtMarketCap(cr) {
-            if (cr == null || isNaN(cr)) return "—";
+        // Market cap is stored RAW, in the stock's native currency (see backend/
+        // fundamentals.py) -- this function owns all display formatting, keyed on the
+        // active market. India: ₹ crore, with lakh-style grouping up to 1 lakh-crore,
+        // then "L Cr". US: $ with standard K/M/B/T suffixes.
+        function fmtMarketCap(raw) {
+            if (raw == null || isNaN(raw)) return "—";
+            if (MARKET === "US") {
+                const abs = Math.abs(raw);
+                if (abs >= 1e12) return "$" + (raw / 1e12).toFixed(2) + "T";
+                if (abs >= 1e9)  return "$" + (raw / 1e9).toFixed(2) + "B";
+                if (abs >= 1e6)  return "$" + (raw / 1e6).toFixed(1) + "M";
+                return "$" + Math.round(raw).toLocaleString("en-US");
+            }
+            const cr = raw / 1e7;
             if (cr >= 100000) return "₹" + (cr / 100000).toFixed(2) + " L Cr";
             if (cr >= 1000)   return "₹" + Math.round(cr).toLocaleString("en-IN") + " Cr";
             return "₹" + cr.toFixed(cr < 100 ? 1 : 0) + " Cr";
@@ -552,14 +569,26 @@
         // each (keeps the whole fundamentals bar on one horizontal line). The first option is
         // always "Any" (no filter); each carries the {min,max} it applies to s.fundamentals[field].
         const FUND_FIELDS = [
-            { key: "mcap", label: "Market Cap", field: "market_cap_cr",
-              tip: "The total value of all the company's shares — share price × number of shares — in ₹ crore (1 lakh Cr = 1L Cr). A rough size gauge: <b>larger = more established and generally more stable</b>; smaller can move faster but carries more risk.",
-              options: [
+            // Market cap is stored RAW (native currency — see backend/fundamentals.py),
+            // so both the explanation and the bucket thresholds have to be market-aware.
+            // `tip`/`options` are functions here (evaluated at render/use time) rather
+            // than static values, unlike every other field below.
+            { key: "mcap", label: "Market Cap", field: "market_cap",
+              tip: () => MARKET === "US"
+                ? "The total value of all the company's shares — share price × number of shares — in US dollars. A rough size gauge: <b>larger = more established and generally more stable</b>; smaller can move faster but carries more risk."
+                : "The total value of all the company's shares — share price × number of shares — in ₹ crore (1 lakh Cr = 1L Cr). A rough size gauge: <b>larger = more established and generally more stable</b>; smaller can move faster but carries more risk.",
+              options: () => MARKET === "US" ? [
                 { label: "Any size", min: null, max: null },
-                { label: "Micro · <5K Cr", min: null, max: 5000 },
-                { label: "Small · 5K–30K Cr", min: 5000, max: 30000 },
-                { label: "Mid · 30K–1L Cr", min: 30000, max: 100000 },
-                { label: "Large · 1L Cr+", min: 100000, max: null },
+                { label: "Micro · <$300M", min: null, max: 3e8 },
+                { label: "Small · $300M–$2B", min: 3e8, max: 2e9 },
+                { label: "Mid · $2B–$10B", min: 2e9, max: 1e10 },
+                { label: "Large · $10B+", min: 1e10, max: null },
+              ] : [
+                { label: "Any size", min: null, max: null },
+                { label: "Micro · <5K Cr", min: null, max: 5e10 },
+                { label: "Small · 5K–30K Cr", min: 5e10, max: 3e11 },
+                { label: "Mid · 30K–1L Cr", min: 3e11, max: 1e12 },
+                { label: "Large · 1L Cr+", min: 1e12, max: null },
             ] },
             { key: "pe", label: "P/E", field: "pe_ratio",
               tip: "Price-to-Earnings — share price ÷ yearly profit per share. Roughly <b>how many years of current profit you're paying for one share</b>. Lower can mean cheap (or slow-growing); higher means the market expects fast growth. Compare within the same industry.",
@@ -611,7 +640,7 @@
 
         // Filter/sort state, driven by the top bar. Default sort is the composite
         // conviction score (most→least likely to break out and follow through).
-        const filters = { query: "", sector: "", sort: "conviction", primedOnly: false, fundamentals: {}, collection: "", setup: "" };
+        const filters = { query: "", sector: "", industry: "", sort: "conviction", primedOnly: false, fundamentals: {}, collection: "", setup: "" };
         FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
 
         // --- Curated collections -------------------------------------------------------
@@ -624,12 +653,74 @@
             "ITC JIOFIN JSWSTEEL KOTAKBANK LT M&M MARUTI MAXHEALTH NESTLEIND NTPC ONGC POWERGRID RELIANCE " +
             "SBILIFE SBIN SHRIRAMFIN SUNPHARMA TATACONSUM TATASTEEL TCS TECHM TITAN TRENT ULTRACEMCO WIPRO").split(" "));
 
+        // US index constituents (curated, fetched from Wikipedia/GitHub-mirrored source
+        // data 2026-07-06 — same "resync periodically" caveat as NIFTY50: membership
+        // shifts at quarterly/annual index reviews). Symbols normalized to yfinance's
+        // dash style (BRK.B -> BRK-B) to match universe.py's US ticker convention.
+        // Coverage confirmed against the live universe: S&P 500 500/503, Nasdaq-100
+        // 101/101, Dow 30 30/30 matched (the handful of S&P misses are recent
+        // spinoffs/renames not yet in the finviz-sourced universe screen).
+        const SP500 = new Set(("A AAPL ABBV ABNB ABT ACGL ACN ADBE ADI ADM ADP ADSK " +
+            "AEE AEP AES AFL AIG AIZ AJG AKAM ALB ALGN ALL ALLE " +
+            "AMAT AMCR AMD AME AMGN AMP AMT AMZN ANET AON AOS APA " +
+            "APD APH APO APP APTV ARE ARES ATO AVB AVGO AVY AWK " +
+            "AXON AXP AZO BA BAC BALL BAX BBY BDX BEN BF-B BG " +
+            "BIIB BKNG BKR BLDR BLK BMY BNY BR BRK-B BRO BSX BX " +
+            "BXP C CAH CARR CASY CAT CB CBOE CBRE CCI CCL CDNS " +
+            "CDW CEG CF CFG CHD CHRW CHTR CI CIEN CINF CL CLX " +
+            "CMCSA CME CMG CMI CMS CNC CNP COF COHR COIN COO COP " +
+            "COR COST CPAY CPRT CPT CRH CRL CRM CRWD CSCO CSGP CSX " +
+            "CTAS CTSH CTVA CVNA CVS CVX D DAL DASH DD DDOG DE " +
+            "DECK DELL DG DGX DHI DHR DIS DLR DLTR DOC DOV DOW " +
+            "DPZ DRI DTE DUK DVA DVN DXCM EA EBAY ECHO ECL ED " +
+            "EFX EG EIX EL ELV EME EMR EOG EQIX EQR EQT ERIE " +
+            "ES ESS ETN ETR EVRG EW EXC EXE EXPD EXPE EXR F " +
+            "FANG FAST FCX FDS FDX FDXF FE FFIV FICO FIS FISV FITB " +
+            "FIX FLEX FOX FOXA FRT FSLR FTNT FTV GD GDDY GE GEHC " +
+            "GEN GEV GILD GIS GL GLW GM GNRC GOOG GOOGL GPC GPN " +
+            "GRMN GS GWW HAL HAS HBAN HCA HD HIG HII HLT HON " +
+            "HONA HOOD HPE HPQ HRL HSIC HST HSY HUBB HUM HWM IBKR " +
+            "IBM ICE IDXX IEX IFF INCY INTC INTU INVH IP IQV IR " +
+            "IRM ISRG IT ITW IVZ J JBHT JBL JCI JKHY JNJ JPM " +
+            "KDP KEY KEYS KHC KIM KKR KLAC KMB KMI KO KR KVUE " +
+            "L LDOS LEN LH LHX LII LIN LITE LLY LMT LNT LOW " +
+            "LRCX LULU LUV LVS LYB LYV MA MAA MAR MAS MCD MCHP " +
+            "MCK MCO MDLZ MDT MET META MGM MKC MLM MMM MNST MO " +
+            "MOS MPC MPWR MRK MRNA MRSH MRVL MS MSCI MSFT MSI MTB " +
+            "MTD MU NCLH NDAQ NDSN NEE NEM NFLX NI NKE NOC NOW " +
+            "NRG NSC NTAP NTRS NUE NVDA NVR NWS NWSA NXPI O ODFL " +
+            "OKE OMC ON ORCL ORLY OTIS OXY PANW PAYX PCAR PCG PEG " +
+            "PEP PFE PFG PG PGR PH PHM PKG PLD PLTR PM PNC " +
+            "PNR PNW PODD PPG PPL PRU PSA PSKY PSX PTC PWR PYPL " +
+            "Q QCOM RCL REG REGN RF RJF RL RMD ROK ROL ROP " +
+            "ROST RSG RTX RVTY SBAC SBUX SCHW SHW SJM SLB SMCI SNA " +
+            "SNDK SNPS SO SOLV SPG SPGI SRE STE STLD STT STX STZ " +
+            "SW SWK SWKS SYF SYK SYY T TAP TDG TDY TECH TEL " +
+            "TER TFC TGT TJX TKO TMO TMUS TPL TPR TRGP TRMB TROW " +
+            "TRV TSCO TSLA TSN TT TTD TTWO TXN TXT TYL UAL UBER " +
+            "UDR UHS ULTA UNH UNP UPS URI USB V VEEV VICI VLO " +
+            "VLTO VMC VRSK VRSN VRT VRTX VST VTR VTRS VZ WAB WAT " +
+            "WBD WDAY WDC WEC WELL WFC WM WMB WMT WRB WSM WST " +
+            "WTW WY WYNN XEL XOM XYL XYZ YUM ZBH ZBRA ZTS").split(" "));
+        const NASDAQ100 = new Set(("ADBE AMD ABNB ALNY GOOGL GOOG AMZN AEP AMGN ADI AAPL AMAT " +
+            "APP ARM ASML ALAB ADSK ADP AXON BKR BKNG AVGO CDNS CTAS " +
+            "CSCO CCEP CMCSA CEG CPRT CRWV COST CRWD CSX DDOG DXCM FANG " +
+            "DASH EA EXC FAST FER FTNT GEHC GILD HON IDXX INTC INTU " +
+            "ISRG KDP KLAC KHC LRCX LIN LITE MAR MRVL MELI META MCHP " +
+            "MU MSFT MSTR MDLZ MPWR MNST NBIS NFLX NVDA NXPI ORLY ODFL " +
+            "PCAR PLTR PANW PAYX PYPL PDD PEP QCOM REGN RKLB ROP ROST " +
+            "SNDK STX SHOP SBUX SNPS TMUS TTWO TER TSLA TXN TRI VRTX " +
+            "WMT WBD WDC WDAY XEL").split(" "));
+        const DOW30 = new Set(("MMM GOOGL AXP AMGN AMZN AAPL BA CAT CVX CSCO KO DIS " +
+            "GS HD HON IBM JNJ JPM MCD MRK MSFT NKE NVDA PG CRM " +
+            "SHW TRV UNH V WMT").split(" "));
+
         // Market-cap rank (1 = biggest) over the whole loaded universe, so cap tiers follow
         // SEBI's definition (large = top 100, mid = 101–250, small = 251+). Self-updating.
         const MCAP_RANK = {};
         function computeMcapRank() {
-            STOCKS.filter(s => s.fundamentals && s.fundamentals.market_cap_cr != null)
-                .sort((a, b) => b.fundamentals.market_cap_cr - a.fundamentals.market_cap_cr)
+            STOCKS.filter(s => s.fundamentals && s.fundamentals.market_cap != null)
+                .sort((a, b) => b.fundamentals.market_cap - a.fundamentals.market_cap)
                 .forEach((s, i) => { MCAP_RANK[s.symbol] = i + 1; });
         }
         const rankIn = (s, lo, hi) => {
@@ -642,6 +733,10 @@
             { key: "large", label: "Large cap", tip: "Top 100 by market cap (SEBI large-cap).", match: s => rankIn(s, 1, 100), inOnly: true },
             { key: "mid", label: "Mid cap", tip: "Ranks 101–250 by market cap (SEBI mid-cap).", match: s => rankIn(s, 101, 250), inOnly: true },
             { key: "small", label: "Small cap", tip: "Rank 251+ by market cap (SEBI small-cap).", match: s => rankIn(s, 251, Infinity), inOnly: true },
+            { key: "sp500", label: "S&P 500", tip: "S&P 500 index constituents — the 500 largest US companies by the index's own methodology (curated list, resynced periodically).", match: s => SP500.has(s.symbol), usOnly: true },
+            { key: "nasdaq100", label: "Nasdaq 100", tip: "Nasdaq-100 constituents — the 100 largest non-financial companies listed on Nasdaq (curated list, resynced periodically).", match: s => NASDAQ100.has(s.symbol), usOnly: true },
+            { key: "dow30", label: "Dow 30", tip: "Dow Jones Industrial Average — 30 large, well-established \"blue chip\" companies (curated list, resynced periodically).", match: s => DOW30.has(s.symbol), usOnly: true },
+            { key: "russell2000-ish", label: "Small cap (Russell 2000-ish)", tip: "Approximate Russell 2000 zone — ranked roughly 1,001–3,000 by market cap in this scanner's own universe. NOT the official Russell 2000 membership list (that requires a licensed data feed); a market-cap-rank proxy for \"the small-cap segment.\"", match: s => rankIn(s, 1001, 3000), usOnly: true },
             { key: "primedProven", label: "Primed & proven", tip: "On-watch setups with a conviction score of 60 or more.", match: s => s.readiness && s.readiness.watch && (s.readiness.conviction ?? 0) >= 60 },
             { key: "qualityGrowth", label: "Quality growth", tip: "ROE ≥ 15% and positive profit growth — solid businesses, not just chart setups.", match: s => { const f = s.fundamentals; return f && f.roe_pct != null && f.roe_pct >= 15 && f.profit_growth_pct != null && f.profit_growth_pct > 0; } },
         ];
@@ -694,6 +789,22 @@
             if (!sec) return "Unclassified";
             const g = sec.split(" · ")[0].trim() || "Unclassified";
             return SECTOR_ALIAS[g] || g;
+        }
+
+        // The finer-grained half of the "Sector · Industry" label (e.g. "Software -
+        // Infrastructure" within "Technology") — null if a stock has no industry on
+        // record. Powers the Sector Radar's drill-down (see renderSectorRadar).
+        function industryOf(s) {
+            const parts = (s.sector || "").trim().split(" · ");
+            return parts.length > 1 && parts[1].trim() ? parts[1].trim() : null;
+        }
+
+        // Single place that changes the sector filter, so picking a new top-level
+        // sector always clears any deeper industry pick (a stale industry filter
+        // silently zeroing out every match would be confusing, not helpful).
+        function setSectorFilter(sector, industry) {
+            filters.sector = sector || "";
+            filters.industry = industry || "";
         }
 
         let DATA_IN = null;
@@ -754,6 +865,12 @@
             STOCKS = m === "US" ? STOCKS_US : STOCKS_IN;
             const data = m === "US" ? DATA_US : DATA_IN;
 
+            // Live quotes are keyed by bare symbol -- clear on switch so a stray
+            // same-ticker collision between markets can't leak a stale price across.
+            LIVE_QUOTES = {};
+            liveQuotesAsOf = null;
+            updateLiveBadge();
+
             const ACTIVE = "bg-purple-600 text-white", INACTIVE = "text-slate-400 hover:text-slate-200";
             $("marketBtnIN").className = "px-2.5 py-1 rounded-md transition-all " + (m === "IN" ? ACTIVE : INACTIVE);
             $("marketBtnUS").className = "px-2.5 py-1 rounded-md transition-all " + (m === "US" ? ACTIVE : INACTIVE);
@@ -762,12 +879,17 @@
             $("dataSource").innerText = (data && data.source) || "—";
             $("disclaimer").innerText = data ? "⚠️ " + (data.disclaimer || "") : "";
             renderMarketMood(data && data.market_mood);
+            $("metaMcapTip").setAttribute("data-tip", m === "US"
+                ? "Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in US dollars, with K/M/B/T suffixes."
+                : "Market capitalisation — the total value of all the company's shares (price × shares outstanding). A quick size gauge: larger tends to mean more established and stable. Shown in ₹ crore (Cr), or lakh-crore (L Cr = 1,00,000 Cr) for the biggest names.");
 
             // Sector taxonomy and India-only collection chips (Nifty 50, SEBI cap tiers)
             // don't carry over between markets -- a stale value would silently zero out
             // every match instead of erroring, so clear it rather than leave it dangling.
             filters.sector = "";
+            filters.industry = "";
             filters.collection = "";
+            expandedSectorGroup = null;
 
             if (!STOCKS.length) {
                 $("watchlist").innerHTML = `<span class="text-sm text-slate-500 py-2">No ${m === "US" ? "US" : "India"} scan data yet.</span>`;
@@ -786,13 +908,15 @@
             renderFundPanel();
             applyFilters();
             selectStock(STOCKS[0].symbol);
+            startLiveQuotePolling();
         }
 
         function wireControls() {
             $("marketBtnIN").onclick = () => { if (MARKET !== "IN") switchMarket("IN"); };
             $("marketBtnUS").onclick = () => { if (MARKET !== "US") switchMarket("US"); };
             $("fltSearch").oninput = (e) => { filters.query = e.target.value; applyFilters(); };
-            $("fltSector").onchange = (e) => { filters.sector = e.target.value; applyFilters(); };
+            $("fltSector").onchange = (e) => { setSectorFilter(e.target.value); applyFilters(); };
+            $("industryChip").onclick = () => { filters.industry = ""; renderSectorRadar(); applyFilters(); };
             $("fltSort").onchange = (e) => { filters.sort = e.target.value; applyFilters(); };
             $("fltPrimed").onclick = () => {
                 filters.primedOnly = !filters.primedOnly;
@@ -825,7 +949,9 @@
             host.innerHTML = "";
             FUND_FIELDS.forEach(f => {
                 const range = filters.fundamentals[f.key];
-                const optsHtml = f.options.map((o, i) => {
+                const opts = typeof f.options === "function" ? f.options() : f.options;
+                const tip = typeof f.tip === "function" ? f.tip() : f.tip;
+                const optsHtml = opts.map((o, i) => {
                     const sel = (range.min === o.min && range.max === o.max) ? " selected" : "";
                     return `<option value="${i}"${sel}>${o.label}</option>`;
                 }).join("");
@@ -833,7 +959,7 @@
                 const unit = document.createElement("label");
                 unit.className = "flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap";
                 unit.innerHTML =
-                    `<span class="flex items-center uppercase tracking-wider">${f.label}${infoTip(f.tip)}</span>` +
+                    `<span class="flex items-center uppercase tracking-wider">${f.label}${infoTip(tip)}</span>` +
                     `<select data-fund="${f.key}" class="px-2 py-1.5 text-sm rounded-lg border focus:outline-none focus:border-purple-500 ${active ? "bg-purple-600/20 border-purple-500 text-white" : "bg-slate-800 border-borderCl text-slate-200"}">${optsHtml}</select>`;
                 host.appendChild(unit);
             });
@@ -841,7 +967,8 @@
             host.querySelectorAll("[data-fund]").forEach(sel => {
                 sel.onchange = () => {
                     const f = FUND_FIELDS.find(x => x.key === sel.dataset.fund);
-                    const o = f.options[Number(sel.value)];
+                    const opts = typeof f.options === "function" ? f.options() : f.options;
+                    const o = opts[Number(sel.value)];
                     filters.fundamentals[f.key] = { min: o.min, max: o.max };
                     renderFundPanel();
                     applyFilters();
@@ -909,6 +1036,7 @@
             let list = STOCKS.filter(s => {
                 if (filters.primedOnly && !(s.readiness && s.readiness.watch)) return false;
                 if (filters.sector && sectorGroup(s) !== filters.sector) return false;
+                if (filters.industry && industryOf(s) !== filters.industry) return false;
                 if (filters.setup && setupType(s) !== filters.setup) return false;
                 if (!collectionMatch(s)) return false;
                 if (q && !(s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q))) return false;
@@ -919,7 +1047,24 @@
             return list;
         }
 
+        // Shows/hides the dismissible "Software ×" style chip next to the sector
+        // dropdown whenever an industry drill-down is active — otherwise picking an
+        // industry in the Sector Radar popup and closing it would leave a filter
+        // active with no visible trace of it.
+        function renderIndustryChip() {
+            const chip = $("industryChip");
+            if (filters.industry) {
+                $("industryChipLabel").textContent = filters.industry;
+                chip.classList.remove("hidden");
+                chip.classList.add("flex");
+            } else {
+                chip.classList.add("hidden");
+                chip.classList.remove("flex");
+            }
+        }
+
         function applyFilters() {
+            renderIndustryChip();
             const list = currentVisible();
             renderWatchlist(list);
             const shown = Math.min(list.length, MAX_RESULTS);
@@ -974,14 +1119,15 @@
                             <span class="wl-quick-track w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold leading-none ${tracked ? "text-emerald-400" : "text-slate-500 hover:text-purple-300"}"
                                   role="button" tabindex="0" title="${tracked ? "Tracking — click to remove" : "Add to My Watchlist"}">${tracked ? "✓" : "+"}</span>
                             <span class="flex items-baseline gap-1" title="Breakout conviction (0–100)">
+                                ${s.readiness.signal === "high_conviction" ? `<span class="text-amber-400 text-xs" title="This scanner's single strongest, most selective backtested signal">★</span>` : ""}
                                 <span class="text-base font-black leading-none ${convColor(conv)}">${conv != null ? conv : "—"}</span>
                             </span>
                         </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
                     <div class="flex items-center justify-between gap-2 mt-1">
-                        <span class="text-[11px] text-slate-400">${fmtPrice(s.price ?? 0)}</span>
-                        <span class="text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
+                        <span class="wl-price text-[11px] text-slate-400">${fmtPrice(s.price ?? 0)}</span>
+                        <span class="wl-change text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
                         <span class="text-[10px] ${rs.text}">${distTxt}</span>
                     </div>`;
                 row.querySelector(".wl-quick-track").onclick = (e) => {
@@ -1001,6 +1147,106 @@
                 const a = $("wl-" + current.symbol);
                 if (a) a.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-purple-600/15 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.12)] cursor-pointer";
             }
+        }
+
+        // --- Live price overlay ---------------------------------------------------------
+        // Lightweight polling on top of the once-daily readiness/ADX/resistance analysis
+        // (see api/quotes.py): every ~90s, fetch current price/day-move for just the
+        // symbols on screen and paint it over the last-close values already rendered.
+        // Never mutates STOCKS or re-runs the heavier render* functions (chart, holdings,
+        // news, etc.) -- purely a price/change display overlay. Keyed by bare symbol, so
+        // it's cleared on market switch (an India/US ticker collision could otherwise
+        // leak a US quote into the India view or vice versa).
+        let LIVE_QUOTES = {};
+        let liveQuotesAsOf = null;
+        let liveQuoteTimer = null;
+        const LIVE_POLL_MS = 90000;
+
+        function isMarketOpenNow() {
+            const tz = MARKET === "US" ? "America/New_York" : "Asia/Kolkata";
+            const now = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+            const day = now.getDay();
+            if (day === 0 || day === 6) return false;
+            const mins = now.getHours() * 60 + now.getMinutes();
+            return MARKET === "US"
+                ? mins >= 9 * 60 + 30 && mins <= 16 * 60
+                : mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+        }
+
+        function applyLiveQuoteToDetail() {
+            if (!current) return;
+            const lq = LIVE_QUOTES[current.symbol];
+            if (!lq) return;
+            $("metaPrice").innerText = fmtPrice(lq.price);
+            const chgEl = $("metaChange");
+            chgEl.innerText = (lq.change_pct >= 0 ? "+" : "") + lq.change_pct + "%";
+            chgEl.className = "text-sm font-semibold " + (lq.change_pct >= 0 ? "text-emerald-400" : "text-rose-400");
+        }
+
+        function applyLiveQuotesToWatchlist() {
+            document.querySelectorAll(".wl-row").forEach(row => {
+                const lq = LIVE_QUOTES[row.id.slice(3)]; // "wl-<symbol>"
+                if (!lq) return;
+                const priceEl = row.querySelector(".wl-price");
+                const chgEl = row.querySelector(".wl-change");
+                if (priceEl) priceEl.innerText = fmtPrice(lq.price);
+                if (chgEl) {
+                    chgEl.innerText = (lq.change_pct >= 0 ? "+" : "") + lq.change_pct + "%";
+                    chgEl.className = "wl-change text-[10px] font-semibold " + (lq.change_pct >= 0 ? "text-emerald-400" : "text-rose-400");
+                }
+            });
+        }
+
+        function updateLiveBadge() {
+            const el = $("liveBadge");
+            if (!el) return;
+            el.innerText = liveQuotesAsOf
+                ? "Live " + liveQuotesAsOf.toLocaleTimeString(MARKET === "US" ? "en-US" : "en-IN", { hour: "2-digit", minute: "2-digit" })
+                : "Live Data";
+        }
+
+        async function pollLiveQuotes() {
+            if (document.visibilityState !== "visible" || !STOCKS.length || !isMarketOpenNow()) return;
+            const symbols = new Set(currentVisible().slice(0, MAX_RESULTS).map(s => s.symbol));
+            if (current) symbols.add(current.symbol);
+            if (!symbols.size) return;
+            const pollMarket = MARKET;
+            try {
+                const res = await fetch(`/api/quotes?symbols=${encodeURIComponent([...symbols].join(","))}&market=${pollMarket}`, { cache: "no-store" });
+                if (!res.ok || pollMarket !== MARKET) return; // market may have been switched mid-flight
+                const body = await res.json();
+                Object.assign(LIVE_QUOTES, body.quotes || {});
+                liveQuotesAsOf = new Date();
+                applyLiveQuotesToWatchlist();
+                applyLiveQuoteToDetail();
+                updateLiveBadge();
+            } catch (err) {
+                console.warn("Live quote refresh failed —", err.message);
+            }
+        }
+
+        function startLiveQuotePolling() {
+            if (liveQuoteTimer) clearInterval(liveQuoteTimer);
+            pollLiveQuotes();
+            liveQuoteTimer = setInterval(pollLiveQuotes, LIVE_POLL_MS);
+        }
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pollLiveQuotes(); });
+
+        // Which sector's industry breakdown is currently expanded in the radar popup
+        // (accordion-style — one at a time keeps the list compact). Reset on market
+        // switch since a US-expanded sector name wouldn't mean anything for India.
+        let expandedSectorGroup = null;
+
+        function _radarRowHTML(label, b, maxPrimed, active) {
+            const w = Math.round((b.primed / maxPrimed) * 100);
+            return `
+                <div class="flex items-center justify-between gap-2 mb-1">
+                    <span class="text-[11px] font-semibold truncate ${active ? "text-purple-300" : "text-slate-300"}">${label}</span>
+                    <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed · ${b.total} total${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-slate-900">
+                    <div class="h-full rounded-full ${active ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-400"}" style="width:${w}%"></div>
+                </div>`;
         }
 
         function renderSectorRadar() {
@@ -1023,26 +1269,79 @@
             const host = $("sectorRadar");
             host.innerHTML = "";
             rows.forEach(([g, b]) => {
-                const w = Math.round((b.primed / maxPrimed) * 100);
-                const active = filters.sector === g;
+                const active = filters.sector === g && !filters.industry;
+                const expanded = expandedSectorGroup === g;
+                const wrap = document.createElement("div");
+
+                const row = document.createElement("div");
+                row.className = "flex items-center gap-1.5";
+
+                // Drill-down toggle — reveals the industries within this sector
+                // (e.g. Software, Semiconductors, Communication Equipment under
+                // Technology) without changing the filter or closing the popup.
+                // Placed before the sector name (not after) so it reads as "expand
+                // this" rather than a trailing decoration.
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.title = expanded ? "Hide industries" : "Show industries in this sector";
+                toggle.className = "flex-none w-5 h-5 flex items-center justify-center rounded text-slate-200 font-bold hover:text-purple-300 hover:bg-slate-700/60 text-xs";
+                toggle.textContent = expanded ? "−" : "+";
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    expandedSectorGroup = expanded ? null : g;
+                    renderSectorRadar();
+                };
+                row.appendChild(toggle);
+
                 const btn = document.createElement("button");
+                btn.className = "flex-1 min-w-0 text-left group";
+                btn.innerHTML = _radarRowHTML(g, b, maxPrimed, active);
                 btn.onclick = () => {
-                    filters.sector = active ? "" : g;
+                    setSectorFilter(active ? "" : g);
                     $("fltSector").value = filters.sector;
                     renderSectorRadar();
                     applyFilters();
                     $("sectorPopup").classList.add("hidden");
                 };
-                btn.className = "w-full text-left group";
-                btn.innerHTML = `
-                    <div class="flex items-center justify-between gap-2 mb-1">
-                        <span class="text-[11px] font-semibold truncate ${active ? "text-purple-300" : "text-slate-300"}">${g}</span>
-                        <span class="text-[10px] text-slate-500 flex-none">${b.primed} primed · ${b.total} total${b.breaking ? ` · ${b.breaking}🔥` : ""}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-slate-900">
-                        <div class="h-full rounded-full ${active ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-400"}" style="width:${w}%"></div>
-                    </div>`;
-                host.appendChild(btn);
+                row.appendChild(btn);
+                wrap.appendChild(row);
+
+                if (expanded) {
+                    const byIndustry = {};
+                    STOCKS.forEach(s => {
+                        if (sectorGroup(s) !== g) return;
+                        const ind = industryOf(s);
+                        if (!ind) return;
+                        const ib = byIndustry[ind] || (byIndustry[ind] = { total: 0, primed: 0, breaking: 0 });
+                        ib.total++;
+                        if (s.readiness && s.readiness.watch) ib.primed++;
+                        if (s.breakout && s.breakout.today) ib.breaking++;
+                    });
+                    const indRows = Object.entries(byIndustry)
+                        .sort((a, b) => b[1].primed - a[1].primed || b[1].total - a[1].total);
+                    const indMax = Math.max(1, ...indRows.map(r => r[1].primed));
+                    const sub = document.createElement("div");
+                    sub.className = "pl-3 mt-1.5 space-y-2 border-l border-slate-700/60";
+                    if (!indRows.length) {
+                        sub.innerHTML = `<p class="text-[10px] text-slate-500 pl-2">No industry breakdown available.</p>`;
+                    }
+                    indRows.forEach(([ind, ib]) => {
+                        const indActive = filters.sector === g && filters.industry === ind;
+                        const indBtn = document.createElement("button");
+                        indBtn.className = "w-full text-left group pl-2";
+                        indBtn.innerHTML = _radarRowHTML(ind, ib, indMax, indActive);
+                        indBtn.onclick = () => {
+                            setSectorFilter(g, indActive ? null : ind);
+                            $("fltSector").value = filters.sector;
+                            renderSectorRadar();
+                            applyFilters();
+                            $("sectorPopup").classList.add("hidden");
+                        };
+                        sub.appendChild(indBtn);
+                    });
+                    wrap.appendChild(sub);
+                }
+                host.appendChild(wrap);
             });
             if (!rows.length) host.innerHTML = `<p class="text-[11px] text-slate-500">No sector data yet — run fetch_sectors.py.</p>`;
         }
@@ -1050,7 +1349,7 @@
         function renderCollections() {
             const host = $("collectionChips");
             host.innerHTML = "";
-            COLLECTIONS.filter(c => !c.inOnly || MARKET === "IN").forEach(c => {
+            COLLECTIONS.filter(c => (!c.inOnly || MARKET === "IN") && (!c.usOnly || MARKET === "US")).forEach(c => {
                 const active = filters.collection === c.key;
                 const btn = document.createElement("button");
                 btn.type = "button";
@@ -1111,7 +1410,9 @@
             $("metaTitle").innerText = s.name;
             $("metaSector").innerText = s.sector || "Unclassified";
             $("metaPrice").innerText = fmtPrice(s.price);
-            $("metaMcap").innerText = fmtMarketCap(s.fundamentals && s.fundamentals.market_cap_cr);
+            const mcap = s.fundamentals && s.fundamentals.market_cap;
+            $("metaMcapRow").classList.toggle("hidden", mcap == null);
+            $("metaMcap").innerText = fmtMarketCap(mcap);
             const chg = s.change_pct;
             const chgEl = $("metaChange");
             chgEl.innerText = (chg >= 0 ? "+" : "") + chg + "%";
@@ -1121,6 +1422,11 @@
             const convEl = $("metaConviction");
             convEl.innerText = conv != null ? conv : "—";
             convEl.className = "text-2xl font-black leading-none " + convColor(conv);
+            const hcBadge = $("metaHighConvBadge");
+            hcBadge.className = s.readiness.signal === "high_conviction"
+                ? "inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 whitespace-nowrap"
+                : "hidden";
+            applyLiveQuoteToDetail(); // overlay a cached live price/change if one exists for this symbol
 
             renderVerdict(s);
             renderPrecedents(s);
@@ -1887,7 +2193,11 @@
 
             let explain;
             const benchName = MARKET === "US" ? "S&P 500" : "Nifty";
-            if (s.breakout.today) {
+            if (s.readiness.signal === "high_conviction") {
+                explain = `A rare, backtested combination: this stock's volatility had compressed to multi-month lows (a squeeze), and it's now releasing — a breakout through resistance confirmed it within the last week, price is still close to the trigger (not chased), and the stock moves enough day-to-day for a real move to play out. The strongest, most selective signal this scanner produces — historically the best-performing setup it looks for, though never a guarantee.`;
+            } else if (s.readiness.signal === "strong_breakout") {
+                explain = `Today's breakout has real energy behind it: the stock cleared its 50-day high on heavy volume, and it moves enough day-to-day for a real move to plausibly play out quickly. A stronger-than-average breakout, historically more likely to follow through than a typical one.`;
+            } else if (s.breakout.today) {
                 explain = `${s.name} is breaking out today — closing above its resistance of ${fmtPrice(s.resistance.level)} on strong volume.`;
             } else if (s.readiness.signal === "relative_strength") {
                 explain = `${s.name} is outperforming the ${benchName} by a widening margin — its price-to-${benchName} ratio just hit a fresh 50-day high, a "relative strength" signal that often precedes further outperformance.`;

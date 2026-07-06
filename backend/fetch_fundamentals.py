@@ -26,7 +26,7 @@ from universe import build_universe
 
 FUNDAMENTALS_JSON = settings.DATA_DIR / "fundamentals.json"
 _SCORE_RANK = {"high": 0, "medium": 1, "low": 2}
-_MISS = {"market_cap_cr": None, "pe_ratio": None, "revenue_growth_pct": None,
+_MISS = {"market_cap": None, "pe_ratio": None, "revenue_growth_pct": None,
          "profit_growth_pct": None, "roe_pct": None, "debt_to_equity": None}
 
 

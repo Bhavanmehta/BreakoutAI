@@ -41,6 +41,42 @@ MOOD_VIX_CALM = 12.0 if MARKET == "US" else 10.0
 MOOD_VIX_PANIC = 35.0 if MARKET == "US" else 30.0
 # Entry-guidance display currency (find_breakouts.py's plain-English trigger/stop text).
 CURRENCY_SYMBOL = "$" if MARKET == "US" else "₹"
+# --- Conviction-score calibration (score.py; thresholds also drive the reliability
+# caution text in find_breakouts._reliability_note). Backtested PER MARKET, because the
+# two markets' measured Method-A follow-through base rates are far apart: India 38.8%
+# (17k+ events) vs US 26.7% (20,814 events, whole-market replay 2026-07-05) -- US
+# stocks resolve the fixed ~6% stop/target band within 10 days far less often. Using
+# India's 0.39 prior on US stocks systematically oversells every thin-history name.
+# US weights were chosen on a 60% train split and held up out-of-sample (test-set
+# tertile stratification 14.4% -> 39.4%, p<1e-96; top-decile 43.4%): base depth is the
+# strongest validated US feature, trailing reliability keeps a smaller but real role,
+# and the method-confirmation term is DROPPED for US (D co-fire measured -12.2pt
+# harmful, p=0.002; E2 co-fire lift is subsumed by depth+reliability). India's numbers
+# are untouched -- identical to the values shipped 2026-07-04.
+if MARKET == "US":
+    SCORE_BASE_RATE = 0.27
+    SCORE_W_REL, SCORE_W_DEPTH, SCORE_W_METHOD = 0.30, 0.70, 0.00
+    SCORE_Q_RANGE = (0.04, 0.85)   # p01/p99 of the blend over 20,814 replayed US events
+else:
+    SCORE_BASE_RATE = 0.39
+    SCORE_W_REL, SCORE_W_DEPTH, SCORE_W_METHOD = 0.60, 0.25, 0.15
+    SCORE_Q_RANGE = (0.18, 0.78)
+# Reliability-note bands sit +-6pts around the market base rate. For India these land
+# on 0.33/0.45 -- exactly the constants that were previously hardcoded, so IN output
+# is bit-identical; for US they land on 0.21/0.33.
+RELIABILITY_CAUTION_BELOW = round(SCORE_BASE_RATE - 0.06, 2)
+RELIABILITY_GOOD_AT = round(SCORE_BASE_RATE + 0.06, 2)
+
+# --- US high-conviction setup tiers (find_breakouts.build_summary; validated
+# 2026-07-06 on a train/test split of the whole-market 3y replay — see
+# IMPLEMENT_US_HIGH_CONVICTION.md for the numbers each threshold carries).
+# NOT validated on India data — do not enable for IN without rerunning the backtest.
+HC_ENABLED = MARKET == "US"
+HC_ATR_MIN_PCT = 4.5             # 10-day ATR must be >= this % of price ("enough energy")
+HC_EXT_MAX_PCT = 3.0             # tier-1 only: close <= this % above the 50d resistance
+HC_COFIRE_BARS = 5               # tier-1 only: Method-A breakout within the last N bars (incl today)
+HC_MIN_AVG_VOL_SHARES = 100_000  # 20-day avg volume floor (user-chosen; keeps small caps)
+HC_MIN_PRICE = 1.0
 # Social buzz (fetch_social.py): subreddits + pytrends geo/locale/timezone.
 SOCIAL_SUBREDDITS_US = ["wallstreetbets", "stocks", "investing", "StockMarket"]
 TRENDS_GEO = "US" if MARKET == "US" else "IN"

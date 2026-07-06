@@ -22,7 +22,8 @@ import export_ohlc
 import market_mood
 from get_prices import get_prices, fetch_prices_yfinance_batch
 from find_breakouts import add_indicators, build_summary
-from methods import add_method_e_relative_strength, add_method_e2_relative_strength_uptrend, fetch_benchmark
+from methods import (add_method_e_relative_strength, add_method_e2_relative_strength_uptrend,
+                    add_method_c_squeeze, fetch_benchmark)
 from track import update_and_evaluate
 from universe import build_universe
 
@@ -78,6 +79,8 @@ def run():
         feat = add_indicators(prices)
         feat = add_method_e_relative_strength(feat, benchmark)
         feat = add_method_e2_relative_strength_uptrend(feat)
+        if settings.HC_ENABLED:
+            feat = add_method_c_squeeze(feat)
         summary = build_summary(feat, symbol, meta)
         if summary is None:
             short_history += 1
@@ -144,7 +147,7 @@ def run():
         matched = 0
         for s in summaries:
             s["fundamentals"] = fundamentals.get(s["symbol"])
-            matched += 1 if s["fundamentals"] and s["fundamentals"].get("market_cap_cr") else 0
+            matched += 1 if s["fundamentals"] and s["fundamentals"].get("market_cap") else 0
         print(f"  merged fundamentals for {matched}/{len(summaries)} stocks")
     else:
         for s in summaries:
