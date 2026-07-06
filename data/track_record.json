@@ -1,15 +1,23 @@
 {
-  "generated_at": "2026-07-05T20:27:29+00:00",
+  "generated_at": "2026-07-06T10:30:10+00:00",
   "horizon_days": 10,
   "stop_loss_fraction": 0.94,
   "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",
-  "actionable_evaluated": 27,
-  "followed_through": 5,
-  "hit_rate": 0.185,
-  "pending": 207,
-  "live_calls_logged": 1826,
+  "actionable_evaluated": 28,
+  "followed_through": 6,
+  "hit_rate": 0.214,
+  "pending": 265,
+  "live_calls_logged": 3648,
   "note": "Includes a walk-forward simulation of recent history (source=simulated); live daily calls accumulate from now on.",
   "recent": [
+    {
+      "date": "2026-06-22",
+      "symbol": "SUNPHARMA",
+      "price": 1862.9,
+      "score": "high",
+      "source": "simulated",
+      "worked": true
+    },
     {
       "date": "2026-06-12",
       "symbol": "LT",
@@ -158,14 +166,6 @@
       "date": "2026-03-17",
       "symbol": "SUNPHARMA",
       "price": 1794.4,
-      "score": "medium",
-      "source": "simulated",
-      "worked": false
-    },
-    {
-      "date": "2026-03-12",
-      "symbol": "SUNPHARMA",
-      "price": 1825.3,
       "score": "medium",
       "source": "simulated",
       "worked": false
