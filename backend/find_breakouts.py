@@ -178,6 +178,28 @@ def _sentiment(latest, adx_val) -> str:
 RELIABILITY_MIN_SAMPLE = 3
 
 
+def _last_is_fresh_fire(mask: pd.Series, cooldown: int) -> bool:
+    """Was the LAST bar a fresh fire of `mask`, under the same cooldown-dedup rule
+    analyze_reliability.py's `_dedup_with_cooldown` uses to grade backtested events
+    (kept fires must be > cooldown bars apart -- NOT "raw signal must go quiet";
+    a long continuously-true run is still re-counted every cooldown+1 bars)? A
+    squeeze release can stay true for several consecutive days during one continuous
+    move (confirmed: e.g. ATYR fired raw is_breakout_c on 18 days across only 12
+    distinct backtest-counted clusters) -- without this, a live badge would repeat
+    daily through a single move and both overstate cadence and dilute the hit rate
+    below the validated ~51%/n=190 stat. Local re-implementation (not imported from
+    analyze_reliability.py) to avoid a circular import -- that module imports
+    add_indicators from here."""
+    arr = mask.fillna(False).values
+    last_fire = -cooldown - 1
+    fresh_at_end = False
+    for i in np.flatnonzero(arr):
+        fresh_at_end = (i - last_fire > cooldown)
+        if fresh_at_end:
+            last_fire = i
+    return fresh_at_end and bool(arr[-1])
+
+
 def _reliability_note(worked: int, total: int, kind: str = "breakouts"):
     """Turn a stock's own past follow-through record into (text, reliable_flag) using a
     Bayesian-shrunk estimate (score.reliability_estimate) so a tiny sample can neither
@@ -190,11 +212,19 @@ def _reliability_note(worked: int, total: int, kind: str = "breakouts"):
                 f"not enough to judge reliability yet.", None)
     rel = reliability_estimate(worked, total)
     pct = round(rel * 100)
-    if rel < 0.33:
+    # Bands sit +-6pts around the market's own measured base rate (settings' score-
+    # calibration block): India 0.33/0.45 (identical to the old hardcoded values),
+    # US 0.21/0.33 — US breakouts resolve the fixed band far less often, so judging a
+    # US stock against India's 39% base rate would mislabel nearly everything "weak".
+    if rel < settings.RELIABILITY_CAUTION_BELOW:
         return (f"Caution: a weak track record — about {pct}% of its {total} past "
                 f"{kind} followed through.", False)
-    if rel >= 0.45:
-        return (f"Reliable — about {pct}% of its {total} past {kind} followed through.", True)
+    if rel >= settings.RELIABILITY_GOOD_AT:
+        # In the US a "reliable" stock can still read ~34% — above its market's ~27%
+        # average but jarring without that context, so spell the baseline out there.
+        avg_note = (f", above the ~{round(settings.SCORE_BASE_RATE * 100)}% market average"
+                    if settings.MARKET == "US" else "")
+        return (f"Reliable — about {pct}% of its {total} past {kind} followed through{avg_note}.", True)
     return (f"About {pct}% of its {total} past {kind} have followed through — "
             f"roughly the market average.", None)
 
@@ -300,7 +330,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         # (whole-market, 2026-07-04): 41.6% follow-through hit rate vs Method A's
         # 38.8%, only 22% event-overlap with A, so it's kept as its own tier rather
         # than blended into "Primed"/"Approaching resistance" (see methods.py).
-        readiness = {"label": "Outperforming the market — new relative-strength high vs Nifty",
+        readiness = {"label": f"Outperforming the market — new relative-strength high vs {settings.RS_BENCHMARK_LABEL}",
                      "watch": True, "score": "high", "signal": "relative_strength"}
     elif near and coiling:
         readiness = {"label": "Primed — coiling below resistance in an uptrend", "watch": True, "score": "high"}
@@ -311,6 +341,39 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     else:
         readiness = {"label": "In an uptrend, no setup yet", "watch": False, "score": "low"}
     readiness.setdefault("signal", None)
+
+    # --- US high-conviction tiers (train/test-validated; IMPLEMENT_US_HIGH_CONVICTION.md).
+    # Tier 1: a volatility squeeze releasing into a confirmed breakout, bought near the
+    # trigger, in a name with enough daily range to plausibly move +-1R inside the 10-day
+    # grading window, above the liquidity floor. Historically ~51% follow-through (n=190)
+    # vs the 26.7% US base. Tier 2: today's Method-A breakout with the same energy + floor
+    # gates (~46%, n=3,215). Both tiers deliberately reuse already-computed columns.
+    if settings.HC_ENABLED:
+        atr_v = float(latest["atr_short"]) if pd.notna(latest["atr_short"]) else None
+        atr_pct = (atr_v / price * 100) if atr_v and price else None
+        ext_pct = (price / resistance - 1) * 100 if resistance else None
+        a_recent = bool(df["is_breakout"].tail(settings.HC_COFIRE_BARS).any())
+        liquid = (avg_vol is not None and avg_vol >= settings.HC_MIN_AVG_VOL_SHARES
+                  and price >= settings.HC_MIN_PRICE)
+        energetic = atr_pct is not None and atr_pct >= settings.HC_ATR_MIN_PCT
+        # Require today to be a FRESH squeeze-release fire, under the identical
+        # cooldown-dedup rule the backtest used to count events (see
+        # _last_is_fresh_fire) — otherwise a live badge would repeat every day of a
+        # single continuous move and both overstate cadence and dilute the hit rate
+        # below the validated ~51%/n=190 stat.
+        c_fresh = ("is_breakout_c" in df.columns
+                   and _last_is_fresh_fire(df["is_breakout_c"], settings.FOLLOWTHROUGH_WINDOW))
+        if (c_fresh and a_recent and liquid and energetic
+                and ext_pct is not None and ext_pct <= settings.HC_EXT_MAX_PCT):
+            readiness.update({"label": "High-conviction setup — volatility squeeze released "
+                                        "into a confirmed breakout, entry still near the trigger",
+                              "watch": True, "score": "high", "signal": "high_conviction"})
+        elif (broke_out_today and liquid and energetic
+              and _last_is_fresh_fire(df["is_breakout"], settings.FOLLOWTHROUGH_WINDOW)):
+            # Same fresh-fire requirement as tier 1 (Method-A breakouts cluster on
+            # consecutive days too — the backtest's n=3,215/45.3% counted deduped A
+            # events, not raw daily fires; broke_out_today alone would double-count).
+            readiness["signal"] = "strong_breakout"   # label stays "Breaking out now"
 
     # Fold the historical follow-through rate into the read, so a flagged setup never
     # oversells: a stock whose breakouts rarely work gets a caution — but only with
@@ -345,6 +408,14 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     readiness["conviction"] = conviction(rel_for_score, base_depth, imminence,
                                          rs_on=rs_breakout_today)
 
+    # Rank floors, not probabilities: held-out hit rates are 52% (tier 1) and 46%
+    # (tier 2) vs 43% for the score's own top decile — a badge stock must outrank
+    # any pure-score stock. max() keeps ordering within each tier quality-driven.
+    if readiness["signal"] == "high_conviction":
+        readiness["conviction"] = max(readiness["conviction"], 90)
+    elif readiness["signal"] == "strong_breakout":
+        readiness["conviction"] = max(readiness["conviction"], 80)
+
     # Named chart pattern (real geometry — see patterns.py)
     pattern = detect_pattern(df)
 
@@ -360,12 +431,13 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     levels = resolve_display_levels(df)
 
     # Plain-English guidance derived from the computed state
+    cur = settings.CURRENCY_SYMBOL
     if resistance:
-        trigger = (f"Watch for a close above ₹{resistance:,.2f} on above-average volume "
+        trigger = (f"Watch for a close above {cur}{resistance:,.2f} on above-average volume "
                    f"to confirm a breakout.")
-        suggested_entry = f"₹{resistance:,.2f}+ (breakout close on volume)"
+        suggested_entry = f"{cur}{resistance:,.2f}+ (breakout close on volume)"
         stop = round(resistance * settings.STOP_LOSS_FRACTION, 2)
-        stop_loss = f"₹{stop:,.2f} (~-6% below the trigger)"
+        stop_loss = f"{cur}{stop:,.2f} (~-6% below the trigger)"
     else:
         trigger = "Not enough history to define a clear resistance level yet."
         suggested_entry = "—"
@@ -376,6 +448,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         "name": meta.get("name", symbol),
         "sector": meta.get("sector", ""),
         "industry": meta.get("industry", ""),
+        "exchange": meta.get("exchange", ""),
         "as_of": latest["date"].strftime("%Y-%m-%d"),
         "price": price,
         "change_pct": change_pct,

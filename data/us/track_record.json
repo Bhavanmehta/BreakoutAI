@@ -1,0 +1,174 @@
+{
+  "generated_at": "2026-07-06T09:01:40+00:00",
+  "horizon_days": 10,
+  "stop_loss_fraction": 0.94,
+  "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",
+  "actionable_evaluated": 8080,
+  "followed_through": 3320,
+  "hit_rate": 0.411,
+  "pending": 2287,
+  "live_calls_logged": 4474,
+  "note": "Includes a walk-forward simulation of recent history (source=simulated); live daily calls accumulate from now on.",
+  "recent": [
+    {
+      "date": "2026-06-17",
+      "symbol": "AMAT",
+      "price": 592.92,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "BEN",
+      "price": 32.96,
+      "score": "medium",
+      "source": "simulated",
+      "worked": false
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "CAH",
+      "price": 225.79,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "CINF",
+      "price": 170.54,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "GD",
+      "price": 361.24,
+      "score": "medium",
+      "source": "simulated",
+      "worked": false
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "MRNA",
+      "price": 61.8,
+      "score": "high",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "STT",
+      "price": 170.25,
+      "score": "medium",
+      "source": "simulated",
+      "worked": false
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "ARM",
+      "price": 418.88,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "ASML",
+      "price": 1867.83,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "AIR",
+      "price": 132.14,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "ALKS",
+      "price": 44.51,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "AMBP",
+      "price": 4.35,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "APLE",
+      "price": 16.17,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "ATEN",
+      "price": 32.92,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "AXGN",
+      "price": 44.57,
+      "score": "medium",
+      "source": "simulated",
+      "worked": false
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "BELFB",
+      "price": 299.84,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "BHE",
+      "price": 90.89,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "BJRI",
+      "price": 52.4,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "CAKE",
+      "price": 75.52,
+      "score": "medium",
+      "source": "simulated",
+      "worked": true
+    },
+    {
+      "date": "2026-06-17",
+      "symbol": "CBFV",
+      "price": 37.19,
+      "score": "medium",
+      "source": "simulated",
+      "worked": false
+    }
+  ]
+}

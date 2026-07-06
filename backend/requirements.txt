@@ -6,3 +6,4 @@ jugaad-data>=0.33
 requests>=2.31
 vaderSentiment>=3.3    # local news/social sentiment scoring (sentiment.py)
 pytrends>=4.9           # Google Trends search-interest score (fetch_social.py)
+finvizfinance>=1.3.0    # US universe discovery (S&P 500/Nasdaq 100/Russell 2000 screener, universe.py)

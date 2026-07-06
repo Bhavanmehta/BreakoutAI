@@ -24,8 +24,98 @@ import io
 import json
 
 import pandas as pd
+import requests
 
 import settings
+
+# US universe (settings.MARKET == "US"): every US common stock with market cap >=
+# $50M via finvizfinance's free screener (no key) -- confirmed live to return ~4,960
+# names in one filtered call, carrying sector/industry/market cap/price/volume for
+# free. This supersedes an earlier narrower version of this function that unioned
+# just S&P 500 + Nasdaq 100 + Russell 2000 (~2,500 names) -- that undercounted the
+# real tradeable market by excluding non-index mid/small-caps; a market-cap floor
+# catches all three indices anyway (every member exceeds $50M) plus everything else
+# above the same liquidity floor NSE's own MIN_TURNOVER gate is trying to achieve.
+# Deliberately NOT literally "Any" (no cap floor): true nano-caps/shells are the US
+# equivalent of the illiquid tail NSE's MIN_TURNOVER already excludes. finvizfinance
+# scrapes finviz.com (no official API) -- same risk profile already accepted
+# elsewhere in this codebase for Google News RSS.
+_US_MARKET_CAP_FLOOR = "+Micro (over $50mln)"
+
+
+def _nasdaq_listed_symbols() -> set[str]:
+    """Symbols on NASDAQ (vs. NYSE/AMEX/ARCA), for TradingView's exchange-prefixed
+    chart symbol. Free, no key: nasdaqtrader.com's own daily symbol directory.
+    Best-effort -- an empty set here just means every US symbol defaults to NYSE
+    in find_breakouts.py, which is a display-only imprecision, not a correctness bug."""
+    try:
+        r = requests.get("https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt", timeout=15)
+        r.raise_for_status()
+        lines = r.text.splitlines()[1:-1]  # drop header + "File Creation Time:" footer
+        return {line.split("|")[0].strip() for line in lines if line.strip()}
+    except Exception:
+        return set()
+
+
+def discover_us_universe(size: int | None = -1) -> dict:
+    """US parallel to build_universe(): {symbol: {"name","sector","exchange"}},
+    every US common stock above settings' market-cap floor via finvizfinance. `size`
+    is accepted for signature parity with build_universe() but not applied -- this
+    is already a bounded, liquidity-filtered size, unlike NSE's whole-market
+    bhavcopy which genuinely needs a top-N cut."""
+    try:
+        from finvizfinance.screener.overview import Overview
+    except ImportError:
+        print("  [universe] finvizfinance not installed -- falling back.")
+        return _us_fallback()
+
+    try:
+        fo = Overview()
+        fo.set_filter(filters_dict={"Market Cap.": _US_MARKET_CAP_FLOOR})
+        all_rows = fo.screener_view(verbose=0)
+    except Exception as e:
+        print(f"  [universe] finviz market-cap screen failed ({e}).")
+        all_rows = None
+
+    if all_rows is None or not len(all_rows):
+        return _us_fallback()
+
+    # SPACs/blank-check shells (~6% of the market-cap-floor screen, confirmed via a
+    # live check) trade near trust value and don't "breakout" in any meaningful sense
+    # -- the US equivalent of excluding ETF/fund units on the India side (ISIN prefix
+    # there; finviz's own Industry tag does the same job cleanly here).
+    all_rows = all_rows[all_rows["Industry"] != "Shell Companies"]
+    all_rows = all_rows.drop_duplicates(subset="Ticker", keep="first")
+    nasdaq_symbols = _nasdaq_listed_symbols()
+
+    universe = {}
+    for _, row in all_rows.iterrows():
+        symbol = str(row["Ticker"]).strip().upper()
+        if not symbol:
+            continue
+        yf_symbol = symbol.replace(".", "-")  # yfinance wants BRK-B, finviz shows BRK.B
+        sector = str(row.get("Sector") or "").strip()
+        industry = str(row.get("Industry") or "").strip()
+        label = f"{sector} · {industry}" if sector and industry else (sector or industry)
+        universe[yf_symbol] = {
+            "name": str(row.get("Company") or symbol).strip(),
+            "sector": label,
+            "exchange": "NASDAQ" if symbol in nasdaq_symbols else "NYSE",
+        }
+
+    if not universe:
+        return _us_fallback()
+    print(f"  [universe] US: {len(universe)} unique symbols, market cap {_US_MARKET_CAP_FLOOR}.")
+    return universe
+
+
+def _us_fallback() -> dict:
+    prior = _universe_from_last_scan()
+    if prior:
+        print(f"  [universe] US discovery failed -- reusing {len(prior)} symbols from the last breakouts.json.")
+        return prior
+    print("  [universe] US discovery failed and no prior scan -- falling back to the static watchlist.")
+    return dict(settings.FALLBACK_WATCHLIST)
 
 # Equity-only, mainline capital-market series. Excludes SME (SM), trade-to-trade
 # (BE), government securities/bonds (GS/GB), and other non-equity series the
@@ -88,6 +178,9 @@ def build_universe(size: int | None = -1) -> dict:
     None for whole-market by default)."""
     if not settings.USE_DYNAMIC_UNIVERSE:
         return dict(settings.FALLBACK_WATCHLIST)
+
+    if settings.MARKET == "US":
+        return discover_us_universe(size)
 
     if size == -1:
         size = settings.UNIVERSE_SIZE

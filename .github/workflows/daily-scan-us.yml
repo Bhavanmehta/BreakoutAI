@@ -1,0 +1,55 @@
+name: Daily breakout scan (US)
+
+# US parallel to daily-scan.yml -- same "zero-backend" heartbeat, same pipeline
+# (backend/run_scan.py), just BREAKOUTAI_MARKET=US so settings.py's market branch
+# points everything at data/us/* and US-appropriate sources/thresholds instead.
+# News is deliberately NOT run here yet (explicitly deferred); Social IS (ApeWisdom +
+# Google Trends need no credentials for the US market, unlike India's still-unresolved
+# Reddit app requirement).
+on:
+  schedule:
+    # 21:30 UTC = 4:30pm EDT / 5:30pm EST, safely after the 4pm ET US market close
+    # year-round without needing to special-case daylight saving.
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch: {}   # lets you trigger it by hand from the Actions tab
+
+permissions:
+  contents: write         # needed so the job can commit the refreshed JSON
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      BREAKOUTAI_MARKET: US
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run the pipeline
+        working-directory: backend
+        run: python run_scan.py
+
+      - name: Fetch social buzz (ApeWisdom + Google Trends -- no credentials needed for US)
+        working-directory: backend
+        run: python fetch_social.py
+
+      - name: Commit updated results (if changed)
+        run: |
+          git config user.name "breakoutai-bot"
+          git config user.email "actions@github.com"
+          git add data/us/breakouts.json data/us/track_record.json data/us/ohlc data/us/social.json
+          if git diff --cached --quiet; then
+            echo "No changes — nothing to commit."
+          else
+            git commit -m "chore: daily US breakout scan $(date -u +'%Y-%m-%d')"
+            git push
+          fi

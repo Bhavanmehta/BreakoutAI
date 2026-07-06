@@ -23,6 +23,8 @@ run_scan.py merges in, NOT re-fetched during the daily price scan.
 """
 from __future__ import annotations
 
+import settings
+
 MAX_QUARTERS = 8
 # yfinance's earnings calendar can be STALE for a stock even when it returns rows --
 # confirmed live (2026-07-05): SUVEN's get_earnings_dates() tops out at Feb 2020 (its
@@ -109,7 +111,7 @@ def fetch_earnings(symbol: str) -> dict | None:
     raises -- networking/parse errors just return None so the caller can move on."""
     try:
         import yfinance as yf
-        t = yf.Ticker(f"{symbol}.NS")
+        t = yf.Ticker(f"{symbol}{settings.TICKER_SUFFIX}")
     except Exception:
         return None
 

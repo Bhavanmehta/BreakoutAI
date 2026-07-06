@@ -15,6 +15,8 @@ data/sectors.json that run_scan.py merges in, NOT re-fetched during the daily pr
 """
 from __future__ import annotations
 
+import settings
+
 # yfinance's broad `sector` labels are US-GICS-flavoured; keep them but present the
 # `industry` as the finer sub-label so a card reads like "Financial Services · Insurance
 # Brokers", matching the curated FALLBACK_WATCHLIST convention ("Financials · Private Bank").
@@ -26,7 +28,7 @@ def fetch_sector(symbol: str) -> dict | None:
     just return None so the caller can move on."""
     try:
         import yfinance as yf
-        info = yf.Ticker(f"{symbol}.NS").info or {}
+        info = yf.Ticker(f"{symbol}{settings.TICKER_SUFFIX}").info or {}
     except Exception:
         return None
     sector = (info.get("sector") or "").strip() or None

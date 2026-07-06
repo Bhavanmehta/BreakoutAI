@@ -3,17 +3,24 @@ A single "how good is this setup" score, built ONLY from features the whole-mark
 reliability study (analyze_reliability.py) actually validated as predictive of
 follow-through — not from decorative signals that looked good but didn't hold up.
 
-Validated inputs (see CLAUDE.md's reliability section):
-  * trailing follow-through rate (persistence) — the STRONGEST signal (p<0.001):
-    low-trailing-rate stocks hit ~32%, high-trailing hit ~46%.
-  * base depth — robust (p<0.001): deeper bases follow through MORE (41% vs 35%).
-  * relative-strength (E2) and trend-inception (D) method confirmation — both beat
-    the 38.8% baseline significantly.
+Validated inputs, PER MARKET (constants live in settings.py's score-calibration
+block; India numbers in CLAUDE.md's reliability section, US replay 2026-07-05 on
+20,814 whole-market Method-A events):
+  * trailing follow-through rate (persistence) — India's STRONGEST signal (p<0.001,
+    ~32% vs ~46%); real but weaker in the US (22.3% vs 34.7%, p<0.001), hence the
+    smaller US weight.
+  * base depth — robust in both markets (India p<0.001, 41% vs 35%; US the strongest
+    feature, 14.6% shallow vs 39.1% deep, p<0.001), hence the larger US weight.
+  * method confirmation — India only (E2/D both beat its baseline). In the US this
+    term is weighted 0: D co-fire measured -12.2pt HARMFUL (p=0.002, n=130) and E2
+    co-fire's +9.5pt lift is already captured by depth+reliability in the blend.
 
 Deliberately NOT used: ADX, volume-surge magnitude, named chart patterns (all shown
-non-predictive), vol_contraction (significant but counterintuitive and weak), and the
-single "closest historical analog" outcome (one day — never validated as predictive;
-see test_analog_predictiveness in analyze_reliability.py).
+non-predictive in both markets), vol_contraction (direction flips between markets;
+under volatility-neutral ATR grading it reverses entirely — an artifact carrier, not
+a signal), market regime / SPX-vs-200dma (US: -0.5pt, p=0.52 — tested, rejected), and
+the single "closest historical analog" outcome (weak in India, +10.2pt raw in the US
+but adds nothing over the blend out-of-sample; see test_analog_predictiveness).
 
 Two pieces:
   1. reliability_estimate() — a Bayesian-shrunk follow-through rate. A stock with one
@@ -25,20 +32,23 @@ Two pieces:
 """
 from __future__ import annotations
 
-# Measured whole-market Method-A follow-through base rate (~38.8% in the latest run).
+import settings
+
+# Measured whole-market Method-A follow-through base rate for the active market
+# (India ~38.8% -> 0.39; US ~26.7% -> 0.27 — see settings' score-calibration block).
 # Used as the prior a stock's own rate is shrunk toward when it has little history.
-BASE_RATE = 0.39
+BASE_RATE = settings.SCORE_BASE_RATE
 
 
 def reliability_estimate(worked: int | None, total: int | None,
                          prior: float = BASE_RATE, strength: float = 4.0) -> float:
     """Bayesian-shrunk follow-through rate in [0,1].
 
-    (worked + strength*prior) / (total + strength). With strength=4 and prior=0.39:
+    (worked + strength*prior) / (total + strength). With strength=4 and India's 0.39:
       0 of 1  -> 0.31   (one failure is NOT damning)
       0 of 5  -> 0.17   (a real, earned low)
       3 of 4  -> 0.58
-      no history -> 0.39 (the market prior)
+      no history -> 0.39 (the market prior; 0.27 when running the US market)
     So the estimate only moves far from the base rate once there's enough evidence to
     justify it — which is exactly what stops a single occurrence from flashing red.
     """
@@ -58,20 +68,23 @@ def _depth_component(base_depth_pct: float | None) -> float:
 
 def breakout_quality(rel_est: float, base_depth_pct: float | None,
                      rs_on: bool = False, d_on: bool = False,
-                     w_rel: float = 0.60, w_depth: float = 0.25,
-                     w_method: float = 0.15) -> float:
+                     w_rel: float = settings.SCORE_W_REL,
+                     w_depth: float = settings.SCORE_W_DEPTH,
+                     w_method: float = settings.SCORE_W_METHOD) -> float:
     """Blend the validated features into one ordering score. Not a calibrated
     probability — a monotone quality rank (higher = historically more likely to follow
-    through). Weights default to the values chosen from the backtest; the same function
-    is replayed in analyze_reliability.py to confirm they stratify follow-through."""
+    through). Weights default to the active market's backtest-chosen values (settings'
+    score-calibration block); the same function is replayed in analyze_reliability.py
+    to confirm they stratify follow-through."""
     depth = _depth_component(base_depth_pct)
     method = (0.5 if rs_on else 0.0) + (0.5 if d_on else 0.0)
     return w_rel * rel_est + w_depth * depth + w_method * method
 
 
-# Plausible range of breakout_quality() with the default weights, used only to rescale
-# the raw blend to 0..1 for display (a monotone transform — doesn't change ordering).
-_Q_LO, _Q_HI = 0.18, 0.78
+# Plausible range of breakout_quality() with the active market's weights, used only to
+# rescale the raw blend to 0..1 for display (a monotone transform — doesn't change
+# ordering). Per market because the weight mix shifts the achievable range.
+_Q_LO, _Q_HI = settings.SCORE_Q_RANGE
 
 # How "imminent" each readiness tier is — the other half of conviction. A stock that is
 # both about to break AND historically reliable should top the list.

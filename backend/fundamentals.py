@@ -17,6 +17,8 @@ for that pattern).
 """
 from __future__ import annotations
 
+import settings
+
 
 def fetch_fundamentals(symbol: str) -> dict | None:
     """Return market cap / P-E / growth / ROE / D-E for one NSE symbol via yfinance's
@@ -24,19 +26,25 @@ def fetch_fundamentals(symbol: str) -> dict | None:
     return None so the caller can move on.
 
     Unit notes (verified against known real-world figures for ICICIBANK/RELIANCE):
-    - yfinance's marketCap is raw INR -> divide by 1e7 for Rupees Crore.
+    - yfinance's marketCap is stored RAW, in the stock's native currency (INR for
+      India, USD for US) -- NOT pre-converted to any display unit. Display/filter
+      formatting (Rupees crore vs $ with B/M/T suffixes) is the frontend's job
+      (`fmtMarketCap()`/`FUND_FIELDS` in combined_breakout_scanner_platform.html),
+      keyed on the active market -- a fixed /1e7 "crore" conversion here would be
+      silently wrong for a US stock (caught 2026-07-06: US market caps were showing
+      as mislabeled ₹ crore figures).
     - yfinance's debtToEquity is already *100 (e.g. 36.653 means a 0.37 ratio) -> /100.
     - revenueGrowth / earningsGrowth / returnOnEquity are fractions -> *100 for %.
     """
     try:
         import yfinance as yf
-        info = yf.Ticker(f"{symbol}.NS").info or {}
+        info = yf.Ticker(f"{symbol}{settings.TICKER_SUFFIX}").info or {}
     except Exception:
         return None
     if not info.get("marketCap"):
         return None
     return {
-        "market_cap_cr": round(info["marketCap"] / 1e7, 1),
+        "market_cap": info["marketCap"],
         "pe_ratio": info.get("trailingPE"),
         "revenue_growth_pct": (round(info["revenueGrowth"] * 100, 1)
                                 if info.get("revenueGrowth") is not None else None),

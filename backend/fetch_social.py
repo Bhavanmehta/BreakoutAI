@@ -39,7 +39,7 @@ from pytrends.request import TrendReq
 
 import sentiment
 import settings
-from social_providers import QuotaExhausted, fetch_reddit_mentions
+from social_providers import QuotaExhausted, fetch_apewisdom_mentions, fetch_reddit_mentions
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -109,10 +109,25 @@ def _reddit_result(raw: dict) -> dict:
     }
 
 
+def _apewisdom_result(entry: dict) -> dict:
+    """Same {mentions, buzz, sentiment, sample} shape as _reddit_result() so the
+    frontend's renderSocial() needs zero changes -- ApeWisdom gives mention counts/
+    rank/upvotes, not post text, so sentiment/sample are empty rather than fabricated."""
+    return {
+        "mentions": entry["mentions"],
+        "buzz": _buzz_label(entry["mentions"]),
+        "sentiment": None,
+        "sample": [],
+        "rank": entry.get("rank"),
+        "mentions_24h_ago": entry.get("mentions_24h_ago"),
+    }
+
+
 def _trends_interest(pytrends: TrendReq, name: str) -> int | None:
-    """Latest 0-100 India search-interest point for `name` over the trailing month,
-    or None if pytrends returns nothing (thin/unlisted search terms often do)."""
-    pytrends.build_payload([name], timeframe="today 1-m", geo="IN")
+    """Latest 0-100 search-interest point for `name` over the trailing month (geo =
+    settings.TRENDS_GEO), or None if pytrends returns nothing (thin/unlisted search
+    terms often do)."""
+    pytrends.build_payload([name], timeframe="today 1-m", geo=settings.TRENDS_GEO)
     df = pytrends.interest_over_time()
     if df is None or df.empty or name not in df.columns:
         return None
@@ -120,10 +135,22 @@ def _trends_interest(pytrends: TrendReq, name: str) -> int | None:
 
 
 def _check(client_id, client_secret, user_agent):
-    print("Smoke test -- one call per source against RELIANCE.\n")
-    if client_id and client_secret:
+    sample_symbol, sample_name = ("AAPL", "Apple") if settings.MARKET == "US" else \
+        ("RELIANCE", "Reliance Industries Limited")
+    print(f"Smoke test -- one call per source against {sample_symbol}.\n")
+    if settings.MARKET == "US":
         try:
-            r = fetch_reddit_mentions("RELIANCE", "Reliance Industries Limited", client_id, client_secret,
+            board = fetch_apewisdom_mentions(settings.APEWISDOM_FILTER)
+            entry = (board or {}).get(sample_symbol)
+            print("ApeWisdom:", "OK" if board is not None else "no data returned")
+            print(" ", entry or f"(no {sample_symbol} mention today -- board had {len(board or {})} tickers)")
+        except QuotaExhausted as e:
+            print("ApeWisdom: quota/auth error --", e)
+        except Exception as e:
+            print("ApeWisdom: FAILED --", repr(e))
+    elif client_id and client_secret:
+        try:
+            r = fetch_reddit_mentions(sample_symbol, sample_name, client_id, client_secret,
                                        user_agent or "BreakoutAI/1.0", settings.SOCIAL_SUBREDDITS,
                                        settings.SOCIAL_MENTIONS_TIME_FILTER)
             print("Reddit:", "OK" if r is not None else "no data returned")
@@ -136,8 +163,8 @@ def _check(client_id, client_secret, user_agent):
         print("Reddit: REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET not set, skipped.")
     print()
     try:
-        pytrends = TrendReq(hl="en-IN", tz=330)
-        score = _trends_interest(pytrends, "Reliance Industries")
+        pytrends = TrendReq(hl=settings.TRENDS_HL, tz=settings.TRENDS_TZ)
+        score = _trends_interest(pytrends, sample_name)
         print("Google Trends:", "OK" if score is not None else "no data returned")
         print("  interest:", score)
     except Exception as e:
@@ -160,9 +187,33 @@ def run(limit: int | None = None):
     if limit is not None:
         stocks = stocks[:limit]
 
-    # --- Phase 1: Reddit mentions + sentiment ---
+    # --- Phase 1: Reddit-equivalent mentions + sentiment ---
+    # US market: ApeWisdom is a free, keyless, PRE-AGGREGATED whole-board snapshot
+    # (one call gets every tracked ticker's mentions at once), unlike India's
+    # per-symbol Reddit search loop below -- there's no per-symbol budget/loop here,
+    # just one fetch then a local dict lookup per stock.
     rd_ok = rd_fail = 0
-    if client_id and client_secret:
+    if settings.MARKET == "US":
+        stale = [s for s in stocks if ((data.get(s["symbol"]) or {}).get("reddit") or {}).get("as_of") != today]
+        print(f"ApeWisdom: {len(stale)} of {len(stocks)} in today's conviction order are stale.\n")
+        try:
+            board = fetch_apewisdom_mentions(settings.APEWISDOM_FILTER) or {}
+        except QuotaExhausted as e:
+            print(f"  ApeWisdom: quota/rate-limit error ({e}) -- skipping this phase for today.\n")
+            board = {}
+        for s in stale:
+            entry = board.get(s["symbol"])
+            d = data.setdefault(s["symbol"], {})
+            if entry is not None:
+                d["reddit"] = {**_apewisdom_result(entry), "as_of": today}
+                rd_ok += 1
+            else:
+                d.setdefault("reddit", None)
+                rd_fail += 1
+        _save(data)
+        print(f"  ApeWisdom done: {rd_ok} updated (mentioned on {settings.APEWISDOM_FILTER} today), "
+              f"{rd_fail} not currently trending.\n")
+    elif client_id and client_secret:
         stale = [s for s in stocks if ((data.get(s["symbol"]) or {}).get("reddit") or {}).get("as_of") != today]
         print(f"Reddit: {len(stale)} of {len(stocks)} in today's conviction order are stale.\n")
         budget = settings.SOCIAL_REDDIT_DAILY_BUDGET
@@ -199,7 +250,7 @@ def run(limit: int | None = None):
     stale = [s for s in stocks if ((data.get(s["symbol"]) or {}).get("trends") or {}).get("as_of") != today]
     print(f"Trends: {len(stale)} of {len(stocks)} in today's conviction order are stale.\n")
     budget = settings.TRENDS_DAILY_BUDGET
-    pytrends = TrendReq(hl="en-IN", tz=330)
+    pytrends = TrendReq(hl=settings.TRENDS_HL, tz=settings.TRENDS_TZ)
     t0 = time.time()
     for s in stale:
         if tr_ok + tr_fail >= budget:

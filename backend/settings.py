@@ -3,17 +3,85 @@ Central settings for the BreakoutAI data pipeline.
 
 Everything tunable lives here so the rest of the code stays clean and you can
 adjust behaviour without hunting through modules.
+
+MARKET SWITCH: this module reads BREAKOUTAI_MARKET from the environment ONCE
+at import time and branches every per-market constant below accordingly. It is
+a frozen-at-import singleton -- correct for the one-process-per-invocation model
+every script here uses (`BREAKOUTAI_MARKET=US python run_scan.py`), but it means
+a single long-lived process can never serve both markets without an explicit
+`importlib.reload(settings)`. Don't build that; just don't be surprised by it.
 """
+import os
 from pathlib import Path
+
+MARKET = os.environ.get("BREAKOUTAI_MARKET", "IN").strip().upper()
+if MARKET not in ("IN", "US"):
+    raise ValueError(f"Unknown BREAKOUTAI_MARKET={MARKET!r} -- expected 'IN' or 'US'")
 
 # --- Paths -------------------------------------------------------------------
 BACKEND_DIR = Path(__file__).resolve().parent
 REPO_DIR = BACKEND_DIR.parent
-DATA_DIR = REPO_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR = REPO_DIR / "data" / "us" if MARKET == "US" else REPO_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DUCKDB_PATH = DATA_DIR / "market_research.duckdb"   # local research DB (git-ignored)
 BREAKOUTS_JSON = DATA_DIR / "breakouts.json"         # output the website reads (committed)
+
+# Ticker suffix yfinance needs: NSE tickers are "<SYMBOL>.NS"; US tickers are bare.
+TICKER_SUFFIX = "" if MARKET == "US" else ".NS"
+# Relative-strength benchmark (methods.py's Method E) + its display label.
+RS_BENCHMARK = "^GSPC" if MARKET == "US" else "^NSEI"          # S&P 500 vs Nifty 50
+RS_BENCHMARK_LABEL = "S&P 500" if MARKET == "US" else "Nifty"
+# Market Mood Index inputs (market_mood.py, run inside run_scan.py).
+VIX_TICKER = "^VIX" if MARKET == "US" else "^INDIAVIX"
+HAS_FII_DII_FLOW = MARKET != "US"   # no free public US equivalent of NSE's daily FII/DII feed
+# India VIX and CBOE VIX are NOT on the same historical scale -- reusing India's
+# calm/panic calibration for CBOE VIX would misjudge US regimes.
+MOOD_VIX_CALM = 12.0 if MARKET == "US" else 10.0
+MOOD_VIX_PANIC = 35.0 if MARKET == "US" else 30.0
+# Entry-guidance display currency (find_breakouts.py's plain-English trigger/stop text).
+CURRENCY_SYMBOL = "$" if MARKET == "US" else "₹"
+# --- Conviction-score calibration (score.py; thresholds also drive the reliability
+# caution text in find_breakouts._reliability_note). Backtested PER MARKET, because the
+# two markets' measured Method-A follow-through base rates are far apart: India 38.8%
+# (17k+ events) vs US 26.7% (20,814 events, whole-market replay 2026-07-05) -- US
+# stocks resolve the fixed ~6% stop/target band within 10 days far less often. Using
+# India's 0.39 prior on US stocks systematically oversells every thin-history name.
+# US weights were chosen on a 60% train split and held up out-of-sample (test-set
+# tertile stratification 14.4% -> 39.4%, p<1e-96; top-decile 43.4%): base depth is the
+# strongest validated US feature, trailing reliability keeps a smaller but real role,
+# and the method-confirmation term is DROPPED for US (D co-fire measured -12.2pt
+# harmful, p=0.002; E2 co-fire lift is subsumed by depth+reliability). India's numbers
+# are untouched -- identical to the values shipped 2026-07-04.
+if MARKET == "US":
+    SCORE_BASE_RATE = 0.27
+    SCORE_W_REL, SCORE_W_DEPTH, SCORE_W_METHOD = 0.30, 0.70, 0.00
+    SCORE_Q_RANGE = (0.04, 0.85)   # p01/p99 of the blend over 20,814 replayed US events
+else:
+    SCORE_BASE_RATE = 0.39
+    SCORE_W_REL, SCORE_W_DEPTH, SCORE_W_METHOD = 0.60, 0.25, 0.15
+    SCORE_Q_RANGE = (0.18, 0.78)
+# Reliability-note bands sit +-6pts around the market base rate. For India these land
+# on 0.33/0.45 -- exactly the constants that were previously hardcoded, so IN output
+# is bit-identical; for US they land on 0.21/0.33.
+RELIABILITY_CAUTION_BELOW = round(SCORE_BASE_RATE - 0.06, 2)
+RELIABILITY_GOOD_AT = round(SCORE_BASE_RATE + 0.06, 2)
+
+# --- US high-conviction setup tiers (find_breakouts.build_summary; validated
+# 2026-07-06 on a train/test split of the whole-market 3y replay — see
+# IMPLEMENT_US_HIGH_CONVICTION.md for the numbers each threshold carries).
+# NOT validated on India data — do not enable for IN without rerunning the backtest.
+HC_ENABLED = MARKET == "US"
+HC_ATR_MIN_PCT = 4.5             # 10-day ATR must be >= this % of price ("enough energy")
+HC_EXT_MAX_PCT = 3.0             # tier-1 only: close <= this % above the 50d resistance
+HC_COFIRE_BARS = 5               # tier-1 only: Method-A breakout within the last N bars (incl today)
+HC_MIN_AVG_VOL_SHARES = 100_000  # 20-day avg volume floor (user-chosen; keeps small caps)
+HC_MIN_PRICE = 1.0
+# Social buzz (fetch_social.py): subreddits + pytrends geo/locale/timezone.
+SOCIAL_SUBREDDITS_US = ["wallstreetbets", "stocks", "investing", "StockMarket"]
+TRENDS_GEO = "US" if MARKET == "US" else "IN"
+TRENDS_HL = "en-US" if MARKET == "US" else "en-IN"
+TRENDS_TZ = 300 if MARKET == "US" else 330   # US Eastern vs IST, minutes offset pytrends expects
 
 # --- Universe ------------------------------------------------------------
 # Which symbols get scanned. By default this is discovered dynamically every run
@@ -51,6 +119,23 @@ FALLBACK_WATCHLIST = {
     "TITAN":      {"name": "Titan Company Ltd.",             "sector": "Consumer Discretionary · Jewellery"},
     "LT":         {"name": "Larsen & Toubro Ltd.",          "sector": "Industrials · Construction"},
 }
+
+FALLBACK_WATCHLIST_US = {
+    "AAPL":  {"name": "Apple Inc.",            "sector": "Technology · Consumer Electronics"},
+    "MSFT":  {"name": "Microsoft Corp.",       "sector": "Technology · Software"},
+    "NVDA":  {"name": "NVIDIA Corp.",          "sector": "Technology · Semiconductors"},
+    "AMZN":  {"name": "Amazon.com Inc.",       "sector": "Consumer Cyclical · Internet Retail"},
+    "GOOGL": {"name": "Alphabet Inc.",         "sector": "Communication Services · Internet Content"},
+    "META":  {"name": "Meta Platforms Inc.",   "sector": "Communication Services · Internet Content"},
+    "TSLA":  {"name": "Tesla Inc.",            "sector": "Consumer Cyclical · Auto Manufacturers"},
+    "JPM":   {"name": "JPMorgan Chase & Co.",  "sector": "Financial Services · Banks"},
+    "XOM":   {"name": "Exxon Mobil Corp.",     "sector": "Energy · Oil & Gas"},
+    "UNH":   {"name": "UnitedHealth Group Inc.", "sector": "Healthcare · Managed Care"},
+    "V":     {"name": "Visa Inc.",             "sector": "Financial Services · Payments"},
+    "WMT":   {"name": "Walmart Inc.",          "sector": "Consumer Defensive · Discount Stores"},
+}
+if MARKET == "US":
+    FALLBACK_WATCHLIST = FALLBACK_WATCHLIST_US
 
 # --- Data fetch --------------------------------------------------------------
 # How many years of daily history to pull for each stock. Needs to comfortably
@@ -148,11 +233,12 @@ DI_ADX_RISING_LOOKBACK = 10
 # bigger sample or was a strict-filter fluke.
 DI_ADX_THRESHOLD_LOOSE = 15
 
-# E — relative-strength breakout: stock-price ÷ Nifty ratio line makes a new N-day high,
-# independent of the stock's own absolute chart (classic IBD-style "RS line" signal).
-# No longer research-only: the uptrend-gated variant (E2) backs a production readiness
-# tier in find_breakouts.build_summary(), via run_scan.py — see methods.py's docstring.
-RS_BENCHMARK = "^NSEI"        # Nifty 50 index
+# E — relative-strength breakout: stock-price ÷ benchmark ratio line makes a new N-day
+# high, independent of the stock's own absolute chart (classic IBD-style "RS line"
+# signal). No longer research-only: the uptrend-gated variant (E2) backs a production
+# readiness tier in find_breakouts.build_summary(), via run_scan.py — see methods.py's
+# docstring. RS_BENCHMARK itself is set in the market branch at the top of this file
+# (^NSEI/^GSPC) — not redefined here, so it isn't silently overwritten back to India's.
 RS_LOOKBACK = 50
 
 # F — episodic pivot: a massive gap up on extreme volume (the technical proxy for a
@@ -197,7 +283,14 @@ NEWS_MAX_AGE_DAYS = 45
 # Trends (pytrends, unofficial -- no API key): a 0-100 search-interest score, a cheap
 # "how much is this being searched" proxy independent of any single social platform.
 SOCIAL_JSON = DATA_DIR / "social.json"
-SOCIAL_SUBREDDITS = ["IndianStreetBets", "DalalStreetTalks", "IndiaInvestments", "StockMarketIndia"]
+SOCIAL_SUBREDDITS = SOCIAL_SUBREDDITS_US if MARKET == "US" else \
+    ["IndianStreetBets", "DalalStreetTalks", "IndiaInvestments", "StockMarketIndia"]
+# ApeWisdom (apewisdom.io) -- free, keyless Reddit mention-count aggregator, US-only
+# (WSB-centric subreddit coverage). Used instead of the Reddit OAuth path for the US
+# market since it needs zero credentials; India still needs REDDIT_CLIENT_ID/SECRET
+# (unresolved) since ApeWisdom's subreddit coverage doesn't include Indian markets.
+APEWISDOM_FILTER = "wallstreetbets"
+APEWISDOM_DAILY_BUDGET = 300
 SOCIAL_MENTIONS_TIME_FILTER = "week"   # Reddit search `t` param: hour/day/week/month/year/all
 SOCIAL_REDDIT_DAILY_BUDGET = 300       # generous: free OAuth script apps allow ~60 req/min
 SOCIAL_BUZZ_LOW = 3     # < this many mentions in the window -> "Low" buzz
@@ -217,10 +310,10 @@ TRENDS_MIN_REQUEST_GAP_SEC = 1.5   # spacing between pytrends calls to stay unde
 FII_DII_HISTORY_JSON = DATA_DIR / "fii_dii_history.json"
 FII_DII_HISTORY_DAYS = 90        # keep this many days on disk; only the trailing
                                   # MOOD_FII_ROLLING_DAYS are actually used
-MOOD_TREND_SMA_WINDOW = 20       # Nifty close vs its N-day SMA ("trend strength")
+MOOD_TREND_SMA_WINDOW = 20       # benchmark close vs its N-day SMA ("trend strength")
 MOOD_TREND_CLAMP_PCT = 10.0      # +/- this % distance from the SMA maps to the full 0-100 range
-MOOD_VIX_CALM = 10.0             # India VIX at/below this -> 100 (calm)
-MOOD_VIX_PANIC = 30.0            # India VIX at/above this -> 0 (panic)
+# MOOD_VIX_CALM / MOOD_VIX_PANIC are set in the market branch at the top of this file
+# (India VIX and CBOE VIX aren't on the same historical scale) -- not redefined here.
 MOOD_FII_ROLLING_DAYS = 21       # window today's net FII flow is z-scored against
 MOOD_FII_CLAMP_Z = 2.0           # a z-score of +/- this many std-devs maps to the full 0-100 range
 

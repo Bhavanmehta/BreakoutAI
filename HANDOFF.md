@@ -1,11 +1,20 @@
 # BreakoutAI — Session Handoff
 
-_Last updated: 2026-07-04 (session 8). Read this + `CLAUDE.md` (durable project record) to resume._
+_Last updated: 2026-07-06 (session 9, US market branch `feature/us-market`). Read this +
+`CLAUDE.md` (durable project record) to resume._
 _When you start a fresh chat, point it here first._
 
 ## TL;DR of where things stand
 
-Six independent, **uncommitted** threads are open right now:
+Seven independent, **uncommitted** threads are open right now (session 9 is on the
+`feature/us-market` branch; sessions 0-5 below are on `main`'s working tree):
+-1. **Session 9 — US market conviction score validated + recalibrated + 2 new
+   high-conviction tiers** (backend + frontend). The US mirror (`data/us/`,
+   `BREAKOUTAI_MARKET=US`) had never had its score backtested. Found the US Method-A
+   base rate is far lower than India's (26.7% vs 38.8%) and root-caused why; per-market
+   score calibration shipped (India untouched, verified bit-identical); then built two
+   new backtested, out-of-sample-validated "high-conviction" setup tiers (51% and 45%
+   hit rates, vs the 26.7% base and the 50% breakeven line). See "Session 9" below.
 0. **Session 8 — Single 0-100 "conviction" score** (backend + frontend, continues sessions 6/7).
    New `backend/score.py` blends only backtest-validated features into one ranking number;
    Bayesian shrinkage so one bad breakout no longer flashes red; the one-day analog backtested
@@ -34,6 +43,175 @@ Sessions 4, 6, 7, 8 are one continuous line of work (same conversation) and touc
 files (`backend/find_breakouts.py`, `run_scan.py`, `analyze_reliability.py`,
 `combined_breakout_scanner_platform.html`, the regenerated `data/*.json`) — resume/commit them
 together as one body of work. Sessions 3 (Ask AI) and 5 (Claude Skills) remain independent.
+
+---
+
+## Session 9: US conviction score validated + recalibrated + 2 new high-conviction tiers
+
+### Why
+The US market mirror (built on this branch before this session, `data/us/`, ~4,465
+stocks via `BREAKOUTAI_MARKET=US`) reused India's conviction-score weights/prior as-is
+— never backtested against actual US data. User asked to make the US score as
+high-hit-rate and honestly validated as possible, "like a professional trading
+analyst," then explicitly pushed further: don't just rank well, find a genuinely
+high-precision subset — "whatever we find needs to be really good," but "we don't
+focus on quantity... I don't mind [more picks] but I want the hit rate to be good,"
+and keep small/cheap stocks in (floor at avg volume ≥100k shares, price ≥$1 — no
+market-cap or price-tier filter).
+
+### What was found (whole-market replay, 20,814 Method-A events, 4,166 stocks, 3yr)
+- **US base rate is 26.7%** vs India's 38.8%. Root cause: the fixed ±6%-of-resistance
+  stop/target band is implicitly tuned to Indian volatility — **51.7% of US events
+  resolve NEITHER side within 10 days** (80% for low-ATR stocks). Confirmed via a
+  volatility-neutral ATR-scaled regrade (±2×ATR10): base rate becomes 41.8%, flat
+  across volatility (p=0.55), and India's strongest feature (persistence) nearly
+  vanishes (22.3%→34.7% fixed-rule vs 40.6%→41.6%/p=0.27 ATR-scaled) — most of its US
+  edge was a volatility-persistence artifact, not real signal. Production still uses
+  the fixed-band rule (switching it changes the displayed stop/history/track record
+  sitewide — flagged as a future option, not done this session).
+- **Per-market score recalibration** (60/40 train/test split by stock): US weights
+  rel/depth/method = 0.30/0.70/0.00 (India 0.60/0.25/0.15; D method-confirmation
+  measured -12.2pt harmful on US data, p=0.002, dropped). TEST-set tertile spread
+  14.4%→39.4% (p<1e-96), top decile 43.4%.
+- **High-precision search** (point-in-time features: closing range, cross-sectional
+  RS percentile vs the whole universe that date, breadth, base tightness/age, $
+  liquidity, cross-method co-fires; TRAIN-only gate search, ONE test-set evaluation of
+  finalists): **"squeeze-confirmed breakout"** — volatility-squeeze release (Method C)
+  + Method-A breakout within ~5 bars + ATR≥4.5% of price + close within 3% of trigger
+  + liquidity floor — **51.1% hit rate (n=190, 176 stocks), 52.0% held out on TEST**,
+  roughly double the 26.7% base. A looser rule (A-breakout + ATR≥4.5% + liquidity
+  floor, no squeeze/gap needed) scored 45.3%/n=3,215 (46.2% TEST) — real lift, kept as
+  a second tier. A gap≥4% variant died on TEST (47.4%) — excluded.
+
+### What was built
+- **`backend/settings.py`**: new score-calibration block (`SCORE_BASE_RATE`,
+  `SCORE_W_REL/W_DEPTH/W_METHOD`, `SCORE_Q_RANGE`, `RELIABILITY_CAUTION_BELOW/GOOD_AT`)
+  branching on `MARKET`; new `HC_*` tier-threshold constants gated by `HC_ENABLED =
+  MARKET == "US"`.
+- **`backend/score.py`**: reads the new settings instead of hardcoded India values.
+- **`backend/find_breakouts.py`**: `_reliability_note()` uses market-aware thresholds;
+  `build_summary()` gained the two new tiers (`readiness.signal` = `"high_conviction"`
+  / `"strong_breakout"`, conviction floors 90/80) plus `_last_is_fresh_fire()` — see
+  the bug below.
+- **`backend/run_scan.py`**: computes `is_breakout_c` (research Method C, promoted for
+  US only) alongside the existing E/E2 columns.
+- **`combined_breakout_scanner_platform.html`**: `verdictExplainer` branches for both
+  new signals (checked before the generic `breakout.today` case, since tier-2 always
+  coincides with it); an amber "★ High conviction" pill on the detail header and
+  watchlist rows for `high_conviction` only.
+- **A real bug caught before shipping, worth remembering for any future live signal
+  built this way**: the first cut used raw/undeduped trigger columns as each tier's
+  anchor condition. Both `is_breakout` and `is_breakout_c` cluster on consecutive days
+  during one continuous move (confirmed: e.g. ATYR fired raw `is_breakout_c` on 18
+  days across only 12 backtest-counted clusters) — the backtest's
+  `_dedup_with_cooldown` counts only the first day of each cluster (enforcing minimum
+  *spacing between kept fires*, not "wait for quiet"). Without matching that, an
+  acceptance test (replaying history through the actual production code) caught tier-1
+  inflating from a backtested n=190/51.1% to n=830/46.1%, and tier-2 from n=3,215/45.3%
+  to n=6,521/44.2%. Fixed via `_last_is_fresh_fire()` — a local reimplementation of
+  the same cooldown-dedup algorithm (can't import `analyze_reliability.py` directly:
+  circular import, it imports `add_indicators` from `find_breakouts`). After the fix,
+  a whole-market replay via the actual imported helper matched the backtest almost
+  exactly: tier 1 n=197/51.3%, tier 2 n=3,215/45.3% (exact).
+- **`IMPLEMENT_US_HIGH_CONVICTION.md`** (repo root, new) — the full spec written for
+  the implementing model, with the exact rule table, thresholds, and acceptance-test
+  methodology. Left in place as reference/documentation even though the plan changed
+  from "spawn a separate implementer" to "implement directly in this session."
+
+### Follow-on: US market cap was showing as mislabeled ₹ crore (real bug, found while
+### the user was previewing the above in-browser)
+User caught it live: Moderna Inc's detail header showed "₹3,165 Cr" — a US stock with
+a rupee-crore market cap. Root cause: `backend/fundamentals.py` unconditionally did
+`marketCap / 1e7` into a field literally named `market_cap_cr`, and the frontend's
+`fmtMarketCap()`/market-cap filter thresholds always assumed ₹ crore — neither had any
+`MARKET` awareness, so a US stock's raw USD cap got the same India-only conversion and
+label. Separately, ~5.6% of US stocks (251/4,465) showed a blank "—" because
+`fetch_fundamentals.py` had cached a permanent fetch-failure miss for them. See
+[[yfinance-fundamentals-coverage]] for the full writeup. Fixed both, this session:
+- **Backend**: `fundamentals.py` now stores the raw, native-currency market cap under
+  a renamed `market_cap` field (was `market_cap_cr`) — all scale/currency formatting
+  moved to the frontend, keyed on `MARKET`. `fetch_fundamentals.py`'s miss-cache key
+  renamed to match; `run_scan.py`'s merge-count log line updated.
+- **Migrated in place** (not re-fetched — cheap, avoids an unnecessary yfinance
+  re-scrape): `data/fundamentals.json`, `data/us/fundamentals.json`, and the embedded
+  `fundamentals` sub-objects inside both `data/breakouts.json` and
+  `data/us/breakouts.json` — renamed the key and multiplied by 1e7 to restore the raw
+  value.
+- **Recovered the missing 251**: cleared their cached all-`None` misses and re-ran
+  `fetch_fundamentals.py` — 249/251 (99.2%) recovered on retry (transient yfinance
+  flakiness, same accepted pattern already documented for earnings data), merged into
+  `data/us/breakouts.json`. Only `ZTR` (a closed-end fund with no `marketCap` in
+  yfinance at all) remains genuinely missing.
+- **Frontend**: `fmtMarketCap()` now branches on `MARKET` (India: ₹ crore/lakh-crore
+  unchanged; US: $ with K/M/B/T suffixes). The market-cap filter's bucket thresholds
+  (`FUND_FIELDS`'s "mcap" entry) became functions of `MARKET` (US tiers: Micro <$300M,
+  Small $300M–2B, Mid $2B–10B, Large $10B+) rather than static ₹-crore numbers. A
+  static HTML tooltip on the "Mkt Cap" label had the same hardcoded "₹ crore" text —
+  given an id and refreshed in `switchMarket()`. Per the user's explicit preference:
+  when `market_cap` is `null` (the `ZTR` case), the whole "Mkt Cap" row is now hidden
+  rather than showing a "—" placeholder.
+- **Verified**: live Playwright pass — AAPL $4.53T, NVDA $4.72T, MRNA $31.65B, CRSP
+  $5.92B (all plausible real-world figures), `ZTR`'s row correctly hidden, India's TCS
+  still shows ₹7.57 L Cr unchanged, zero console errors. The market-cap filter itself
+  cross-checked exactly against an independent Python query (940/4,463 stocks ≥$10B,
+  both routes agree).
+
+### Verified end-to-end
+India regression: `build_summary()` on 6 India large-caps produces byte-identical
+conviction/reliability-note output vs the committed `data/breakouts.json`, both before
+and after the fresh-fire fix. US acceptance: whole-market replay via the real
+`_last_is_fresh_fire` helper reproduces the backtest (tier 1 n=197/51.3% vs backtest
+190/51.1%; tier 2 n=3,215/45.3% exact match). Whole-market US smoke: 0 crashes across
+4,464 stocks. Ran the full `run_scan.py` (fed from the DuckDB cache to avoid a second
+yfinance rate-limit hit): 4,463 cards, 1 `high_conviction` (CRSP, conviction 90) and 2
+`strong_breakout` (RIVN 84, NGNE 80) that day — consistent with the ~6/month and
+~97/month backtested cadences. Verified live via Playwright against the served site:
+badge, conviction number, explainer text (both tiers), and watchlist star pill all
+render correctly; zero console errors; screenshot confirmed visual consistency.
+
+### Current honest state
+- **Not committed.** Modified: `backend/find_breakouts.py`, `backend/run_scan.py`,
+  `backend/score.py`, `backend/settings.py`, `backend/fundamentals.py`,
+  `backend/fetch_fundamentals.py`, `combined_breakout_scanner_platform.html`,
+  `data/fundamentals.json`, `data/us/fundamentals.json`, `data/breakouts.json`
+  (fundamentals-embedded market_cap migrated only — not a full rescan),
+  `data/us/breakouts.json`/`data/us/track_record.json` (regenerated + the market-cap
+  fix merged in, real current data). New: `IMPLEMENT_US_HIGH_CONVICTION.md`. This is
+  on branch `feature/us-market` — separate from sessions 0/3-8 below, which are
+  `main`'s working tree.
+- Note: `data/breakouts.json`/`data/fundamentals.json` (India) also show as modified
+  in `git status` — their embedded/cached `market_cap` was migrated in place too
+  (schema-rename fix only, no rescan, no price/conviction changes — confirmed via the
+  same India regression check used for the scoring work) since the field rename is
+  shared code (`backend/fundamentals.py`), not something that could be scoped to US
+  only.
+- `backend/universe.py`'s US-universe widening (S&P500+Nasdaq100+Russell2000 →
+  full market-cap-floor screen, ~4,668 symbols) predates this session (already
+  modified when this session started) — untouched by this session's work.
+- The local static server (`python -m http.server 8000`) may still be running from
+  this session's verification.
+
+### Next steps
+- Decide on committing (this branch, not `main` — user's standing rule).
+- Open option, not requested: switch US grading to the ATR-scaled stop/target (would
+  raise the US base rate to a volatility-neutral ~42% and change which features read
+  as predictive) — this changes the displayed stop, history, and track record
+  sitewide, a product decision, not just a backend one.
+- Re-check the squeeze-confirmed tier's hit rate after a few live months — its most
+  recent backtested half-year (2026H1) ran weaker (~43-46%) than the full-sample
+  51-52%, still well above base but worth confirming it holds.
+- `IMPLEMENT_US_HIGH_CONVICTION.md` has the full rule table/thresholds if this ever
+  needs to be re-derived, re-tuned, or extended to a third market.
+
+### How to re-verify
+```
+cd backend
+python run_scan.py                      # BREAKOUTAI_MARKET=US env var must be set
+grep -c '"high_conviction"' ../data/us/breakouts.json
+grep -c '"strong_breakout"' ../data/us/breakouts.json
+```
+Then serve (`python -m http.server 8000` at repo root), switch to US market, and open
+a tagged symbol (search any `high_conviction` stock from the grep above).
 
 ---
 

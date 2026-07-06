@@ -1719,7 +1719,7 @@
 {"date": "2026-07-03", "symbol": "NESCO", "price": 1125.1, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "JAYBARMARU", "price": 171.55, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "No clear pattern", "source": "live"}
 {"date": "2026-07-03", "symbol": "PNGJL", "price": 569.35, "score": "low", "watch": false, "sentiment": "Neutral", "in_uptrend": false, "pattern": "Double Bottom", "source": "live"}
-{"date": "2026-07-03", "symbol": "SUNDARMFIN", "price": 4575.4, "score": "low", "watch": false, "sentiment": "Neutral", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
+{"date": "2026-07-03", "symbol": "SUNDARMFIN", "price": 4551.4, "score": "low", "watch": false, "sentiment": "Neutral", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "PFIZER", "price": 4568.6, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Double Bottom", "source": "live"}
 {"date": "2026-07-03", "symbol": "EQUITASBNK", "price": 76.3, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "FINPIPE", "price": 174.77, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
@@ -1876,7 +1876,7 @@
 {"date": "2026-07-03", "symbol": "RALLIS", "price": 228.14, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Tight Consolidation", "source": "live"}
 {"date": "2026-07-03", "symbol": "KSCL", "price": 919.2, "score": "low", "watch": false, "sentiment": "Neutral", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "DHANBANK", "price": 34.09, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "Head & Shoulders", "source": "live"}
-{"date": "2026-07-03", "symbol": "DJML", "price": 121.87, "score": "high", "watch": true, "sentiment": "Bullish", "in_uptrend": true, "pattern": "No clear pattern", "source": "live"}
+{"date": "2026-07-03", "symbol": "DJML", "price": 121.72, "score": "high", "watch": true, "sentiment": "Bullish", "in_uptrend": true, "pattern": "No clear pattern", "source": "live"}
 {"date": "2026-07-03", "symbol": "EUREKAFORB", "price": 476.0, "score": "low", "watch": false, "sentiment": "Neutral", "in_uptrend": false, "pattern": "No clear pattern", "source": "live"}
 {"date": "2026-07-03", "symbol": "NAVA", "price": 622.35, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "No clear pattern", "source": "live"}
 {"date": "2026-07-03", "symbol": "GIPCL", "price": 162.34, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "Cup & Handle", "source": "live"}
@@ -2365,7 +2365,7 @@
 {"date": "2026-07-03", "symbol": "SANGAMIND", "price": 552.5, "score": "low", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "DMCC", "price": 253.85, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "TVTODAY", "price": 129.62, "score": "low", "watch": false, "sentiment": "Bullish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
-{"date": "2026-07-03", "symbol": "PILANIINVS", "price": 4415.7, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Double Bottom", "source": "live"}
+{"date": "2026-07-03", "symbol": "PILANIINVS", "price": 4406.7, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Double Bottom", "source": "live"}
 {"date": "2026-07-03", "symbol": "SMCGLOBAL", "price": 69.41, "score": "medium", "watch": false, "sentiment": "Bullish", "in_uptrend": true, "pattern": "No clear pattern", "source": "live"}
 {"date": "2026-07-03", "symbol": "VENTIVE", "price": 633.2, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
 {"date": "2026-07-03", "symbol": "SAURASHCEM", "price": 58.12, "score": "low", "watch": false, "sentiment": "Bearish", "in_uptrend": false, "pattern": "Cup & Handle", "source": "live"}
