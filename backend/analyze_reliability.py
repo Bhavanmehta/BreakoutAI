@@ -67,17 +67,33 @@ BASE_METHODS = {
     "E_relative_strength": "is_breakout_e",
     "E2_relative_strength_uptrend": "is_breakout_e2",
     "F_episodic_pivot": "is_breakout_f",
+    "G_pre_breakout_composite": "is_breakout_g",
+    "G2_pre_breakout_retuned": "is_breakout_g2",
+    "H_pressure_cooker": "is_breakout_h",
+    "HC_tier1_high_conviction": "is_high_conviction",
+    "SB_tier2_strong_breakout": "is_strong_breakout",
+    "SB_after_G2_alert": "is_sb_after_g2",
+    "SB_after_H_alert": "is_sb_after_h",
+    "HC_after_G2_alert": "is_hc_after_g2",
+    "HC_after_H_alert": "is_hc_after_h",
 }
 
 # Combos: does requiring 2-3 methods to agree on the SAME day beat any of them alone?
 # Picked A+E (both individually solid, only 17% overlap - largely independent votes),
 # A+D and E+D (D has the best solo hit rate, worth pairing with the two frequent ones),
-# and all three together.
+# and all three together. SB/HC_and_* (2026-07-06): does requiring the NEW pre-breakout
+# composites (G2/H) to agree, same-day, with the ALREADY-SHIPPED confirmation tiers add
+# anything on top of those tiers alone -- i.e. "keep the existing scores, does adding
+# the new one as a same-day confirmation filter help" rather than replacing anything.
 COMBOS = {
     "AE_combo": ("A_donchian_minervini", "E_relative_strength"),
     "AD_combo": ("A_donchian_minervini", "D_trend_inception"),
     "ED_combo": ("E_relative_strength", "D_trend_inception"),
     "AED_combo": ("A_donchian_minervini", "E_relative_strength", "D_trend_inception"),
+    "SB_and_G2": ("SB_tier2_strong_breakout", "G2_pre_breakout_retuned"),
+    "SB_and_H": ("SB_tier2_strong_breakout", "H_pressure_cooker"),
+    "HC_and_G2": ("HC_tier1_high_conviction", "G2_pre_breakout_retuned"),
+    "HC_and_H": ("HC_tier1_high_conviction", "H_pressure_cooker"),
 }
 
 
@@ -183,6 +199,9 @@ def collect_events(watchlist: dict):
                     "d_cofire": d_cofire,
                     "analog_worked": analog_worked,
                     "analog_sim": analog_sim,
+                    "score_g": float(ev["pre_breakout_score_g"]) if "pre_breakout_score_g" in ev.index and pd.notna(ev["pre_breakout_score_g"]) else np.nan,
+                    "score_g2": float(ev["pre_breakout_score_g2"]) if "pre_breakout_score_g2" in ev.index and pd.notna(ev["pre_breakout_score_g2"]) else np.nan,
+                    "score_h": float(ev["pressure_cooker_score_h"]) if "pressure_cooker_score_h" in ev.index and pd.notna(ev["pressure_cooker_score_h"]) else np.nan,
                 })
     df = pd.DataFrame(rows)
     if len(df):
@@ -288,6 +307,9 @@ def test_features(df: pd.DataFrame):
         "dist_from_52w_high": "Distance from 52-week high (%)",
         "vol_surge": "Volume surge multiple on breakout day",
         "base_depth_pct": "Base depth (%, drawdown into the base)",
+        "score_g": "Pre-breakout composite score (Method G, 0-100) on Method-A's own event days",
+        "score_g2": "Retuned pre-breakout composite (Method G2, 0-100) on Method-A's own event days",
+        "score_h": "Pressure Cooker score (Method H, 0-100) on Method-A's own event days",
     }
     for col, label in numeric_features.items():
         table = bucket_hit_rates(df, col, q=3)
@@ -462,10 +484,21 @@ RELEVANT_EXTRAS = {
     "E_relative_strength": ["rs"],
     "E2_relative_strength_uptrend": ["rs"],
     "F_episodic_pivot": ["ep"],
+    "G_pre_breakout_composite": ["score_g"],
+    "G2_pre_breakout_retuned": ["score_g2"],
+    "H_pressure_cooker": ["score_h"],
     "AE_combo": ["rs"],
     "AD_combo": ["di"],
     "ED_combo": ["rs", "di"],
     "AED_combo": ["rs", "di"],
+    "SB_and_G2": ["score_g2"],
+    "HC_and_G2": ["score_g2"],
+    "SB_and_H": ["score_h"],
+    "HC_and_H": ["score_h"],
+    "SB_after_G2_alert": ["score_g2"],
+    "HC_after_G2_alert": ["score_g2"],
+    "SB_after_H_alert": ["score_h"],
+    "HC_after_H_alert": ["score_h"],
 }
 
 
@@ -484,6 +517,12 @@ def print_examples(df: pd.DataFrame, method: str, n: int = 2):
             extras.append(f"price/Nifty ratio={ev['rs_ratio']:.4f}")
         if "ep" in wanted and pd.notna(ev.get("ep_gap_pct")):
             extras.append(f"gap={ev['ep_gap_pct']:.1f}%, volume={ev['ep_vol_ratio']:.1f}x avg")
+        if "score_g" in wanted and pd.notna(ev.get("score_g")):
+            extras.append(f"pre-breakout score={ev['score_g']:.0f}/100")
+        if "score_g2" in wanted and pd.notna(ev.get("score_g2")):
+            extras.append(f"pre-breakout score (G2)={ev['score_g2']:.0f}/100")
+        if "score_h" in wanted and pd.notna(ev.get("score_h")):
+            extras.append(f"pressure-cooker score={ev['score_h']:.0f}/100")
         extra_str = ("  [" + ", ".join(extras) + "]") if extras else ""
         target_pct = (ev["target"] / ev["price"] - 1) * 100
         stop_pct = (ev["stop"] / ev["price"] - 1) * 100
@@ -535,8 +574,10 @@ def main():
     print("   see section 3 above for the honest hit rate)")
     print("=" * 72)
     for m in ["D_trend_inception", "D2_trend_inception_loose", "E_relative_strength",
-              "E2_relative_strength_uptrend",
-              "AE_combo", "AD_combo", "ED_combo", "AED_combo"]:
+              "E2_relative_strength_uptrend", "G_pre_breakout_composite", "G2_pre_breakout_retuned",
+              "H_pressure_cooker", "AE_combo", "AD_combo", "ED_combo", "AED_combo",
+              "SB_and_G2", "SB_and_H", "HC_and_G2", "HC_and_H",
+              "SB_after_G2_alert", "SB_after_H_alert", "HC_after_G2_alert", "HC_after_H_alert"]:
         print_examples(df, m)
 
     print("\n" + "=" * 72)
