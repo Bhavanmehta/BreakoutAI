@@ -2,10 +2,11 @@
 
 ## Vision
 
-A high-performance, minimalist, and educational "Pre-Breakout Radar" for the Indian equity
-market (NSE/BSE). Helps retail traders identify stocks that are mathematically coiling for a
-move, rather than just showing lagging indicators. Prioritizes actionable, educational insights
-over raw data saturation.
+A high-performance, minimalist, and educational "Pre-Breakout Radar" — originally built for the
+Indian equity market (NSE/BSE), now mirrored for **US equities** too (same engine, same site, a
+market toggle). Helps retail traders identify stocks that are mathematically coiling for a move,
+rather than just showing lagging indicators. Prioritizes actionable, educational insights over raw
+data saturation.
 
 ## Design Philosophy
 
@@ -15,303 +16,344 @@ over raw data saturation.
 
 ## Stack
 
-- **Frontend**: single static HTML file + Tailwind (CDN) + vanilla JS. No build step.
-- **Charting**: TradingView widget (`BSE:<TICKER>`). Migrating to `lightweight-charts` later for
-  custom pattern overlays — see TODO.
+- **Frontend**: two static HTML files + Tailwind (CDN) + vanilla JS, no build step —
+  [combined_breakout_scanner_platform.html](combined_breakout_scanner_platform.html) (the main
+  scanner/watchlist app) and [performance.html](performance.html) (the forward-only track-record
+  ledger, see the Performance page bullet below).
+- **Charting**: the per-stock detail chart is still the TradingView widget (`BSE:<TICKER>`); a
+  second, home-grown annotated chart (EMA8/21 overlays + volume/RSI panes, `lightweight-charts`)
+  was built for pattern/indicator overlays and is already live — see `export_ohlc.py` and TODO #8.
 - **Backend**: Python (pandas/numpy/duckdb/yfinance/jugaad-data) in `backend/`. Real, working.
-- **Hosting**: Vercel / GitHub Pages, via GitHub CI/CD.
+  Every script is **market-aware** via one env var, `BREAKOUTAI_MARKET` (`IN` default, or `US`) —
+  see `settings.py` and the Multi-market bullet below.
+- **Live API layer**: two Vercel Python serverless functions in `api/` — `watchlist.py` (My
+  Watchlist CRUD, Upstash Redis-backed) and `quotes.py` (live intraday price overlay, direct Yahoo
+  v8 chart-meta calls, no yfinance/pandas dependency to keep cold starts light). Everything else is
+  static JSON, no always-on server.
+- **Hosting**: Vercel (serves the two HTML files + the `api/` functions) / GitHub Pages, via GitHub
+  CI/CD. **Serving data lives on a separate orphan `data` branch, not `main`** — see the Data-branch
+  serving bullet below; this is the single biggest architectural change since the app was JSON-only.
 
 ## IMPORTANT: repo location & how to run
 
 - **Canonical repo (git remote + Vercel)**: `C:\Users\bhava\OneDrive\Documents\GitHub\BreakoutAI`
-  → `github.com/Bhavanmehta/BreakoutAI`. **Do all work here** and commit/push from here. (A stale,
-  non-git duplicate used to exist at `C:\Users\bhava\Projects\BreakoutAI` — it's been deleted; if
-  it reappears, it's not the source of truth.)
+  → `github.com/Bhavanmehta/BreakoutAI`. **Do all work here** and commit/push from here.
 - **Python**: `C:\Users\bhava\AppData\Local\Programs\Python\Python312\python.exe` (not on PATH as
   `python`). **Git**: `C:\Program Files\Git\cmd` (add to `$env:Path`).
-- **Run the pipeline**: `cd backend; python run_scan.py` (regenerates `data/breakouts.json`,
-  `predictions_log.jsonl`, `track_record.json`, and the git-ignored DuckDB).
+- **Run the pipeline**: `cd backend; python run_scan.py` — regenerates `data/breakouts.json`,
+  `predictions_log.jsonl`, `track_record.json`, `performance.json`, per-stock `data/ohlc/*.json`,
+  and the git-ignored DuckDB, for **India** by default. For the **US mirror**, set the env var
+  first: `BREAKOUTAI_MARKET=US python run_scan.py` — writes to `data/us/` instead (see Multi-market
+  bullet). `data/` is real and present locally either way; it's just **not committed on `main`**
+  anymore (gitignored — see Data-branch serving bullet), so `git status` after a local run should
+  show it clean.
 - **Preview the site**: from the repo root `python -m http.server 8000`, open
-  `http://localhost:8000/combined_breakout_scanner_platform.html`. `file://` won't work (fetch is
-  blocked); the frontend fetches `data/breakouts.json`.
+  `http://localhost:8000/combined_breakout_scanner_platform.html` (or `/performance.html`).
+  `file://` won't work (fetch is blocked). Locally the frontend reads straight from disk (`data/` /
+  `data/us/`); in production it fetches from the `data` branch on raw.githubusercontent.com (see
+  `DATA_BASE` in both HTML files).
+- **Ask AI dev server** (optional, only needed to test the chat panel locally): `cd backend; python
+  chat_server.py` (needs `GROQ_API_KEY`, see the Ask AI bullet) — a local proxy so the key never
+  sits in client-side JS.
+- **Claude Skills**: `.claude/skills/` has five repo-specific skills (`backtest-method`,
+  `grade-watchlist`, `ship-signal`, `verify-frontend`, `wrap-session`) that codify this project's
+  recurring workflows — invoke them by name rather than re-deriving the same steps from scratch.
 
 ## Current State
 
-Frontend [combined_breakout_scanner_platform.html](combined_breakout_scanner_platform.html) is
-**JSON-driven** — it fetches `data/breakouts.json` (no more hardcoded dataset). Everything shown is
-real computed data. The universe is the **whole NSE market** (~1,800 stocks that produce cards,
-discovered daily — was a hand-typed 12) — see the Backend section.
+The site now covers **two markets** (India NSE/BSE + US, toggled on the same page,
+`combined_breakout_scanner_platform.html`) plus a companion **performance page**
+([performance.html](performance.html)). Everything shown is real computed data, JSON-driven —
+no hardcoded dataset anywhere.
 
-**Layout (redesigned 2026-07 from the annotated-screenshot feedback):** a top **filter/sort bar**
-(search · sector dropdown · sort [readiness/proximity/day-move/ADX/A→Z] · "Primed only" toggle),
-then a two-column split: **left** = a **Sector Radar** (which sectors have the most primed/breaking
-names, click to filter) + a **vertical watchlist** where each row is a compact *overview*
-(symbol · Δ% · name · price · distance-to-resistance · sentiment), capped at `MAX_RESULTS`=80 and
-click-to-drill; **right** = the selected stock's detail — a slim header (name · sector · price · Δ,
-**no ADX here** — de-duplicated), then **The Read** (readiness + the historical-analog hero, see
-`analogs.py`), the indicator strip (ADX + EMAs, each with a plain-English **ⓘ tooltip**) above the
-TradingView chart, then Ownership (snapshot bars + a **tabbed FII-default over-time chart**),
-Historical Precedents, Resistance, VCP, and entry guidance. The ⓘ tooltips are a single body-level
-`#floatTip` positioned by `initTooltips()` (portal-style, viewport-clamped) so no card's
-`overflow-hidden` can clip them. All vanilla JS: `applyFilters()`/`currentVisible()`
-drive the list, `renderSectorRadar()`, `renderWatchlist()`, `renderAnalog()`, `renderHoldings()`
-(quarterly `history` if present, else the annual promoter trend). The old horizontal chip strip and
-the (already-hidden) track-record banner are gone.
+**Layout:** a top **filter/sort bar** (search · sector dropdown · sort [**breakout conviction**
+(default) / readiness / proximity / day-move / ADX / A→Z] · "Primed only" toggle · a collapsible
+**⚙ Fundamentals** filter panel — Market Cap/P/E/Revenue Growth/Profit Growth/ROE/D-E), then a
+two-column split: **left** = a **Sector Radar** (click to filter) + a **vertical watchlist**, each
+row showing symbol · Δ% · name · price · distance-to-resistance · sentiment · the big **conviction
+number** · a one-click **★ quick-track** star (adds to My Watchlist without opening the detail
+pane) · an amber **★ High conviction** pill for US `high_conviction`-tier stocks; capped at
+`MAX_RESULTS`=80, click-to-drill. **Right** = the selected stock's detail — a slim header (name ·
+sector · price · Δ · the conviction score), **The Read** (readiness + a de-emphasized, muted
+one-day historical-analog reference — see `analogs.py` and `score.py`), the indicator strip (ADX +
+EMAs, ⓘ tooltips) above the TradingView chart, then the annotated `lightweight-charts` panel
+(EMA8/21, volume, RSI), Ownership (tabbed FII-default over-time chart), Historical Precedents,
+Resistance/Support (now swing-pivot-clustered zones, see `levels.py`), VCP, entry guidance, and
+fundamentals. A floating **Ask AI** chat panel (Groq-backed, tool-calling, can query/compare any
+stock in the universe or run read-only SQL) sits alongside. **My Watchlist** is a separate personal
+tab — add/remove any stock (Upstash-backed via `api/watchlist.py`), graded later by
+`grade-watchlist`. The frontend's default sort/rank is the single 0–100 **breakout conviction**
+score (`readiness.conviction`, see `score.py`), not raw readiness label.
 
 ## Backend (`backend/`) — the data "engine"
 
-A Python pipeline now exists and produces real computed data (replacing the hand-typed
-`dataset` for the fields it can derive from price/volume). See `backend/README.md` for details.
+A Python pipeline produces all computed data. See `backend/README.md` for details.
 
-- **Files** (flat, named by what they do): `settings.py` (all thresholds + universe size),
-  `universe.py` (discovers the scan universe), `get_prices.py`, `adjust_for_splits.py`,
-  `find_breakouts.py`, `patterns.py` (chart-pattern detection), `analogs.py` (historical-analog
-  engine behind "The Read"), `track.py` (forward track record), `holdings_screener.py` (primary
-  quarterly ownership source, screener.in) + `holdings.py` (NSE-XBRL fallback) + `fetch_holdings.py`,
-  `sectors.py` + `fetch_sectors.py` (sector/industry), `run_scan.py` (the entry point),
-  `analyze_reliability.py` (standalone validation script).
-- **Universe** (`universe.py`): the scan list is discovered fresh every run, not hand-typed. One
-  bhavcopy request via `jugaad-data` (`jugaad_data.nse.bhavcopy_raw`) returns every listed NSE
+- **Files** (flat, named by what they do): `settings.py` (all thresholds + universe size +
+  per-market calibration), `universe.py` (discovers the scan universe, market-aware),
+  `get_prices.py`, `adjust_for_splits.py`, `find_breakouts.py` (core indicators + readiness +
+  conviction wiring), `methods.py` (research breakout-definition alternatives A-H, not all
+  shipped), `score.py` (the conviction-score brain), `levels.py` (swing-pivot support/resistance),
+  `patterns.py` (chart-pattern detection, decorative — see TODO #5), `analogs.py` (historical-analog
+  engine behind "The Read"), `track.py` (forward track record), `build_performance.py` (the
+  performance-page ledger), `holdings_screener.py` (primary quarterly ownership source,
+  screener.in) + `holdings.py` (NSE-XBRL fallback) + `fetch_holdings.py`, `sectors.py` +
+  `fetch_sectors.py` (sector/industry), `fundamentals.py` + `fetch_fundamentals.py` (market
+  cap/P-E/growth/ROE/D-E), `earnings.py` + `fetch_earnings.py` (EPS estimate-vs-actual),
+  `fetch_news.py` + `news_providers.py` + `event_classifier.py` + `sentiment.py` (news +
+  sentiment), `fetch_social.py` + `social_providers.py` (Reddit/Trends buzz), `market_mood.py`
+  (fear/greed gauge), `export_ohlc.py` (per-stock chart JSON), `ask_ai.py` + `chat_server.py` (Ask
+  AI assistant), `run_scan.py` (the entry point), `analyze_reliability.py` /
+  `analyze_hc_rolling_window.py` (standalone validation scripts).
+- **Multi-market** (`settings.py`): every script reads `BREAKOUTAI_MARKET` from the environment
+  once at import (`IN` default or `US`) and branches nearly everything off it — `DATA_DIR`
+  (`data/` vs `data/us/`), ticker suffix (`.NS` vs none), RS benchmark (Nifty vs S&P 500), VIX
+  ticker, currency symbol/formatting, score calibration (see Conviction score bullet), and
+  US-only `HC_ENABLED` high-conviction tiers. India's universe (`universe.py`) is discovered from
+  the daily NSE bhavcopy (whole market, ~2,055 equities); the **US universe** was independently
+  widened from an initial S&P500+Nasdaq100+Russell2000 seed to a full market-cap-floor screen
+  (~4,668 symbols). Two separate GitHub Actions run the two markets on their own schedules — see
+  the Data-branch serving bullet.
+- **Universe** (`universe.py`, India): the scan list is discovered fresh every run, not hand-typed.
+  One bhavcopy request via `jugaad-data` (`jugaad_data.nse.bhavcopy_raw`) returns every listed NSE
   equity's turnover for the latest trading day; filtered to real equity shares (ISIN prefix `INE`
-  — excludes ETFs/fund units like LIQUIDBEES, which share the `EQ` series but aren't companies) and
-  ranked by turnover. `settings.UNIVERSE_SIZE = None` means **whole market** (~2,055 equities;
-  ~1,800 pass the history-length gate and produce cards); set it to an int to keep only the top-N,
-  and/or raise `settings.MIN_TURNOVER` (default 0) to drop the illiquid tail. If bhavcopy discovery
-  fails (NSE rate-limits aggressively), it now falls back to the **previous `breakouts.json`'s symbol
-  list** (`_universe_from_last_scan()` — preserves the whole ~1,800-name market) and only then to
-  `settings.FALLBACK_WATCHLIST` (the hand-picked 12) — so a bad NSE day can't silently shrink and
-  overwrite the served universe down to 12. This is the *only* jugaad/NSE-scraping touchpoint in the
-  daily flow — price history comes from `yfinance`.
-- **Data sources**: `yfinance` (default; already split/bonus-adjusted, works in CI). At whole-market
-  scale we **batch-fetch** — `get_prices.fetch_prices_yfinance_batch()` pulls ~100 tickers per
-  `yf.download` call (~30× faster and far fewer requests than one-at-a-time; whole market fetches in
-  ~70s vs. ~10min looping). `run_scan._fetch_all()` uses the batch path for yfinance and falls back
-  to a per-symbol loop for the `jugaad` price source (which has no batch API). Single-symbol
-  `get_prices()` and the `jugaad-data` + NSE-corporate-actions adjustment path (`adjust_for_splits.py`)
-  still exist — tested but not the daily default (see `settings.PRICE_SOURCE`).
-- **`settings.MIN_HISTORY_BARS`**: recently-listed/demerged symbols (e.g. a spin-off with 2 weeks of
-  trading) can now surface from the wider universe. `ema()` never returns NaN regardless of history
-  length, so a naive dropna doesn't catch them — `build_summary()` explicitly requires
-  `MIN_HISTORY_BARS` (needs the 200-EMA "rising" check window and a genuine 52-week high) before
-  producing a card, and skips the stock otherwise ("not enough history").
+  — excludes ETFs/fund units like LIQUIDBEES) and ranked by turnover. `settings.UNIVERSE_SIZE =
+  None` means whole market; set it to an int to keep only the top-N. If bhavcopy discovery fails,
+  it falls back to the **previous `breakouts.json`'s symbol list** and only then to
+  `settings.FALLBACK_WATCHLIST` (hand-picked 12) — so a bad NSE day can't silently shrink the
+  served universe. This is the *only* jugaad/NSE-scraping touchpoint in the daily flow.
+- **Data sources**: `yfinance` (default; already split/bonus-adjusted, works in CI). At
+  whole-market scale we **batch-fetch** — `get_prices.fetch_prices_yfinance_batch()` pulls ~100
+  tickers per `yf.download` call. Single-symbol `get_prices()` and the `jugaad-data` +
+  NSE-corporate-actions adjustment path (`adjust_for_splits.py`) still exist as a tested fallback,
+  not the daily default (see `settings.PRICE_SOURCE`).
+- **`settings.MIN_HISTORY_BARS`**: recently-listed/demerged symbols can surface from the wider
+  universe. `build_summary()` explicitly requires `MIN_HISTORY_BARS` (needs the 200-EMA "rising"
+  check window and a genuine 52-week high) before producing a card, skipping the stock otherwise.
 - **Flow** (`backend/run_scan.py`): fetch adjusted prices → `find_breakouts.py` computes EMA stack
-  (8/21/50/200), ADX, resistance/touches, VCP contraction, breakout detection + per-stock historical
-  stats → store in local DuckDB (`data/market_research.duckdb`, git-ignored) → write `breakouts.json`.
+  (8/21/50/200), ADX, resistance/support zones (`levels.py`), VCP contraction, breakout detection +
+  per-stock historical stats, plus the E/E2 relative-strength and (US-only) squeeze/high-conviction
+  trigger columns from `methods.py` → conviction score (`score.py`) → store in local DuckDB
+  (`data/market_research.duckdb`, git-ignored) → write `breakouts.json` + per-stock OHLC +
+  `performance.json`.
 - **Breakout definition** (grounded in Minervini Trend Template / Weinstein Stage 2 / Turtle, not
   invented): close above prior 50-day high, on ≥1.5× avg volume, **while in an uptrend** (above a
-  *rising* 200 EMA and above the 50 EMA) and **within 25% of the 52-week high**. The trend + 52w
-  gates are what stop false breakouts (bounces in a downtrend) from being counted — see
+  *rising* 200 EMA and above the 50 EMA) and **within 25% of the 52-week high** — see
   `settings.REQUIRE_UPTREND`. "Follow-through" (did it work) = price hit **+1R before -1R (stop)**
   within 10 trading days, where R = entry − stop and stop = resistance × `STOP_LOSS_FRACTION`
-  (~6% risk, same stop the entry guidance shows) — an R-multiple, not a fixed %, so it scales
-  per-stock instead of grading low-vol large-caps as failures and high-beta names as wins by
-  construction; it's also order-aware (a drop through the stop that later recovers no longer
-  counts as "worked"). See `add_indicators()` in `find_breakouts.py` and `settings.py`.
-- **`data/breakouts.json`** is the committed serving file the frontend reads. Written **compact**
-  (no indent) since it's a machine-read artifact regenerated daily at ~1,800 stocks — ~3.1 MB on
-  disk, but ~300 KB gzipped over the wire (Vercel/GH Pages gzip automatically), so a single fetch is
-  fine and we deliberately did *not* shard it into per-stock files. Schema: top-level
-  `generated_at`/`as_of_date`/`source`/`disclaimer`/`market_mood` (the market-wide gauge, see the
-  Market Mood Index bullet below — NOT per-stock)/`stocks[]`; each stock has `price`, `ema_stack`
-  (each EMA: period/value/position/label), `adx`, `resistance`, `volatility`, `trend` (in_uptrend),
-  `breakout` (today + sentiment), `readiness` (label/watch/score — powers the "breakout soon?" cue),
-  `history` (past_breakouts, followthrough_rate, followthrough_label, avg_fwd_return_20d_pct,
-  examples[] with per-event `worked` flag), and `entry` (trigger/entry/stop text). Enrichment fields
-  merged in from the standalone fetch scripts: `sector`/`industry` (from `sectors.json`), `analog`
-  (from `analogs.py`), `holdings` (from `holdings.json`, incl. a quarterly `history[]` series
-  once re-scraped), `news` (from `news.json`, see the News + sentiment bullet below), `social`
-  (from `social.json`), and `earnings` (from `earnings.json`, see the Earnings bullet below).
-- **Frontend is now wired to `breakouts.json`** (no more hardcoded dataset). Watchlist builds itself
-  and sorts by readiness; cards: verdict/readiness + trend badge, historical precedents (with
-  worked/faded tags), resistance proximity, VCP, entry guidance; indicator strip (ADX + EMA values)
-  sits above the TradingView chart. Chart uses `BSE:` symbols (license-friendly; NSE hits a
-  "only available on TradingView" wall in the free widget). Open via a local server, not file://.
-- **Zero-backend flow**: `.github/workflows/daily-scan.yml` runs the pipeline after market close
-  (10:30 UTC, Mon–Fri) and commits the refreshed JSON — no always-on server. Manually triggerable
-  from the Actions tab.
-- **Corporate-action adjustment**: raw NSE prices aren't split/bonus-adjusted (causes fake ~50%
-  cliffs, e.g. Reliance's Oct-2024 1:1 bonus). `adjust_for_splits.py` parses the event ratio from
-  NSE's text and back-adjusts; `python backend/adjust_for_splits.py` self-tests the parser.
-- **Pattern detection** (`patterns.py`): real geometry via swing pivots → Ascending Triangle,
-  Cup & Handle, Double Bottom (bullish), Head & Shoulders (bearish), with fallbacks. Heuristic;
-  each stock's `pattern` field carries name/confidence/direction/description. Cup&Handle triggers
-  a bit loosely — tighten if needed.
-- **Historical-analog engine** (`analogs.py` → each stock's `analog` field): the evidence behind
-  "The Read". For today's bar it builds a scale-free feature vector (EMA-stack geometry, coil
-  ratio, ADX, distance-to-52w-high, distance-to-resistance) from columns `add_indicators()` already
-  computes, **z-scores each feature across the stock's own history**, and finds the nearest past bar
-  (Euclidean) that has a full forward runway and isn't in the recent overlapping window. Returns its
-  date, a 0–1 `similarity`, and the actual `fwd_5/10/20d_pct` + `worked` — "today most resembles
-  {date} ({sim}%); it then moved +X% in 20d". Rejects matches beyond a z-distance threshold (shows
-  nothing rather than a bad precedent). Cheap/vectorized; whole-market runtime barely moves. NB: the
-  single-symbol `get_prices()` path keeps today's still-forming NaN-close bar, so the engine queries
-  from the last *complete* bar, not blindly `iloc[-1]`.
-- **Sector / industry** (`sectors.py` + `fetch_sectors.py` → `data/sectors.json`): per-stock sector
-  + industry from `yfinance.Ticker(sym+'.NS').info` (~0.3s/stock, whole market ~10min; ~1,818/1,822
-  classify). Standalone + resumable like holdings; driven by the latest `breakouts.json` symbol list
-  so it needs **no NSE call**; caches misses. `run_scan.py` merges it into each stock's `sector`
-  (curated `FALLBACK_WATCHLIST` labels win) + `industry`. Powers the frontend sector filter + Sector
-  Radar (the "which groups are heating up" breadth view). The frontend derives the broad *group* by
-  splitting the display sector on `" · "`.
-- **Reliability caveat**: `readiness` now carries `reliability`/`reliable` — a "primed" stock with
-  weak historical follow-through gets an amber caution so it never oversells.
+  (~6% risk) — an R-multiple, not a fixed %, order-aware. See `add_indicators()` in
+  `find_breakouts.py` and `settings.py`. **India's Method-A base hit rate is ~38.8%; the US mirror's
+  is much lower, ~26.7%**, because the fixed ±6%-of-resistance band is implicitly tuned to Indian
+  volatility (confirmed via an ATR-scaled regrade: US base rate becomes a volatility-neutral 41.8%
+  under that alternative rule) — production still uses the fixed-band rule for both markets (see
+  the Conviction score bullet for how scoring was recalibrated per-market instead of changing the
+  rule itself).
+- **Support / resistance — now real trader-standard zones** (`levels.py`, folded into
+  `find_breakouts.py`): the mechanical rolling-N-day-high/low the breakout trigger uses is fine as
+  a backtested signal but was a poor thing to *draw on a chart* (a single stale touch, sometimes a
+  months-old irrelevant level). `levels.py` instead clusters swing pivots into horizontal zones (the
+  3-point rule), ranks each by touch count weighted by volume + recency, and reports the nearest
+  validated zone above/below price with a 0–1 strength — this is what the Resistance/Support card
+  and the annotated chart's support line now show (replacing a naive single-level readout).
+- **Conviction score — the single 0–100 ranking number** (`score.py`, `readiness.conviction`,
+  frontend's **default sort**): `100*(0.55*imminence + 0.45*quality_norm)`, where quality =
+  `0.60*shrunk_reliability + 0.25*base_depth + 0.15*method_confirmation` — **only
+  backtest-validated features** (deliberately excludes ADX, volume-surge magnitude, named chart
+  patterns, vol_contraction, and the one-day analog — all shown non-predictive or counterintuitive
+  in `analyze_reliability.py`). **Bayesian shrinkage** (`reliability_estimate`,
+  `(worked + 4*prior)/(total + 4)`) is the key idea behind the reliability caution text: a 0-of-1
+  history reads as ~neutral, not a red flag, fixing the old "one bad breakout flashes red" problem;
+  it requires ≥3 past events before making any negative claim. **Calibration is per-market**
+  (`settings.SCORE_BASE_RATE`/`SCORE_W_REL`/`W_DEPTH`/`W_METHOD`): India uses its 0.39 base rate and
+  0.60/0.25/0.15 weights (unchanged, verified bit-identical across the recalibration); the US mirror
+  was independently backtested (60/40 train/test split, TEST tertile spread 14.4%→39.4%,
+  p<1e-96) and re-weighted to 0.30/0.70/0.00 rel/depth/method (method-confirmation dropped —
+  measured -12.2pt harmful on US data). The one-day historical analog is deliberately shown but
+  visually de-emphasized (muted gray, not red/green) — it IS weakly predictive (36.7% vs 33.0%,
+  p=0.011) but far weaker than the aggregate track record, so it no longer competes visually with
+  the validated signal. See `analyze_reliability.py::test_score`/`test_analog_predictiveness`.
+- **US-only high-conviction tiers** (`readiness.signal` = `"high_conviction"` / `"strong_breakout"`,
+  gated by `settings.HC_ENABLED = MARKET == "US"`): a disciplined precision search (point-in-time
+  trader features — closing range, cross-sectional RS percentile, breadth, base tightness/age, $
+  liquidity, cross-method co-fires; train-only gate search, one-shot test evaluation) found
+  **"squeeze-confirmed breakout"** (volatility-squeeze release + a recent Method-A breakout + ATR≥
+  4.5% of price + not-chased + a liquidity floor) at **51.1% hit rate (52.0% held-out TEST)** —
+  roughly double the US 26.7% base and past the 50% breakeven line for this project's strict 1:1
+  reward:risk grading rule. A looser variant (`strong_breakout`, no squeeze/gap requirement) scored
+  45.3%/46.2% TEST — real lift, kept as a second, lower-conviction (floor 80 vs 90) tier. **Any new
+  live trigger built this way needs a fresh-fire/cooldown-dedup gate matching the backtest's**
+  (`find_breakouts._last_is_fresh_fire()`) **or it silently multiplies how often it fires and
+  dilutes the measured hit rate** — caught exactly this bug pre-ship (a naive port inflated tier 1
+  from backtested n=190/51.1% to n=830/46.1%); always acceptance-replay through the real production
+  code path before trusting a ported trigger. A follow-up rolling-window test found the edge decays
+  over the following week if entry is delayed (46.2%→~32-40% by lag 3-5 for `high_conviction`), so
+  the badge is deliberately NOT sticky/held for a week — see `analyze_hc_rolling_window.py`.
+- **Breakout-method research framework** (`methods.py` + `analyze_reliability.py`, mostly
+  research-only): implements alternative breakout/pre-breakout *definitions* B through H as trigger
+  columns sharing the same cached indicator columns — VCP multi-leg contraction (B), volatility
+  squeeze (C), trend-inception DI-cross (D/D2), relative strength vs benchmark (E/E2 — **E2 is the
+  only one shipped to production**, folded into readiness as an independent `"relative_strength"`
+  tier), episodic gap+volume pivot (F), and two comprehensive pre-breakout composites (G — Minervini
+  Trend Template + CAN SLIM RS + VCP + institutional volume, 0-100 score; H — "Pressure Cooker"
+  coiling score). All graded by the same +1R-before-stop rule via `_dedup_with_cooldown` (a fire
+  cooldown so one continuous move isn't counted as many independent trials). Best-validated,
+  non-shipped standalone finding: **G/G2 (a retuned version with base depth as a monotonic ramp
+  instead of a band) hits 37.6%** on the US market, well above the 26.7% base but still below the
+  50% breakeven line and below the already-shipped HC/SB tiers — kept as research, not wired into
+  `run_scan.py`. A recurring, robustly-confirmed counterintuitive finding across this research:
+  **volatility contraction alone is a weak-to-negative predictor**, in tension with the classic VCP
+  thesis — **base depth is consistently the strongest real feature** in both markets. See the
+  `multi-method-breakout-comparison` memory file for the full backtest history if extending this.
+- **Ask AI** (`ask_ai.py` + `chat_server.py`, Groq-backed floating chat panel): a standard
+  tool-calling model (not Groq's "compound" auto-tool system, which can't take custom tools) with
+  four tools — `lookup_stock` (exact/fuzzy ticker or name resolution to full computed context),
+  `search_stocks` (filtered/sorted slice of the whole universe), `run_sql` (read-only DuckDB SQL
+  over every stock's flattened fields, for open-ended aggregate questions), and `web_search` (only
+  invoked when genuinely needed, proxied to Groq's compound-mini so the scarce web-search budget
+  isn't spent by default). `chat_server.py` is a local dev proxy so `GROQ_API_KEY` never reaches
+  client-side JS; production needs the equivalent wired server-side (see the file's own docstring).
+- **My Watchlist** (`api/watchlist.py`, a Vercel Python serverless function, Upstash Redis-backed):
+  the personal add/track feature — one Redis hash keyed `"{market}:{symbol}"` (so the same ticker
+  in two markets can't collide), gated by a single shared secret (`WATCHLIST_SECRET`) since there's
+  only one real user. Name/current price are deliberately NOT stored — the frontend joins them from
+  the already-loaded `breakouts.json` at render time. Graded periodically with the real +1R rule via
+  the `grade-watchlist` Skill (never graded on raw 1-day price moves).
+- **Live intraday overlay** (`api/quotes.py`, Vercel serverless): `GET /api/quotes?symbols=...` —
+  price/prev-close/change% only (never readiness/ADX/resistance, which are anchored to the last
+  *completed* daily close and would be conceptually wrong to recompute mid-session). Hits Yahoo's
+  public v8 chart-meta endpoint directly (no yfinance/pandas — keeps the function's cold start
+  light per Vercel's per-file bundling). Powers both the watchlist's few-minutes polling and the
+  performance page's `● LIVE` overlay for still-open calls.
+- **Performance page** (`performance.html` + `build_performance.py`, wired into `run_scan.py`): a
+  forward-only ledger of every published call (breakout / relative-strength / US high-conviction
+  tiers) from the conviction era onward — nothing backfilled. Each call tracked ~2 weeks, graded by
+  the same +1R-before-stop rule, with the live intraday overlay for open calls. US high-conviction
+  tiers only shown for the US ledger (India has none, `HC_ENABLED` gate).
+- **`data/breakouts.json`** is the serving file the frontend reads. Written **compact** (no indent)
+  since it's a machine-read artifact regenerated daily at whole-market scale — ~3.1 MB on disk,
+  ~300 KB gzipped. Schema: top-level `generated_at`/`as_of_date`/`source`/`disclaimer`/`market_mood`
+  (market-wide, NOT per-stock)/`stocks[]`; each stock has `price`, `ema_stack`, `adx`, `resistance`
+  (now zone-based, see `levels.py`), `volatility`, `trend`, `breakout`, `readiness`
+  (label/watch/score/**conviction**/signal — powers both the readiness cue and the default sort),
+  `history`, and `entry`. Enrichment fields merged in from standalone fetch scripts: `sector`/
+  `industry`, `analog`, `holdings`, `news`, `social`, `earnings`, `fundamentals`.
+- **Data-branch serving architecture (2026-07-06) — the single biggest infra change since the
+  JSON-driven rewrite.** Serving JSON no longer lives on `main` at all (`data/` is gitignored +
+  untracked there). Instead, `.github/workflows/daily-scan.yml` (India, 10:30 UTC Mon–Fri) and
+  `daily-scan-us.yml` (US, 21:30 UTC) each force-push a single fresh commit of the regenerated data
+  to an **orphan `data` branch**. Both HTML files read a `DATA_BASE` constant: `data/` (or
+  `data/us/`) on localhost/`file://`, else
+  `https://raw.githubusercontent.com/Bhavanmehta/BreakoutAI/data/` (CORS-open, ~5min CDN cache) in
+  production. The `api/` Vercel functions stay origin-relative — unaffected. This killed the
+  unbounded git-history growth that whole-market daily commits to `main` used to cause (was TODO
+  #4). **Windows gotcha**: `origin/main`'s pre-fix history still contains an old commit with
+  `data/us/ohlc/CON.json` (a Windows-reserved device name) — checking out those specific old trees
+  on Windows fails (`invalid path`); `main`'s *current* tree is data-less so a fresh clone is fine.
+  `export_ohlc.py`/the frontend's `safeName()` now map reserved names (`CON` → `CON_.json`) so this
+  can't recur.
+- **Corporate-action adjustment** (India): raw NSE prices aren't split/bonus-adjusted.
+  `adjust_for_splits.py` parses the event ratio from NSE's text and back-adjusts;
+  `python backend/adjust_for_splits.py` self-tests the parser.
+- **Pattern detection** (`patterns.py`): real geometry via swing pivots → Ascending Triangle, Cup &
+  Handle, Double Bottom, Head & Shoulders, with fallbacks. **Confirmed non-predictive** by
+  `analyze_reliability.py` (named patterns underperform "no clear pattern") — shown as decorative
+  context only, not implying signal (see TODO #5).
+- **Historical-analog engine** (`analogs.py` → each stock's `analog` field): z-scores a scale-free
+  feature vector (EMA-stack geometry, coil ratio, ADX, distance-to-52w-high, distance-to-resistance)
+  against the stock's own history and finds the nearest past bar with a full forward runway,
+  returning date/similarity/actual forward return. Weakly predictive (see Conviction-score bullet)
+  — shown de-emphasized, not as a bold verdict.
+- **Sector / industry** (`sectors.py` + `fetch_sectors.py` → `sectors.json`): per-stock sector +
+  industry from `yfinance.Ticker(...).info`. Powers the frontend sector filter + Sector Radar.
+- **Fundamentals** (`fundamentals.py` + `fetch_fundamentals.py` → `fundamentals.json`): market cap,
+  P/E, revenue/profit growth, ROE, D/E via yfinance `.info`. **ROCE is not a yfinance field at all**
+  (India-screener-style metric) — deliberately skipped rather than adding a new scrape source for
+  one field. **Currency/unit handling is market-aware**: `market_cap` is stored RAW in the stock's
+  own native currency (no baked-in ₹-crore conversion), all scale/currency formatting pushed to the
+  frontend keyed on `MARKET` — found and fixed a real bug where the US mirror initially inherited
+  India's hardcoded ₹-crore division and showed US market caps mislabeled (e.g. Moderna as "₹3,165
+  Cr"). Any future currency-denominated fundamentals field needs the same market-neutral-raw-value
+  pattern, not a baked-in conversion constant.
+- **Reliability caveat**: `readiness` carries `reliability`/`reliable` — a "primed" stock with weak
+  historical follow-through gets an amber caution (now driven by the shrunk Bayesian estimate, see
+  Conviction-score bullet, not a raw historical percentage).
 - **Track record — the forward test** (`track.py`): logs every stock's daily call to
-  `data/predictions_log.jsonl` (append-only, committed) and grades each on-watch *episode* once
-  (dedup) by the same +1R-before-stop rule as above → `data/track_record.json`. Seeded with a
-  walk-forward simulation of recent history (source="simulated") so it isn't empty; live calls
-  accumulate daily. **The frontend track-record banner is currently HIDDEN** (`#trackBanner` has
-  `hidden`, `renderTrackRecord()` call commented in `loadData`) — the forward sample is still tiny
-  (27), mostly simulated, and the sub-breakeven headline number undersells the tool. Re-enable once
-  live calls mature, ideally reframed around the measured readiness edge (see analyze_reliability).
-- **Ownership / shareholding** (`fetch_holdings.py` → `data/holdings.json`): per-stock promoter / FII
-  / DII / public % **plus a real quarterly time series** (`history[]`). **Primary source is now
-  `holdings_screener.py` (screener.in)** — its company page renders a Shareholding Pattern table with
-  ~12 quarters of Promoter/FII/DII/Public %; we parse it via the stable classification keys in each
-  row's `Company.showShareholders('foreign_institutions', ...)` onclick. It's far more reliable than
-  NSE (which rate-limits hard and only cleanly surfaces annual promoter %) and gives quarterly FII/DII
-  directly. The **NSE XBRL path (`holdings.py`) is kept as a fallback** — it reads the
-  `corporate-share-holdings-master` API + parses the SHP XBRL's aggregate rollup contexts
-  (`InstitutionsForeign`=FII, `InstitutionsDomestic`=DII, `MutualFundsOrUTI`=MF); `history_points=N`
-  parses the recent N XBRLs. `fetch_holdings.py` tries screener first, then NSE, and re-fetches any
-  entry not yet screener-sourced. Note screener's top-level table has no MF split (it's under DIIs),
-  so `mf` is null on screener rows. **Quarterly-slow, so it's decoupled from the daily scan**:
-  `fetch_holdings.py` is a
-  standalone, resumable populate script (prioritizes by readiness, saves incrementally); `run_scan.py`
-  just merges `holdings.json` into each stock's `holdings` field if present (stocks without an entry
-  carry `holdings: null`). **The redesigned card (2026-07)** shows the current snapshot bars **plus a
-  tabbed who's-accumulating-over-time chart** — defaults to **FII**, click Promoter/DII/Public to
-  switch; each is a mini bar chart with the % on top of every bar, quarter labels on the x-axis
-  ("Jun'24"…"Mar'26"), and a "▲/▼ X% over N quarters" delta. Frontend `renderOwnTrend()`/`ownChartHTML()`;
-  it normalizes either the screener `history[]` (multi-category) or an older NSE `promoter_trend`
-  (promoter-only, degrades gracefully). NOTE: per-stock *daily* FII/DII flow is not public in India;
-  only these quarterly holdings + threshold bulk/block deals exist. **`holdings.json` is being
-  re-scraped from screener** (readiness-prioritized, resumable) — top ~few-hundred done, run
-  `python fetch_holdings.py` to finish the whole market.
-- **News + sentiment** (`fetch_news.py` → `data/news.json`, merged into each stock's `news` field):
-  headlines from four providers run in this priority order, each skipping whatever an earlier one
-  already refreshed today so they extend coverage rather than duplicate it — **GNews** (phase 1, 100
-  free req/day, undelayed, spent on the highest-conviction names first), **Marketaux** (phase 2, ~100
-  free req/day), **NewsData.io** (phase 3, ~12h-delayed but 200 free credits/day so it reaches
-  furthest), and **Google News RSS** (phase 4, no key/quota — `news_providers.fetch_gnews` /
-  `fetch_marketaux` / `fetch_newsdata` / `fetch_rss`). RSS is the one source that reaches small/
-  micro-caps the three budgeted APIs return nothing for (confirmed live). NOTE: Google's RSS feed
-  terms restrict it to personal/non-commercial use in a feed reader — fine for this project's
-  current free/educational use, revisit if ever monetized. Finnhub is deliberately not used (US-only
-  free tier). Sentiment is never taken from a provider — `sentiment.py` scores every cached headline
-  itself (VADER + a hand-picked `FINANCE_LEXICON`) uniformly regardless of source, so coverage
-  doesn't depend on a provider's own (fragile) entity-tagging. Layered on top:
-  **`event_classifier.py`** — ~19 ordered keyword categories (order win, SEBI penalty, rating up/
-  downgrade, earnings beat/miss, buyback, promoter pledge, management exit, ...) each with a small
-  signed bias, blended with the VADER score (weighted toward VADER when it's already confident,
-  toward the event when VADER reads near-neutral — that's exactly where a word-level scorer has
-  nothing useful to say). `sentiment.score_texts()` returns `{score, label, event}`; `event` is
-  whichever headline's classified event swung the blended score most, surfaced in the frontend next
-  to the sentiment badge so "Bullish" isn't a black box. News is time-sensitive (unlike holdings/
-  sectors/fundamentals) so it refreshes daily rather than skip-if-present. GitHub Action needs
-  `GNEWS_API_KEY`/`MARKETAUX_API_KEY`/`NEWSDATA_API_KEY` as repo secrets (RSS always runs regardless).
-- **Social buzz** (`fetch_social.py` → `data/social.json`, merged into each stock's `social` field):
-  Reddit mention count + `sentiment.py` score across India-trading subreddits (needs a free Reddit
-  script-app key — not yet obtained, so this phase is currently inactive) plus a Google Trends
-  search-interest score (pytrends, unofficial, no key). StockTwits skipped (near-zero NSE/BSE
-  coverage). Same conviction-ordered, resumable, incremental-save pattern as fetch_news.py.
-- **Market Mood Index** (`market_mood.py`, runs *inside* `run_scan.py` — not a separate script,
-  since it's cheap and time-sensitive unlike holdings/sectors/fundamentals): a single market-wide
-  0–100 fear/greed gauge in `breakouts.json`'s top-level `market_mood` field (NOT per-stock — shown
-  as a header badge, `renderMarketMood()`). Four equally-weighted components, any of which drops out
-  and the rest reweight proportionally if it fails to fetch: **trend** (Nifty close vs its 20-day
-  SMA — reuses the `benchmark` already fetched for Method E, no extra call), **vix** (India VIX,
-  `^INDIAVIX` via yfinance, inverted), **fii_flow** (today's NSE-published market-*wide* aggregate
-  FII/FPI net equity flow, `nseindia.com/api/fiidiiTradeReact` via a plain `requests.Session()` —
-  no cookies/auth needed in practice; z-scored against its own trailing 21-day history persisted in
-  `data/fii_dii_history.json`, capped to 90 days), **breadth** (% of the whole scanned universe that
-  closed up today — classic advance/decline, reuses data the scan already computes rather than
-  fetching separate NSE sector indices). NOTE: this is market-wide aggregate flow only — per-stock
-  daily FII/DII is not public anywhere in India (see the Ownership bullet above); a genuinely
-  different, coarser data point from the quarterly per-stock holdings.
-- **Earnings** (`earnings.py` + `fetch_earnings.py` → `data/earnings.json`, merged into each
-  stock's `earnings` field): quarterly EPS estimated-vs-actual, shown as a dumbbell/dot-plot card
-  (one hue, two shades — dim "Estimated", bright "Actual" — left of "one similar-looking day",
-  which was shrunk to half-width to make room). Two sources, never blended within one stock's
-  history: (1) yfinance's earnings calendar (`get_earnings_dates`) — analyst-comparable EPS
-  estimate/actual/surprise%, but only ~40-50% of this project's actual watchlist has ANY analyst
-  coverage (tested against the top-30 conviction list — micro-caps like CUPID/NPST had none); (2)
-  fallback to the quarterly income statement's "Basic EPS" line — unadjusted GAAP EPS, available
-  for ~100% of stocks (every listed company reports EPS regardless of analyst coverage), no
-  forward estimate. When a quarter/stock has no estimate, the actual EPS still gets plotted rather
-  than leaving a gap — only the estimate dot is skipped. **Known gotcha**: `get_earnings_dates()`
-  can return genuinely **stale** data for a stock even when it returns real-looking rows — SUVEN's
-  freshest row there was from Feb 2020 (six years old) despite it reporting quarterly ever since;
-  ~31% of stocks tested had a last-quarter-reported date over a year old. `earnings.py` guards
-  against this (`STALE_DAYS`) by falling back to the income-statement source when the calendar's
-  most recent reported quarter is too old to trust. Quarterly-slow reference data like holdings/
-  sectors/fundamentals — fetched by the standalone script, not the daily scan; whole-market
-  populate takes ~25-30 min (yfinance per-symbol calls), and a fraction of stocks land on
-  `actual_only` from transient yfinance flakiness during a mass run even when richer estimate data
-  is really available (re-fetching that single symbol later usually recovers it — not worth a
-  special retry mechanism for what's a minor completeness gap, not a correctness bug).
-- **Reliability validation** (`backend/analyze_reliability.py`, standalone — not part of
-  `run_scan.py`, run manually; batch-fetches, ~2min on the whole market): checks whether the
-  per-stock "X% of past breakouts followed through" caveat is actually predictive, pooled across the
-  whole universe. Two tests: (1) persistence — does a stock's trailing follow-through rate predict
-  its *next* breakout?, and (2) features — do ADX / vol_contraction / distance-from-52w-high /
-  volume-surge / base depth / pattern type predict follow-through pooled across all stocks? **Now
-  very well-powered** (17,695 graded events across the whole market, up from ~127/12 originally).
-  Robust, consistent findings: **persistence is strongly significant** (p<0.001 — low-trailing-rate
-  stocks hit 32%, high-trailing-rate hit 46%, so the UI's reliability caveat is well earned);
-  **base depth** is robust (p<0.001, deeper bases follow through *more*, 41% vs 35% shallow);
-  **vol_contraction** is significant but *counterintuitive* (less contraction slightly beats more —
-  opposite the VCP thesis, but consistent across samples). Weak/unreliable: distance-from-52w-high
-  is significant but its *direction flipped* between the 280-stock and whole-market runs. Not
-  predictive: **ADX**, **volume-surge magnitude**, and **named chart patterns** — "No clear pattern"
-  (41% hit rate) beat every named pattern including Cup & Handle (36%) and Tight Consolidation
-  (21%), so `patterns.py`'s badge is decorative, not predictive; strong argument to stop letting it
-  imply signal (see TODO).
+  `predictions_log.jsonl` (append-only) and grades each on-watch episode by the same +1R-before-stop
+  rule → `track_record.json`. **The frontend's old track-record banner is retired in favor of the
+  standalone Performance page** (see that bullet) — a cleaner, forward-only, per-call ledger.
+- **Ownership / shareholding** (`fetch_holdings.py` → `holdings.json`): per-stock promoter/FII/DII/
+  public % plus a real quarterly time series. Primary source `holdings_screener.py` (screener.in,
+  ~12 quarters, no rate-limiting); NSE XBRL (`holdings.py`) kept as fallback. Card shows current
+  snapshot bars plus a tabbed who's-accumulating-over-time chart (FII default).
+- **News + sentiment** (`fetch_news.py` → `news.json`): four providers in priority order — GNews,
+  Marketaux, NewsData.io, Google News RSS (no key/quota, reaches small/micro-caps the budgeted APIs
+  miss). `sentiment.py` (VADER + a finance lexicon) scores every headline uniformly regardless of
+  source; `event_classifier.py` layers ~19 keyword-categorized event types (order win, SEBI penalty,
+  rating change, earnings beat/miss, etc.) blended with the VADER score. Refreshes daily.
+- **Social buzz** (`fetch_social.py` → `social.json`): Reddit mention count + sentiment (needs a
+  Reddit script-app key — not yet obtained, phase inactive) plus Google Trends search-interest
+  (pytrends, no key). Same resumable, conviction-ordered populate pattern as fetch_news.
+- **Market Mood Index** (`market_mood.py`, runs inside `run_scan.py`): a single market-wide 0–100
+  fear/greed gauge — trend (index vs its 20-day SMA), VIX (inverted), FII/FPI net flow (India only,
+  `HAS_FII_DII_FLOW`), and breadth (% of the scanned universe up today), any dropping out and the
+  rest reweighting if a fetch fails.
+- **Earnings** (`earnings.py` + `fetch_earnings.py` → `earnings.json`): quarterly EPS
+  estimated-vs-actual (dumbbell chart). Two sources, never blended per stock: yfinance's earnings
+  calendar (analyst-comparable, only ~40-50% coverage) falling back to the quarterly income
+  statement's Basic EPS (~100% coverage, no forward estimate). Guards against `get_earnings_dates()`
+  returning genuinely stale data (`STALE_DAYS`) — always verify a financial data source returns
+  *current* data, not just non-empty data.
+- **Reliability validation** (`analyze_reliability.py`, standalone, run manually): checks whether
+  the "X% of past breakouts followed through" caveat is actually predictive, pooled across the whole
+  universe (now well-powered, tens of thousands of graded events per market). Robust findings:
+  **persistence is strongly significant** (trailing follow-through rate predicts the next breakout);
+  **base depth is the most consistently strong feature in both markets**; **volatility
+  contraction is weak-to-counterintuitive** (opposite the classic VCP thesis, confirmed repeatedly
+  across both markets and multiple method variants — see the methods-research bullet); **ADX,
+  volume-surge magnitude, and named chart patterns are not predictive**. This is the empirical basis
+  for what's in/out of `score.py`'s conviction formula.
 
 ### Still TODO (in rough order)
-1. ~~Tune the follow-through target~~ — done: replaced the fixed "+5% within 10 days" with an
-   R-multiple (+1R before -1R stop), order-aware, per-stock-scaled. See the breakout-definition
-   bullet above. Track-record hit rate moved 11% → 18% and the per-stock spread compressed
-   (was 0.0–0.75, now 0.0–0.36), consistent with the old target being volatility-biased rather
-   than measuring setup quality. `settings.FOLLOWTHROUGH_TARGET_PCT` no longer exists; tune via
+1. ~~Tune the follow-through target~~ — done: R-multiple (+1R before -1R stop), order-aware,
+   per-stock-scaled. `settings.FOLLOWTHROUGH_TARGET_PCT` no longer exists; tune via
    `settings.STOP_LOSS_FRACTION` / `FOLLOWTHROUGH_WINDOW` instead.
-2. ~~Widen the universe~~ — done, then taken all the way to **whole-market**: `universe.py` now
-   discovers every NSE equity (~2,055) from the daily bhavcopy (`UNIVERSE_SIZE = None`), ~1,800
-   produce cards; `get_prices` batch-fetches so the full run is ~95s. Confirmed strong, significant
-   signal in `analyze_reliability.py` at 17,695-event scale (see the Reliability-validation bullet).
-3. ~~Frontend watchlist at scale~~ — done: the chip strip shows the top 12 by readiness by default
-   with a search box for the rest (`renderWatchlist`, `TOP_N`/`MAX_RESULTS`). Possible next polish:
-   rank search matches by relevance (exact/prefix first) rather than readiness, and/or a "primed
-   only" toggle.
-4. **Git / log growth at whole-market scale** (new tech debt from #2): `data/breakouts.json` (~3.1MB,
-   changes daily → ~0.75GB/yr of git history) and `data/predictions_log.jsonl` (append-only, now
-   ~1,800 lines/day, and `track.py` rewrites the whole file each run) both grow unboundedly in a
-   committed-daily-data model. Not urgent pre-beta, but the real fix is to stop committing serving
-   data to `main` (build it as a deploy artifact / on an orphan `data` branch) and to prune the
-   predictions log to unevaluated + recent-N rows.
-5. **Retire or rework the pattern badge** — `analyze_reliability.py` shows named chart patterns don't
-   predict follow-through (they slightly *under*-perform "no clear pattern"). The UI now labels it
-   "Chart pattern" as decorative context (de-emphasized under The Read) rather than implying signal,
-   but it's still shown. Fully retiring it, and folding the features that *do* predict (trailing-rate
-   persistence, base depth) directly into `readiness`/`reliability` scoring, is still open. The new
-   `analog` field is the first validated-style "evidence" surfaced in its place.
-6. ~~Fundamentals + **sector**~~ — **sector done** (2026-07): `sectors.py` + `fetch_sectors.py` →
-   `data/sectors.json`, merged into `breakouts.json` (`sector`/`industry`); powers the frontend
-   sector filter + Sector Radar. See the Sector bullet. **Fundamentals (P/E, ROE, mcap) still not
-   produced** — `yfinance` `.info` also carries these as a candidate source (same fetch script pattern).
-7. ~~Holdings layer (FII/DII/MF/promoter)~~ — **built with real quarterly history**; the redesigned
-   card shows ownership **over time** (tabbed FII-default chart, % on bars, quarter x-axis). Solved the
-   NSE rate-limit blocker by switching the **primary source to screener.in** (`holdings_screener.py` —
-   12 quarters of Promoter/FII/DII/Public, no rate-limiting), NSE XBRL kept as fallback. Remaining:
-   (a) **finish the re-scrape** — `fetch_holdings.py` is repopulating `holdings.json` from screener,
-   readiness-prioritized; run it to cover the whole market; (b) still display-only — validate
-   predictiveness (`analyze_reliability.py`-style) before letting rising-holding influence scoring.
-8. **Chart migration**: TradingView widget → `lightweight-charts` v5 to draw pattern overlays
-   (resistance line, handle pivot, breakout marker) directly on candles.
-9. **Enable the GitHub Action** (Actions tab → "Daily breakout scan" → Run workflow) to confirm it
-   works from GitHub's servers at the new whole-market scale (was tested at 12); yfinance can
-   rate-limit cloud IPs (fallback = jugaad path). Local whole-market run is ~95s, so runtime isn't
-   the concern — only whether GitHub's IPs get throttled by Yahoo differently, and whether the daily
-   commit size (#4) is acceptable.
+2. ~~Widen the universe~~ — done, whole-market for both India (~2,055 equities) and US (~4,668,
+   independently widened past the original S&P500+Nasdaq100+Russell2000 seed).
+3. ~~Frontend watchlist at scale~~ — done (conviction-ranked, search, "Primed only" toggle,
+   fundamentals filter panel).
+4. ~~Git / log growth at whole-market scale~~ — **done (2026-07-06)**: serving data moved off
+   `main` entirely onto an orphan `data` branch, force-pushed fresh each run. See the Data-branch
+   serving bullet. `predictions_log.jsonl` pruning is still informally handled by `track.py`
+   rewriting the whole file each run rather than an explicit prune policy — revisit only if it
+   becomes a real size problem.
+5. **Retire or rework the pattern badge** — still open. `patterns.py`'s named-pattern badge remains
+   confirmed non-predictive; still shown as decorative context, not folded into scoring. The
+   validated features that *do* predict (persistence, base depth) are already in `score.py`.
+6. ~~Fundamentals + sector~~ — **both done**: `sectors.py`/`fetch_sectors.py` (sector/industry
+   filter + Sector Radar) and `fundamentals.py`/`fetch_fundamentals.py` (Market Cap/P-E/growth/
+   ROE/D-E filter panel, ROCE deliberately excluded — not a yfinance field).
+7. ~~Holdings layer~~ — **done**, real quarterly history via screener.in, tabbed over-time chart.
+   Still display-only (not folded into scoring) — validating its predictiveness before doing so is
+   the one remaining piece, same discipline already applied to everything in `score.py`.
+8. **Chart migration — partially done.** The per-stock annotated overlay chart
+   (`export_ohlc.py` + `lightweight-charts`, EMA8/21 + volume/RSI panes) is live. The **main
+   detail-pane chart is still the TradingView widget** — migrating that one too (to draw the
+   resistance/support zones, VCP pivots, and breakout markers directly on the primary candles,
+   not just the secondary annotated chart) is the remaining piece of this TODO.
+9. ~~Enable the GitHub Action~~ — **done**, and expanded to two workflows
+   (`daily-scan.yml` India, `daily-scan-us.yml` US), both running on schedule and pushing to the
+   `data` branch (see the Data-branch serving bullet) rather than committing to `main`.
+10. **New, open**: fold G2 (the retuned pre-breakout composite, 37.6% US hit rate) or the
+    validated `high_conviction`/`strong_breakout` sequential-confirmation combos into a future
+    "early radar" panel, distinct from and additive to the existing conviction score — a product
+    direction discussed but not yet built (see `multi-method-breakout-comparison` memory for the
+    full backtest numbers if picking this up).
+11. **New, open**: US grading currently uses the same fixed ±6%-of-resistance stop/target band as
+    India even though it under-resolves for calm US large-caps (see the Breakout-definition
+    bullet) — switching to an ATR-scaled band would raise the US base rate to a volatility-neutral
+    ~42% but changes the displayed stop/history/track record sitewide; flagged as a live option,
+    not decided.
 
-When resuming, read `backend/README.md` and check `data/breakouts.json` + `data/track_record.json`
+When resuming, read `HANDOFF.md` first (session-by-session detail + what's committed vs. not), then
+check `data/breakouts.json` / `data/us/breakouts.json` + `track_record.json` / `performance.json`
 for current real output before assuming anything above is still pending.

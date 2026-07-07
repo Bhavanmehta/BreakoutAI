@@ -70,6 +70,7 @@
                 </div>
                 <span id="liveBadge" class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md"
                       data-tip="Price + day-move for the names on screen refreshes every ~90s during market hours (api/quotes.py). The breakout/readiness analysis below it is still computed once daily after close — this badge only covers live price.">Live Data</span>
+                <span id="perfLink" class="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer select-none" title="Performance ledger">◷</span>
             </div>
         </div>
     </header>
@@ -922,6 +923,9 @@
         function wireControls() {
             $("marketBtnIN").onclick = () => { if (MARKET !== "IN") switchMarket("IN"); };
             $("marketBtnUS").onclick = () => { if (MARKET !== "US") switchMarket("US"); };
+            $("perfLink").onclick = () => {
+                if (prompt("Access code:") === "1234") window.location.href = "performance.html";
+            };
             $("fltSearch").oninput = (e) => { filters.query = e.target.value; applyFilters(); };
             $("fltSector").onchange = (e) => { setSectorFilter(e.target.value); applyFilters(); };
             $("industryChip").onclick = () => { filters.industry = ""; renderSectorRadar(); applyFilters(); };
