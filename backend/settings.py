@@ -199,6 +199,14 @@ MIN_HISTORY_BARS = max(TREND_EMA_LONG + EMA200_SLOPE_LOOKBACK, 252)
 FOLLOWTHROUGH_WINDOW = 10
 STOP_LOSS_FRACTION = 0.94   # stop = resistance * this (~6% below); defines 1R = entry - stop
 
+# --- Performance page (build_performance.py -> data/performance.json) --------
+# The feed behind performance.html: a live, forward-only ledger of every
+# suggestion the site actually published (from the conviction era onward --
+# nothing backfilled), each tracked for the next PERF_TRACK_BARS trading days
+# and graded by the same +1R-before-stop rule. See build_performance.py.
+PERF_JSON = DATA_DIR / "performance.json"
+PERF_TRACK_BARS = FOLLOWTHROUGH_WINDOW   # "~2 weeks": the grade window IS the display window
+
 # --- Alternative breakout-detection methods (research/comparison only — see
 # backend/methods.py and analyze_reliability.py; NOT part of run_scan.py / the served
 # site). Each is a genuinely different trigger definition from Method A above, graded
@@ -249,6 +257,45 @@ RS_LOOKBACK = 50
 EP_MIN_GAP_PCT = 5.0           # minimum opening gap (%) to count as an episodic pivot
 EP_MIN_VOL_MULT = 5.0          # volume must be >= this multiple of the 50-day average (user's 5x-10x floor)
 EP_VOL_AVG_WINDOW = 50
+
+# G — comprehensive PRE-breakout composite (Minervini Trend Template + CAN SLIM RS +
+# VCP volatility contraction + institutional-accumulation volume reads), requested
+# 2026-07-06 to explore for the US market. Unlike A-F above, this is meant to fire
+# BEFORE a breakout, not on/after one -- see methods.py's docstring on this method for
+# the full write-up of what's included/excluded and why. Sector/market-breadth and
+# fundamentals (the user's spec sections 7-8) are deliberately NOT part of the score --
+# no point-in-time history for either is cached (only current snapshots), so including
+# them would leak today's classification into a 3-year backtest. Their combined 10%
+# weight is redistributed proportionally across the six components below that CAN be
+# measured honestly from cached OHLCV history alone.
+G_SMA_SHORT = 50
+G_SMA_MID = 150
+G_SMA_LONG = 200
+G_SMA_LONG_RISING_LOOKBACK = 20     # ~1 trading month, same idea as EMA200_SLOPE_LOOKBACK
+G_MAX_DIST_FROM_52W_HIGH = 5.0      # trend filter: within this % of the 52-week high
+G_MIN_DIST_FROM_52W_LOW = 30.0      # trend filter: at least this % above the 52-week low
+G_BASE_WINDOW = 50                  # bars examined for base/volume/price-action stats
+G_RESISTANCE_TOUCH_PCT = 3.0        # a bar "tests" resistance within this % of it
+G_MAX_EXTENSION_PCT = 7.0           # exclude: close already this % above resistance (chasing)
+G_ATR_CEILING_PCT = 12.0            # exclude: 10-day ATR this % of price = too erratic to be a coil
+G_MAX_6M_RUN_PCT = 100.0            # exclude: already up this % over the last 6 months (parabolic)
+G_DISTRIBUTION_VOL_MULT = 1.5       # a down day needs >= this x avg volume to count as "distribution"
+G_FIRE_THRESHOLD = 75.0             # composite score (0-100) needed, on top of the trend gate, to fire
+# Weights (sum to 100) for the six testable components -- Trend/Base/Volatility/Volume/
+# Price/RS/Readiness -- after excluding Sector(5)+Fundamentals(5) from the user's
+# original 20/15/15/15/10/10/5/5/5 spec and renormalizing the remaining 90pts to 100.
+G_W_TREND, G_W_BASE, G_W_VOLATILITY, G_W_VOLUME, G_W_PRICE, G_W_RS, G_W_READINESS = \
+    22, 17, 17, 17, 11, 11, 5
+
+# H — "Pressure Cooker" score: a composite of the specific behaviors discretionary
+# momentum traders describe seeing right before the strongest breakouts (contracting
+# weekly range, falling ATR, unusually dry volume, higher lows, repeated resistance
+# tests without breaking down, closes in the upper half of the daily range, seller
+# exhaustion). Gated on the existing `uptrend` column from the start -- the same lesson
+# Method E2 already taught (see multi-method-breakout-comparison memory): gating on
+# uptrend cost E2 ~0 accuracy vs raw E, so there's no reason to skip it here.
+H_WINDOW = 20            # trailing bars most sub-signals look over (~1 trading month)
+H_FIRE_THRESHOLD = 75.0
 
 # --- News / sentiment (fetch_news.py -- NOT part of the daily price scan itself; news
 # is separately budgeted since all three free providers cap daily requests) ----------

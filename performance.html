@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakoutAI | Performance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: {
+                darkBg: '#0b1120', cardBg: '#1e293b', borderCl: '#334155',
+            } } }
+        }
+    </script>
+    <style>
+        html { color-scheme: dark; }
+        select option { background-color: #1e293b; color: #e2e8f0; }
+        .fade-in { animation: fade 0.35s ease; }
+        @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body class="min-h-screen text-gray-200 bg-darkBg font-sans selection:bg-purple-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+        <div class="px-6 py-4 max-w-[1200px] mx-auto flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span class="text-purple-500 text-2xl">⌖</span> Breakout<span class="text-purple-400">AI</span>
+                <span class="text-slate-500 font-normal">/</span>
+                <span class="text-slate-200">Performance</span>
+            </h1>
+            <div class="flex items-center gap-3">
+                <a href="combined_breakout_scanner_platform.html"
+                   class="text-xs font-semibold text-slate-400 hover:text-white transition-colors">← Back to the radar</a>
+                <div class="text-[11px] leading-tight text-slate-400 text-right">
+                    <div>Data as of <span id="asOfDate" class="text-slate-200 font-semibold">—</span></div>
+                    <div>Live record since <span id="liveSince" class="text-slate-300">—</span></div>
+                </div>
+                <span id="liveBadge" class="hidden px-2 py-1 text-[11px] font-semibold rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 whitespace-nowrap"></span>
+                <div id="marketToggle" class="flex items-center rounded-lg border border-borderCl bg-slate-800 p-0.5 text-xs font-semibold">
+                    <button id="marketBtnIN" type="button" class="px-2.5 py-1 rounded-md transition-all">🇮🇳 India</button>
+                    <button id="marketBtnUS" type="button" class="px-2.5 py-1 rounded-md transition-all">🇺🇸 US</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="px-6 py-6 max-w-[1200px] mx-auto">
+
+        <!-- What this page is -->
+        <p class="text-sm text-slate-400 max-w-3xl mb-6">
+            Every call the site has published since it started scoring conviction — recorded the day it
+            was made and tracked for the next <span class="text-slate-200 font-semibold">2 trading weeks</span>.
+            Nothing is backfilled. A call counts as
+            <span class="text-emerald-400 font-semibold">worked</span> if price hit
+            <span class="text-slate-200">+1R</span> (the risk-defined target) before the stop within
+            10 trading days — the same rule every backtest on this site is graded by, where 50% is breakeven.
+            While a market is open, still-open calls also show a <span class="text-emerald-300 font-semibold">● LIVE</span>
+            price — how each flagged stock is moving intraday, today.
+        </p>
+
+        <!-- Summary tiles -->
+        <div id="tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"></div>
+
+        <!-- Per-signal breakdown -->
+        <div class="bg-cardBg border border-borderCl rounded-xl p-4 mb-6">
+            <h2 class="text-sm font-bold text-white mb-3">By signal type <span class="text-slate-500 font-normal">· live vs backtest</span></h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs" id="signalTable">
+                    <thead>
+                        <tr class="text-slate-500 uppercase text-[10px] tracking-wider">
+                            <th class="text-left py-1.5 pr-3">Signal</th>
+                            <th class="text-right py-1.5 px-3">Calls</th>
+                            <th class="text-right py-1.5 px-3">Won</th>
+                            <th class="text-right py-1.5 px-3">Lost</th>
+                            <th class="text-right py-1.5 px-3">No resolve</th>
+                            <th class="text-right py-1.5 px-3">Open</th>
+                            <th class="text-right py-1.5 px-3">Live win rate</th>
+                            <th class="text-right py-1.5 pl-3">Backtest</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalTbody"></tbody>
+                </table>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Live win rate = won ÷ (won + lost). Open and unresolved calls aren't counted either way. Backtest = the whole-market historical rate for that signal (— means never backtested on this market).</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <div id="signalChips" class="flex flex-wrap items-center gap-1.5"></div>
+            <select id="statusFilter" class="bg-slate-800 border border-borderCl rounded-lg px-2 py-1.5 text-xs text-slate-200">
+                <option value="">All outcomes</option>
+                <option value="won">✓ Hit +1R</option>
+                <option value="lost">✗ Stopped out</option>
+                <option value="expired">— No resolve</option>
+                <option value="open">● Still open</option>
+            </select>
+            <input id="searchBox" type="text" placeholder="Search symbol…"
+                   class="bg-slate-800 border border-borderCl rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 w-40">
+            <span id="countLabel" class="text-[11px] text-slate-500 ml-auto"></span>
+        </div>
+
+        <!-- Episode list -->
+        <div id="list"></div>
+
+        <p id="disclaimer" class="text-[11px] text-slate-600 mt-8"></p>
+    </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const MARKET_KEY = "breakoutai_market";
+let MARKET = localStorage.getItem(MARKET_KEY) === "US" ? "US" : "IN";
+let DATA_IN = null, DATA_US = null, DATA = null;
+const filters = { signal: "", status: "", q: "" };
+
+// Serving JSON lives on the orphan `data` branch in production (see the daily
+// workflows), but locally it's the plain data/ folder. Same switch on the main page.
+const DATA_BASE = (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)
+                   || location.protocol === "file:")
+    ? "data/"
+    : "https://raw.githubusercontent.com/Bhavanmehta/BreakoutAI/data/";
+
+// --- Live intraday overlay: reuses the Vercel /api/quotes endpoint the main page
+// polls. Only meaningful for still-open calls while the market is open -- it answers
+// "a stock the site flagged yesterday: how did it open, where is it now today?".
+// change_pct from the endpoint is vs the previous close, i.e. exactly today's move. ---
+let LIVE_QUOTES = {};
+let liveQuotesAsOf = null;
+let liveTimer = null;
+const LIVE_POLL_MS = 90000;
+const MAX_LIVE = 60;   // the /api/quotes fan-out is per-symbol; keep the newest open calls
+
+const SIGNAL_META = {
+    high_conviction:   { label: "★ High conviction", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+    strong_breakout:   { label: "Strong breakout",   cls: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
+    breakout:          { label: "Breakout",          cls: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+    relative_strength: { label: "Rel. strength",     cls: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
+};
+const STATUS_META = {
+    won:     { label: "✓ Hit +1R",     cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+    lost:    { label: "✗ Stopped out", cls: "bg-red-500/15 text-red-300 border-red-500/30" },
+    expired: { label: "— No resolve",  cls: "bg-slate-600/20 text-slate-400 border-slate-600/40" },
+    open:    { label: "● Open",        cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+};
+
+const curSymbol = () => MARKET === "US" ? "$" : "₹";
+const fmtPrice = (v) => v == null ? "—"
+    : curSymbol() + Number(v).toLocaleString(MARKET === "US" ? "en-US" : "en-IN",
+        { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPct = (v, dp = 1) => (v >= 0 ? "+" : "") + v.toFixed(dp) + "%";
+const fmtDate = (iso, opts) => new Date(iso + "T00:00:00")
+    .toLocaleDateString("en-US", opts || { weekday: "short", month: "short", day: "numeric" });
+
+function episodeReturnPct(e) {
+    if (!e.closes.length || e.entry == null) return null;
+    return (e.closes[e.closes.length - 1] / e.entry - 1) * 100;
+}
+
+function visible() {
+    if (!DATA) return [];
+    return DATA.episodes.filter(e =>
+        (!filters.signal || e.signals.includes(filters.signal)) &&
+        (!filters.status || e.status === filters.status) &&
+        (!filters.q || e.symbol.toUpperCase().includes(filters.q) ||
+            (e.name || "").toUpperCase().includes(filters.q)));
+}
+
+// --- Tiles + signal table are computed over the signal/search filter (not the
+// status filter — the tiles ARE the status breakdown). -----------------------
+function statsPool() {
+    if (!DATA) return [];
+    return DATA.episodes.filter(e =>
+        (!filters.signal || e.signals.includes(filters.signal)) &&
+        (!filters.q || e.symbol.toUpperCase().includes(filters.q) ||
+            (e.name || "").toUpperCase().includes(filters.q)));
+}
+
+function renderTiles() {
+    const eps = statsPool();
+    const won = eps.filter(e => e.status === "won").length;
+    const lost = eps.filter(e => e.status === "lost").length;
+    const expired = eps.filter(e => e.status === "expired").length;
+    const open = eps.filter(e => e.status === "open").length;
+    const graded = won + lost;
+
+    const nextDay = eps.map(e => e.closes.length && e.entry != null ? (e.closes[0] / e.entry - 1) * 100 : null)
+                       .filter(v => v != null);
+    const ndAvg = nextDay.length ? nextDay.reduce((a, b) => a + b, 0) / nextDay.length : null;
+    const ndUp = nextDay.filter(v => v > 0).length;
+
+    const wr = graded ? won / graded * 100 : null;
+    const tiles = [
+        { label: "Calls made", value: String(eps.length),
+          sub: `since ${DATA.live_since ? fmtDate(DATA.live_since, { month: "short", day: "numeric" }) : "—"} · live only, nothing backfilled`,
+          cls: "text-white" },
+        { label: "Next-day move", value: ndAvg == null ? "—" : fmtPct(ndAvg, 2),
+          sub: nextDay.length ? `${ndUp} of ${nextDay.length} up the next session` : "next session not traded yet",
+          cls: ndAvg == null ? "text-slate-500" : ndAvg >= 0 ? "text-emerald-400" : "text-red-400" },
+        { label: "Graded so far", value: wr == null ? "—" : wr.toFixed(0) + "%",
+          sub: graded ? `✓${won} ✗${lost} of ${graded} resolved · 50% = breakeven` : "nothing resolved yet — early days",
+          cls: wr == null ? "text-slate-500" : wr >= 50 ? "text-emerald-400" : "text-red-400" },
+        { label: "Still open", value: String(open),
+          sub: `inside the ${DATA.grade_window}-day window` + (expired ? ` · ${expired} never resolved` : ""),
+          cls: "text-blue-300" },
+    ];
+    $("tiles").innerHTML = tiles.map(t => `
+        <div class="bg-cardBg border border-borderCl rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">${t.label}</div>
+            <div class="text-2xl font-bold mt-1 ${t.cls}">${t.value}</div>
+            <div class="text-[11px] text-slate-400 mt-1">${t.sub}</div>
+        </div>`).join("");
+}
+
+function renderSignalTable() {
+    const eps = statsPool();
+    const rows = Object.keys(SIGNAL_META)
+        .map(sig => {
+            const rs = eps.filter(e => e.signals.includes(sig));
+            if (!rs.length) return null;
+            const won = rs.filter(e => e.status === "won").length;
+            const lost = rs.filter(e => e.status === "lost").length;
+            const expired = rs.filter(e => e.status === "expired").length;
+            const open = rs.filter(e => e.status === "open").length;
+            const wr = won + lost ? won / (won + lost) * 100 : null;
+            const ref = (DATA.reference_rates || {})[sig];
+            return `<tr class="border-t border-borderCl/60">
+                <td class="py-2 pr-3"><span class="inline-block px-1.5 py-0.5 rounded border text-[10px] font-semibold ${SIGNAL_META[sig].cls}">${SIGNAL_META[sig].label}</span></td>
+                <td class="text-right px-3 text-slate-300">${rs.length}</td>
+                <td class="text-right px-3 text-emerald-400">${won}</td>
+                <td class="text-right px-3 text-red-400">${lost}</td>
+                <td class="text-right px-3 text-slate-400">${expired}</td>
+                <td class="text-right px-3 text-blue-300">${open}</td>
+                <td class="text-right px-3 font-semibold ${wr == null ? "text-slate-500" : wr >= 50 ? "text-emerald-400" : "text-red-400"}">${wr == null ? "—" : wr.toFixed(0) + "%"}</td>
+                <td class="text-right pl-3 text-slate-400">${ref == null ? "—" : (ref * 100).toFixed(0) + "%"}</td>
+            </tr>`;
+        }).filter(Boolean);
+    $("signalTbody").innerHTML = rows.join("") ||
+        `<tr><td colspan="8" class="py-3 text-slate-500">No calls match.</td></tr>`;
+}
+
+function renderChips() {
+    const eps = DATA ? DATA.episodes : [];
+    const chips = [["", `All (${eps.length})`]];
+    for (const sig of Object.keys(SIGNAL_META)) {
+        const n = eps.filter(e => e.signals.includes(sig)).length;
+        if (n) chips.push([sig, `${SIGNAL_META[sig].label} (${n})`]);
+    }
+    $("signalChips").innerHTML = chips.map(([val, label]) => `
+        <button data-sig="${val}" class="px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+            filters.signal === val ? "bg-purple-600 border-purple-500 text-white"
+                                   : "bg-slate-800 border-borderCl text-slate-300 hover:text-white"}">${label}</button>`).join("");
+    document.querySelectorAll("#signalChips button").forEach(b =>
+        b.onclick = () => { filters.signal = b.dataset.sig; render(); });
+}
+
+// --- The per-call daily-move strip: one slot per tracked day (fixed width so
+// rows align), green/red bar per traded session, ring on the resolving day. ---
+function barStrip(e) {
+    const W = DATA.track_bars;
+    const pcts = e.closes.map((c, i) => (c / (i === 0 ? e.entry : e.closes[i - 1]) - 1) * 100);
+    const SCALE = 6; // a |6%| daily move fills the half-height
+    let html = `<div class="flex items-center gap-[3px]" title="daily close-to-close moves after the call">`;
+    for (let i = 0; i < W; i++) {
+        if (i < pcts.length) {
+            const p = pcts[i];
+            const h = Math.min(Math.abs(p) / SCALE, 1) * 14 + 2;
+            const up = p >= 0;
+            const resolved = e.resolved_in != null && i === e.resolved_in - 1;
+            const dl = e.dates && e.dates[i] ? ` (${fmtDate(e.dates[i], { month: "short", day: "numeric" })})` : "";
+            const tip = `Day ${i + 1}${dl}: ${fmtPct(p, 2)} → ${fmtPrice(e.closes[i])}` +
+                        (resolved ? (e.status === "won" ? " · target hit" : " · stop hit") : "");
+            html += `<div class="w-[9px] h-[34px] relative" title="${tip}">
+                <div class="absolute left-0 w-full ${up ? "bg-emerald-500" : "bg-red-500"} ${resolved ? "ring-1 ring-white/80" : ""}"
+                     style="height:${h.toFixed(1)}px; ${up ? `bottom:17px;` : `top:17px;`} border-radius:1px;"></div>
+                <div class="absolute left-0 top-[16.5px] w-full h-px bg-slate-600/60"></div>
+            </div>`;
+        } else {
+            html += `<div class="w-[9px] h-[34px] relative" title="not traded yet">
+                <div class="absolute left-0 top-[16.5px] w-full h-px bg-slate-700/70"></div>
+            </div>`;
+        }
+    }
+    return html + `</div>`;
+}
+
+function statusBadge(e) {
+    const m = STATUS_META[e.status] || STATUS_META.open;
+    let label = m.label;
+    if (e.status === "open") {
+        label = e.closes.length ? `● Day ${e.closes.length}/${DATA.grade_window}` : "● New";
+    }
+    if ((e.status === "won" || e.status === "lost") && e.resolved_in != null) {
+        label += ` in ${e.resolved_in}d`;
+    }
+    return `<span class="inline-block px-2 py-1 rounded-md border text-[10px] font-bold whitespace-nowrap ${m.cls}">${label}</span>`;
+}
+
+function renderList() {
+    const eps = visible();
+    $("countLabel").innerText = `${eps.length} of ${DATA ? DATA.episodes.length : 0} calls`;
+    if (!eps.length) {
+        $("list").innerHTML = `<div class="text-sm text-slate-500 py-8 text-center">No calls match the current filters.</div>`;
+        return;
+    }
+    const byDate = {};
+    eps.forEach(e => (byDate[e.date] = byDate[e.date] || []).push(e));
+    const dates = Object.keys(byDate).sort().reverse();
+
+    $("list").innerHTML = dates.map(d => {
+        const rows = byDate[d].slice().sort((a, b) => (b.conviction || 0) - (a.conviction || 0));
+        return `
+        <div class="mb-5 fade-in">
+            <div class="flex items-baseline gap-2 mb-2">
+                <h3 class="text-sm font-bold text-white">${fmtDate(d, { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</h3>
+                <span class="text-[11px] text-slate-500">${rows.length} call${rows.length === 1 ? "" : "s"}</span>
+            </div>
+            <div class="bg-cardBg border border-borderCl rounded-xl divide-y divide-borderCl/60">
+                ${rows.map(e => {
+                    const ret = episodeReturnPct(e);
+                    return `
+                    <div class="px-4 py-2.5 grid items-center gap-3" data-sym="${e.symbol}" data-entry="${e.entry ?? ""}"
+                         style="grid-template-columns: minmax(180px,1.4fr) minmax(150px,1fr) auto minmax(120px,auto);">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-white text-sm">${e.symbol}</span>
+                                ${e.conviction != null ? `<span class="text-[10px] font-bold text-purple-300 border border-purple-500/30 bg-purple-500/10 rounded px-1" title="Conviction score at the time of the call (0–100)">${e.conviction}</span>` : ""}
+                                ${e.signals.map(s => SIGNAL_META[s] ? `<span class="inline-block px-1.5 py-0.5 rounded border text-[9px] font-semibold ${SIGNAL_META[s].cls}">${SIGNAL_META[s].label}</span>` : "").join("")}
+                            </div>
+                            <div class="text-[11px] text-slate-500 truncate">${e.name || ""}</div>
+                        </div>
+                        <div class="text-xs whitespace-nowrap">
+                            <span class="text-slate-400">${fmtPrice(e.entry)}</span>
+                            <span class="text-slate-600 mx-1">→</span>
+                            <span class="text-slate-200 font-semibold">${e.closes.length ? fmtPrice(e.closes[e.closes.length - 1]) : "…"}</span>
+                            <span class="ml-1.5 font-bold ${ret == null ? "text-slate-600" : ret >= 0 ? "text-emerald-400" : "text-red-400"}">${ret == null ? "" : fmtPct(ret)}</span>
+                            <div class="text-[10px] text-slate-600 mt-0.5" title="The grading levels set on the call date: stop = resistance × ${DATA.stop_loss_fraction}, target = entry + 1R">stop ${fmtPrice(e.stop)} · target ${fmtPrice(e.target)}</div>
+                            ${e.status === "open" ? `<div class="perf-live-line text-[11px] mt-0.5 hidden"></div>` : ""}
+                        </div>
+                        <div>${barStrip(e)}</div>
+                        <div class="text-right">${statusBadge(e)}</div>
+                    </div>`;
+                }).join("")}
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function render() {
+    if (!DATA) return;
+    renderTiles();
+    renderSignalTable();
+    renderChips();
+    renderList();
+    applyLiveToList();   // re-apply any live prices we already have onto the fresh rows
+}
+
+// --- Live intraday overlay -------------------------------------------------
+function isMarketOpenNow() {
+    const tz = MARKET === "US" ? "America/New_York" : "Asia/Kolkata";
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+    const day = now.getDay();
+    if (day === 0 || day === 6) return false;
+    const mins = now.getHours() * 60 + now.getMinutes();
+    return MARKET === "US"
+        ? mins >= 9 * 60 + 30 && mins <= 16 * 60
+        : mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+}
+
+function applyLiveToList() {
+    document.querySelectorAll("#list [data-sym]").forEach(row => {
+        const line = row.querySelector(".perf-live-line");
+        if (!line) return;                      // resolved rows have no live line
+        const lq = LIVE_QUOTES[row.getAttribute("data-sym")];
+        if (!lq) return;
+        const entry = parseFloat(row.getAttribute("data-entry"));
+        const today = lq.change_pct;
+        const since = entry ? (lq.price / entry - 1) * 100 : null;
+        const cls = (v) => v >= 0 ? "text-emerald-400" : "text-red-400";
+        line.innerHTML =
+            `<span class="text-emerald-300 font-semibold">● LIVE</span> ${fmtPrice(lq.price)} ` +
+            `<span class="${cls(today)} font-semibold">${fmtPct(today, 2)} today</span>` +
+            (since != null ? ` · <span class="${cls(since)}">${fmtPct(since)} since call</span>` : "");
+        line.classList.remove("hidden");
+    });
+}
+
+function updateLiveBadge() {
+    const el = $("liveBadge");
+    if (!liveQuotesAsOf) { el.classList.add("hidden"); return; }
+    el.classList.remove("hidden");
+    el.innerText = "● Live " + liveQuotesAsOf.toLocaleTimeString(
+        MARKET === "US" ? "en-US" : "en-IN", { hour: "2-digit", minute: "2-digit" });
+}
+
+async function pollLive() {
+    if (document.visibilityState !== "visible" || !DATA || !isMarketOpenNow()) return;
+    const syms = visible().filter(e => e.status === "open").slice(0, MAX_LIVE).map(e => e.symbol);
+    if (!syms.length) return;
+    const pollMarket = MARKET;
+    try {
+        const res = await fetch(`/api/quotes?symbols=${encodeURIComponent(syms.join(","))}&market=${pollMarket}`,
+                                { cache: "no-store" });
+        if (!res.ok || pollMarket !== MARKET) return;   // market switched mid-flight
+        const body = await res.json();
+        Object.assign(LIVE_QUOTES, body.quotes || {});
+        liveQuotesAsOf = new Date();
+        applyLiveToList();
+        updateLiveBadge();
+    } catch (err) { /* soft-fail: keep showing the last good prices */ }
+}
+
+function startLive() {
+    if (liveTimer) clearInterval(liveTimer);
+    pollLive();
+    liveTimer = setInterval(pollLive, LIVE_POLL_MS);
+}
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") pollLive();
+});
+
+function switchMarket(m) {
+    MARKET = m;
+    localStorage.setItem(MARKET_KEY, m);
+    DATA = m === "US" ? DATA_US : DATA_IN;
+    LIVE_QUOTES = {}; liveQuotesAsOf = null; updateLiveBadge();   // don't leak prices across markets
+    const ACTIVE = "bg-purple-600 text-white", INACTIVE = "text-slate-400 hover:text-slate-200";
+    $("marketBtnIN").className = "px-2.5 py-1 rounded-md transition-all " + (m === "IN" ? ACTIVE : INACTIVE);
+    $("marketBtnUS").className = "px-2.5 py-1 rounded-md transition-all " + (m === "US" ? ACTIVE : INACTIVE);
+    if (!DATA) {
+        $("asOfDate").innerText = "—"; $("liveSince").innerText = "—";
+        $("tiles").innerHTML = ""; $("signalTbody").innerHTML = ""; $("signalChips").innerHTML = "";
+        $("list").innerHTML = `<div class="text-sm text-slate-500 py-8 text-center">No ${m === "US" ? "US" : "India"} performance data yet.</div>`;
+        $("countLabel").innerText = "";
+        return;
+    }
+    $("asOfDate").innerText = DATA.as_of_date || "—";
+    $("liveSince").innerText = DATA.live_since ? fmtDate(DATA.live_since, { month: "short", day: "numeric", year: "numeric" }) : "—";
+    $("disclaimer").innerText = "⚠️ " + (DATA.disclaimer || "");
+    filters.signal = ""; filters.status = ""; filters.q = "";
+    $("statusFilter").value = ""; $("searchBox").value = "";
+    render();
+    startLive();
+}
+
+async function loadData() {
+    const grab = async (path) => {
+        try {
+            const r = await fetch(path, { cache: "no-store" });
+            return r.ok ? await r.json() : null;
+        } catch { return null; }
+    };
+    [DATA_IN, DATA_US] = await Promise.all([
+        grab(DATA_BASE + "performance.json"), grab(DATA_BASE + "us/performance.json")]);
+    switchMarket(MARKET);
+}
+
+$("marketBtnIN").onclick = () => { if (MARKET !== "IN") switchMarket("IN"); };
+$("marketBtnUS").onclick = () => { if (MARKET !== "US") switchMarket("US"); };
+$("statusFilter").onchange = (ev) => { filters.status = ev.target.value; render(); };
+$("searchBox").oninput = (ev) => { filters.q = ev.target.value.trim().toUpperCase(); render(); };
+
+loadData();
+</script>
+</body>
+</html>

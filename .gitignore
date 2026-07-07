@@ -21,6 +21,16 @@ __pycache__/
 .venv/
 venv/
 
-# Local research DB (regenerable by running backend/pipeline.py) — but keep breakouts.json
+# Local research DB (regenerable by running backend/pipeline.py)
 *.duckdb
 *.duckdb.wal
+
+# Serving data (breakouts/ohlc/performance/etc.) now lives on the orphan `data`
+# branch, force-pushed daily by .github/workflows/*.yml — NOT committed to main,
+# which was growing ~6k files/day. Regenerate locally with `cd backend; python
+# run_scan.py`. Activation (one-time, when you adopt this): `git rm -r --cached data`
+# then commit, so main stops tracking the already-committed snapshot.
+/data/
+
+# Throwaway research artifacts (e.g. the G/H method exploration scratch dumps)
+scratch_*

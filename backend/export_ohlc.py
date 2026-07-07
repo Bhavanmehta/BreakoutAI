@@ -39,10 +39,21 @@ _COLS = ["symbol", "date", "open", "high", "low", "close", "volume",
          "ema8", "ema21", "ema50", "ema200", "rsi", "is_breakout"]
 
 
+# Windows reserves these device names as filenames -- any case, any extension
+# (CON.json included). A real US ticker "CON" produced data/us/ohlc/CON.json,
+# which breaks `git checkout` on stock Windows machines if it's ever committed.
+_WIN_RESERVED = {"CON", "PRN", "AUX", "NUL",
+                 *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+
+
 def _safe(sym: str) -> str:
     """Filesystem/URL-safe symbol → filename stem (e.g. 'M&M' → 'M_M', 'BAJAJ-AUTO' →
-    'BAJAJ_AUTO'). The frontend applies the identical transform when fetching."""
-    return re.sub(r"[^A-Za-z0-9]", "_", sym)
+    'BAJAJ_AUTO'; reserved Windows device names get a trailing '_': 'CON' → 'CON_').
+    The frontend applies the identical transform when fetching."""
+    stem = re.sub(r"[^A-Za-z0-9]", "_", sym)
+    if stem.upper() in _WIN_RESERVED:
+        stem += "_"
+    return stem
 
 
 def _r(x):

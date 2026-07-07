@@ -42,14 +42,29 @@ jobs:
         working-directory: backend
         run: python fetch_social.py
 
-      - name: Commit updated results (if changed)
+      - name: Publish serving data to the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "breakoutai-bot"
-          git config user.email "actions@github.com"
-          git add data/us/breakouts.json data/us/track_record.json data/us/ohlc data/us/social.json
-          if git diff --cached --quiet; then
-            echo "No changes — nothing to commit."
+          # US mirror of the publish step in daily-scan.yml -- force-push US files (under
+          # us/) onto the shared orphan `data` branch as a single fresh commit, preserving
+          # India's root-level files. India and US run ~11h apart so they never race.
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          PUB="$(mktemp -d)"
+          git clone --depth 1 --branch data "$REPO_URL" "$PUB/cur" 2>/dev/null && \
+            cp -r "$PUB/cur/." "$PUB/pub" || mkdir -p "$PUB/pub"
+          rm -rf "$PUB/pub/.git"
+          mkdir -p "$PUB/pub/us"
+          cp data/us/breakouts.json data/us/track_record.json data/us/performance.json "$PUB/pub/us/"
+          [ -f data/us/social.json ] && cp data/us/social.json "$PUB/pub/us/" || true
+          rm -rf "$PUB/pub/us/ohlc" && cp -r data/us/ohlc "$PUB/pub/us/ohlc"
+          cd "$PUB/pub"
+          git init -q && git checkout -q -b data
+          git add -A
+          if git -c user.name=breakoutai-bot -c user.email=actions@github.com \
+               commit -q -m "data(US): $(date -u +'%Y-%m-%d %H:%MZ')"; then
+            git push -f "$REPO_URL" data
           else
-            git commit -m "chore: daily US breakout scan $(date -u +'%Y-%m-%d')"
-            git push
+            echo "No data changes — nothing to publish."
           fi

@@ -508,6 +508,14 @@
         // market is actively toggled -- see addToWatchlist/renderMyWatchlist below.
         const MARKET_KEY = "breakoutai_market";
         let MARKET = localStorage.getItem(MARKET_KEY) === "US" ? "US" : "IN";
+        // Serving JSON (breakouts/ohlc/performance) lives on the orphan `data` branch in
+        // production -- force-pushed daily by the workflows, kept off `main` to stop ~6k
+        // files/day of history growth. Locally it's just the data/ folder. Non-data calls
+        // (/api/quotes, /api/watchlist -- Vercel functions) stay relative to the origin.
+        const DATA_BASE = (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)
+                           || location.protocol === "file:")
+            ? "data/"
+            : "https://raw.githubusercontent.com/Bhavanmehta/BreakoutAI/data/";
         const curSymbol = () => MARKET === "US" ? "$" : "₹";
         function fmtPrice(value) {
             if (value == null || Number.isNaN(value)) return "—";
@@ -813,7 +821,7 @@
         async function loadData() {
             showStatus("Loading latest scan…");
             try {
-                const res = await fetch("data/breakouts.json", { cache: "no-store" });
+                const res = await fetch(DATA_BASE + "breakouts.json", { cache: "no-store" });
                 if (!res.ok) throw new Error("HTTP " + res.status);
                 DATA_IN = await res.json();
                 STOCKS_IN = DATA_IN.stocks || [];
@@ -835,7 +843,7 @@
             // US data is optional -- a 404 (not deployed yet, or the daily-scan-us.yml
             // hasn't run) is non-fatal, the US toggle just shows an empty state.
             try {
-                const resUs = await fetch("data/us/breakouts.json", { cache: "no-store" });
+                const resUs = await fetch(DATA_BASE + "us/breakouts.json", { cache: "no-store" });
                 if (resUs.ok) {
                     DATA_US = await resUs.json();
                     STOCKS_US = DATA_US.stocks || [];
@@ -2413,7 +2421,16 @@
         let lwResizeObs = null;
 
         // Symbol → OHLC filename stem, mirroring backend export_ohlc._safe().
-        const safeName = (sym) => sym.replace(/[^A-Za-z0-9]/g, "_");
+        // Reserved Windows device names get a trailing "_" (ticker CON → CON_.json):
+        // a file literally named CON.json breaks git checkouts on Windows.
+        const OHLC_WIN_RESERVED = new Set(["CON","PRN","AUX","NUL",
+            "COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
+            "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"]);
+        const safeName = (sym) => {
+            let stem = sym.replace(/[^A-Za-z0-9]/g, "_");
+            if (OHLC_WIN_RESERVED.has(stem.toUpperCase())) stem += "_";
+            return stem;
+        };
 
         function styleChartToggle() {
             [["chartModeAnnotated", "annotated"], ["chartModeTradingview", "tradingview"]].forEach(([id, mode]) => {
@@ -2462,7 +2479,7 @@
             $("chartLegend").classList.add("hidden");
             let data;
             try {
-                const ohlcBase = MARKET === "US" ? "data/us/ohlc" : "data/ohlc";
+                const ohlcBase = DATA_BASE + (MARKET === "US" ? "us/ohlc" : "ohlc");
                 const res = await fetch(`${ohlcBase}/${safeName(symbol)}.json`, { cache: "no-store" });
                 if (!res.ok) throw new Error("no ohlc");
                 data = await res.json();

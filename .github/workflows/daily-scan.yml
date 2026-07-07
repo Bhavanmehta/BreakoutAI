@@ -39,14 +39,35 @@ jobs:
           GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
         run: python fetch_news.py
 
-      - name: Commit updated results (if changed)
+      - name: Publish serving data to the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "breakoutai-bot"
-          git config user.email "actions@github.com"
-          git add data/breakouts.json data/track_record.json data/ohlc data/news.json data/fii_dii_history.json
-          if git diff --cached --quiet; then
-            echo "No changes — nothing to commit."
+          # The serving JSON no longer lands on `main` (that grew ~6k files/day). Instead
+          # it lives on an orphan `data` branch that we FORCE-PUSH as a single fresh commit
+          # each run, so the branch (and the repo) never accumulates history. The frontend
+          # fetches it from raw.githubusercontent.com/.../data/. See DATA_BASE in the HTML.
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          PUB="$(mktemp -d)"
+          # Start from the branch's current contents so the US job's files (under us/)
+          # survive; if the branch doesn't exist yet, start empty.
+          git clone --depth 1 --branch data "$REPO_URL" "$PUB/cur" 2>/dev/null && \
+            cp -r "$PUB/cur/." "$PUB/pub" || mkdir -p "$PUB/pub"
+          rm -rf "$PUB/pub/.git"
+          # Overlay this run's fresh India artifacts. The branch mirrors data/ with the
+          # data/ prefix stripped, so India files sit at the root, US under us/. The ohlc
+          # tree is swapped wholesale (rm+cp, no rsync dependency) so stale symbols drop.
+          cp data/breakouts.json data/track_record.json data/performance.json "$PUB/pub/"
+          [ -f data/news.json ] && cp data/news.json "$PUB/pub/" || true
+          [ -f data/fii_dii_history.json ] && cp data/fii_dii_history.json "$PUB/pub/" || true
+          rm -rf "$PUB/pub/ohlc" && cp -r data/ohlc "$PUB/pub/ohlc"
+          cd "$PUB/pub"
+          git init -q && git checkout -q -b data
+          git add -A
+          if git -c user.name=breakoutai-bot -c user.email=actions@github.com \
+               commit -q -m "data(IN): $(date -u +'%Y-%m-%d %H:%MZ')"; then
+            git push -f "$REPO_URL" data
           else
-            git commit -m "chore: daily breakout scan $(date -u +'%Y-%m-%d')"
-            git push
+            echo "No data changes — nothing to publish."
           fi
