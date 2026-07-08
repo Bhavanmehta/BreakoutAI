@@ -94,6 +94,67 @@ def add_method_b_vcp(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def latest_vcp_structure(df: pd.DataFrame) -> dict | None:
+    """Chart support: the most recent qualifying multi-leg VCP contraction, as drawable
+    geometry for the annotated chart (export_ohlc.py). Mirrors add_method_b_vcp's
+    window qualification EXACTLY (same settings, same contracting-depth + declining-
+    volume rules) but returns the structure instead of stamping trigger days:
+
+        {"pivots":  [int, ...],   # row positions of the consecutive pivot highs
+         "troughs": [int, ...],   # row position of each leg's low (len = legs)
+         "pivot_level": float,    # final pivot high = the buy point
+         "confirmed": int|None}   # position of the volume-confirmed close above it
+
+    Positions are 0-based row offsets into df's date order, so callers map them to
+    dates with .iloc. Returns None when no window qualifies. If the qualification
+    rules in add_method_b_vcp ever change, keep this in sync —
+    scratchpad/verify_vcp_structure.py cross-checks the two on real DuckDB data.
+    """
+    highs = df["high"].values
+    lows = df["low"].values
+    closes = df["close"].values
+    volumes = df["volume"].values
+    n = len(df)
+
+    ph, _ = find_pivots(highs, lows, k=settings.VCP_PIVOT_K)
+    min_legs = settings.VCP_MIN_LEGS
+    max_legs = settings.VCP_MAX_LOOKBACK_LEGS
+
+    best = None
+    for m in range(min_legs, len(ph)):
+        start = max(0, m - max_legs)
+        window_idx = ph[start:m + 1]  # consecutive pivot highs, oldest -> newest
+        legs = []
+        for a, b in zip(window_idx, window_idx[1:]):
+            trough = a + int(np.argmin(lows[a:b + 1]))
+            depth_pct = (highs[a] - lows[trough]) / highs[a] * 100.0
+            seg_vol = volumes[a:b + 1].mean()
+            legs.append((depth_pct, seg_vol, trough))
+        if len(legs) < min_legs:
+            continue
+        depths = [l[0] for l in legs]
+        vols = [l[1] for l in legs]
+        contracting = all(depths[i + 1] < depths[i] for i in range(len(depths) - 1))
+        vol_declining = all(vols[i + 1] <= vols[i] for i in range(len(vols) - 1))
+        if not (contracting and vol_declining):
+            continue
+
+        idx_end = window_idx[-1]
+        pivot_level = highs[idx_end]
+        avg_vol_before = volumes[max(0, idx_end - 20):idx_end].mean() if idx_end > 0 else np.nan
+        confirmed = None
+        search_end = min(n, idx_end + 1 + settings.VCP_BREAKOUT_SEARCH_DAYS)
+        for t in range(idx_end + 1, search_end):
+            if closes[t] > pivot_level and (np.isnan(avg_vol_before)
+                                             or volumes[t] > avg_vol_before * settings.VCP_VOL_CONFIRM_MULT):
+                confirmed = t
+                break
+        # ph is ascending, so later m = more recent structure; keep the last qualifier
+        best = {"pivots": list(window_idx), "troughs": [l[2] for l in legs],
+                "pivot_level": float(pivot_level), "confirmed": confirmed}
+    return best
+
+
 # --------------------------------------------------------------------------- #
 # C — volatility-squeeze breakout: Bollinger Band width compresses to a multi-month
 # low, then expands with a directional, volume-confirmed close.

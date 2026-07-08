@@ -20,9 +20,10 @@ data saturation.
   [combined_breakout_scanner_platform.html](combined_breakout_scanner_platform.html) (the main
   scanner/watchlist app) and [performance.html](performance.html) (the forward-only track-record
   ledger, see the Performance page bullet below).
-- **Charting**: the per-stock detail chart is still the TradingView widget (`BSE:<TICKER>`); a
-  second, home-grown annotated chart (EMA8/21 overlays + volume/RSI panes, `lightweight-charts`)
-  was built for pattern/indicator overlays and is already live — see `export_ohlc.py` and TODO #8.
+- **Charting**: the per-stock detail chart now **defaults to the home-grown annotated chart**
+  (EMA8/21 overlays + volume/RSI panes + resistance/support/VCP/breakout markers, `lightweight-charts`);
+  a **TradingView toggle** (`chartModeTradingview`, `BSE:<TICKER>`) remains as an alternate view and
+  as the automatic fallback for stocks with no per-stock OHLC yet — see `export_ohlc.py` and TODO #8.
 - **Backend**: Python (pandas/numpy/duckdb/yfinance/jugaad-data) in `backend/`. Real, working.
   Every script is **market-aware** via one env var, `BREAKOUTAI_MARKET` (`IN` default, or `US`) —
   see `settings.py` and the Multi-market bullet below.
@@ -75,9 +76,10 @@ number** · a one-click **★ quick-track** star (adds to My Watchlist without o
 pane) · an amber **★ High conviction** pill for US `high_conviction`-tier stocks; capped at
 `MAX_RESULTS`=80, click-to-drill. **Right** = the selected stock's detail — a slim header (name ·
 sector · price · Δ · the conviction score), **The Read** (readiness + a de-emphasized, muted
-one-day historical-analog reference — see `analogs.py` and `score.py`), the indicator strip (ADX +
-EMAs, ⓘ tooltips) above the TradingView chart, then the annotated `lightweight-charts` panel
-(EMA8/21, volume, RSI), Ownership (tabbed FII-default over-time chart), Historical Precedents,
+one-day historical-analog reference — see `analogs.py` and `score.py`), then a single chart card
+whose header carries the indicator strip (ADX + EMAs, ⓘ tooltips) and an **Annotated | TradingView**
+toggle — defaulting to the annotated `lightweight-charts` view (EMA8/21, volume/RSI panes,
+resistance/support/VCP/breakout overlays), Ownership (tabbed FII-default over-time chart), Historical Precedents,
 Resistance/Support (now swing-pivot-clustered zones, see `levels.py`), VCP, entry guidance, and
 fundamentals. A floating **Ask AI** chat panel (Groq-backed, tool-calling, can query/compare any
 stock in the universe or run read-only SQL) sits alongside. **My Watchlist** is a separate personal
@@ -335,11 +337,12 @@ A Python pipeline produces all computed data. See `backend/README.md` for detail
 7. ~~Holdings layer~~ — **done**, real quarterly history via screener.in, tabbed over-time chart.
    Still display-only (not folded into scoring) — validating its predictiveness before doing so is
    the one remaining piece, same discipline already applied to everything in `score.py`.
-8. **Chart migration — partially done.** The per-stock annotated overlay chart
-   (`export_ohlc.py` + `lightweight-charts`, EMA8/21 + volume/RSI panes) is live. The **main
-   detail-pane chart is still the TradingView widget** — migrating that one too (to draw the
-   resistance/support zones, VCP pivots, and breakout markers directly on the primary candles,
-   not just the secondary annotated chart) is the remaining piece of this TODO.
+8. **Chart migration — done.** The per-stock annotated overlay chart (`export_ohlc.py` +
+   `lightweight-charts`, EMA8/21 + volume/RSI panes, with resistance/support zones, VCP pivots and
+   breakout markers drawn directly on the primary candles) is now the **default** detail-pane chart
+   (`chartMode = "annotated"`). The TradingView widget remains only as an opt-in toggle
+   (`chartModeTradingview`) and as the automatic fallback for stocks that have no per-stock OHLC
+   exported yet. Verified end-to-end via `_verify_frontend.py` (IN + US, zero console errors).
 9. ~~Enable the GitHub Action~~ — **done**, and expanded to two workflows
    (`daily-scan.yml` India, `daily-scan-us.yml` US), both running on schedule and pushing to the
    `data` branch (see the Data-branch serving bullet) rather than committing to `main`.

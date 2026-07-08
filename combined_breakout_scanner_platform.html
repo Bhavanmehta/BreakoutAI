@@ -42,6 +42,36 @@
         .info-i:hover { color: #e2e8f0; border-color: #94a3b8; background: rgba(148,163,184,.15); }
         .wl-scroll::-webkit-scrollbar { width: 6px; }
         .wl-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        /* --- Mobile pass (below the lg breakpoint, where the two-column layout
+           collapses to one column) ------------------------------------------- */
+        @media (max-width: 1023px) {
+            /* Detail pane becomes a full-screen sheet that slides up over the
+               watchlist instead of just sitting below it in the document flow. */
+            #detailPane {
+                position: fixed; inset: 0; z-index: 40;
+                background: #0b1120; overflow-y: auto;
+                padding: 0.75rem; padding-bottom: 2rem;
+                transform: translateY(100%);
+                transition: transform 0.28s ease;
+            }
+            body.mobile-detail-open #detailPane { transform: translateY(0); }
+            #mobileBackBar { display: flex; }
+            #sectionNav { top: 44px; }
+            /* Filter bar docks under the (possibly two-line) header instead of
+               scrolling away, so search/sort/primed stay reachable. */
+            #filterBar { position: sticky; top: var(--header-h, 64px); z-index: 20; }
+        }
+        @media (min-width: 1024px) {
+            #mobileBackBar { display: none; }
+        }
+        /* Comfortable touch targets on phones without changing desktop density. */
+        @media (max-width: 767px) {
+            #app button, #app select, #app input[type="text"] { min-height: 40px; }
+            /* Small circular badges (quick-track star) stay visually compact but
+               get a larger invisible hit area via negative-margin padding. */
+            .wl-quick-track { padding: 10px; margin: -10px; }
+        }
     </style>
 </head>
 <body class="min-h-screen text-gray-200 bg-darkBg font-sans selection:bg-purple-500 selection:text-white">
@@ -50,7 +80,7 @@
     <div id="floatTip" class="hidden"></div>
 
     <!-- Header -->
-    <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+    <header id="appHeader" class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
         <div class="px-6 py-4 max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
             <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                 <span class="text-purple-500 text-2xl">⌖</span> Breakout<span class="text-purple-400">AI</span>
@@ -86,7 +116,7 @@
         <div id="app" class="hidden">
 
             <!-- Filter / sort bar (replaces the old watchlist strip) -->
-            <div class="mb-5 p-3 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-3">
+            <div id="filterBar" class="mb-5 p-3 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-3">
                 <input id="fltSearch" type="text" placeholder="Search symbol or name…"
                        class="flex-1 min-w-[180px] max-w-xs px-3 py-1.5 text-sm rounded-lg bg-slate-800 border border-borderCl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500">
                 <label class="flex items-center gap-2 text-xs text-slate-400">
@@ -126,6 +156,11 @@
                 </button>
                 <span id="fltCount" class="text-[11px] text-slate-500 ml-auto whitespace-nowrap"></span>
             </div>
+
+            <!-- Active filter pills — one removable chip per live filter, so filter
+                 state is always visible and reversible in one click even when it was
+                 set deep inside a popup (Sector Radar, fundamentals presets). -->
+            <div id="activePills" class="hidden mb-5 -mt-2 px-3 py-2 rounded-xl bg-cardBg border border-borderCl flex-wrap items-center gap-2"></div>
 
             <!-- Fundamentals filters — always visible, compact horizontal row so the options are discoverable without eating space -->
             <div id="fundPanel" class="mb-5 px-3 py-2.5 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -167,8 +202,21 @@
                     </div>
                 </div>
 
-                <!-- RIGHT: detail pane for the selected stock -->
-                <div class="lg:col-span-9 flex flex-col gap-5">
+                <!-- RIGHT: detail pane for the selected stock. Below the lg breakpoint
+                     this becomes a full-screen sheet (see the mobile-pass CSS) that
+                     slides up over the watchlist rather than sitting below it. -->
+                <div id="detailPane" class="lg:col-span-9 flex flex-col gap-5">
+
+                    <!-- Mobile-only: back to the watchlist (hidden on lg+ via CSS) -->
+                    <button id="mobileBackBar" type="button" onclick="closeMobileDetail()"
+                            class="sticky top-0 z-40 -mx-3 -mt-3 mb-1 px-3 py-2.5 items-center gap-2 text-sm font-semibold text-slate-300 bg-darkBg/95 backdrop-blur-sm border-b border-borderCl">
+                        ← Back to list
+                    </button>
+
+                    <!-- Sticky scroll-spy section nav — chips are generated at load by
+                         initSectionNav() from each detail card's heading, so cards added
+                         later show up here without touching this markup. -->
+                    <nav id="sectionNav" class="hidden sticky top-0 z-30 -mb-2 py-2 bg-slate-900/95 backdrop-blur border-b border-borderCl flex items-center gap-1.5 overflow-x-auto"></nav>
 
                     <!-- Detail header -->
                     <div class="p-4 rounded-xl bg-cardBg border border-borderCl flex flex-wrap gap-x-8 gap-y-3 items-center">
@@ -202,7 +250,7 @@
                     <div id="readNewsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <!-- The Read (readiness + verdict explainer) -->
                         <div id="verdictCard" class="p-5 border rounded-xl bg-cardBg border-borderCl shadow-xl relative overflow-hidden">
-                            <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                            <div id="verdictGlow" class="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                             <div class="flex items-start justify-between gap-2 mb-3">
                                 <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">The Read</h3>
                                 <div class="flex items-center gap-1 flex-wrap justify-end">
@@ -260,6 +308,8 @@
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-purple-400"></span> 50-day EMA</span>
                             <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-amber-400"></span> 200-day EMA</span>
                             <span class="flex items-center gap-1"><span class="text-emerald-400">▲</span> Past breakout</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0.5 bg-slate-200"></span> VCP contraction</span>
+                            <span class="flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dotted border-yellow-400"></span> VCP pivot <span class="text-yellow-400">●</span> confirmed</span>
                             <span class="flex items-center gap-1">Volume + RSI(14) panes below</span>
                             <span class="text-slate-500">· "3×" = times price reversed there (thicker line = confirmed ≥3 touches)</span>
                         </div>
@@ -458,6 +508,27 @@
         </div>
     </div>
 
+    <!-- Toasts: transient, non-blocking feedback (replaces alert()). Stacked
+         bottom-centre; each auto-dismisses. Purely status output, so aria-live. -->
+    <div id="toastHost" class="fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4 pointer-events-none"
+         role="status" aria-live="polite"></div>
+
+    <!-- Prompt modal: a focus-trapped replacement for the blocking prompt(). One
+         at a time (there's never a second overlapping ask), driven by showPrompt(). -->
+    <div id="promptModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div id="promptBackdrop" class="absolute inset-0 bg-black/60"></div>
+        <form id="promptForm" class="relative w-full max-w-sm bg-cardBg border border-borderCl rounded-xl shadow-2xl fade-in p-5">
+            <div id="promptTitle" class="text-sm font-bold text-white"></div>
+            <div id="promptMsg" class="text-[12px] text-slate-400 mt-1 leading-snug"></div>
+            <input id="promptInput" type="text" autocomplete="off"
+                   class="mt-3 w-full bg-slate-900 border border-borderCl rounded-md px-3 py-2 text-sm text-white outline-none focus:border-purple-500" />
+            <div class="mt-4 flex justify-end gap-2">
+                <button id="promptCancel" type="button" class="px-3 py-1.5 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-all">Cancel</button>
+                <button id="promptOk" type="submit" class="px-3 py-1.5 rounded-md text-sm font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-all">OK</button>
+            </div>
+        </form>
+    </div>
+
     <!-- Ask AI: floating launcher + slide-over panel. Talks to a local dev server
          (backend/chat_server.py) that proxies Groq so the API key stays server-side. -->
     <button id="askAiFab" type="button"
@@ -509,6 +580,21 @@
         // market is actively toggled -- see addToWatchlist/renderMyWatchlist below.
         const MARKET_KEY = "breakoutai_market";
         let MARKET = localStorage.getItem(MARKET_KEY) === "US" ? "US" : "IN";
+        // --- URL deep-linking: #m=IN&s=SYMBOL makes any stock/market shareable. The
+        // hash wins over the remembered market so a pasted link always lands exactly
+        // where the sender was looking. replaceState (not pushState) keeps browsing
+        // stocks from flooding the back button.
+        function parseHash() {
+            const p = new URLSearchParams(location.hash.replace(/^#/, ""));
+            const m = (p.get("m") || "").toUpperCase();
+            return { market: m === "US" || m === "IN" ? m : null,
+                     symbol: (p.get("s") || "").trim() || null };
+        }
+        function syncHash() {
+            const h = "#m=" + MARKET + (current ? "&s=" + encodeURIComponent(current.symbol) : "");
+            if (location.hash !== h) history.replaceState(null, "", h);
+        }
+        MARKET = parseHash().market || MARKET;
         // Serving JSON (breakouts/ohlc/performance) lives on the orphan `data` branch in
         // production -- force-pushed daily by the workflows, kept off `main` to stop ~6k
         // files/day of history growth. Locally it's just the data/ folder. Non-data calls
@@ -820,7 +906,13 @@
         let DATA_US = null;
 
         async function loadData() {
-            showStatus("Loading latest scan…");
+            // Skeleton shimmer while the scan file downloads/parses.
+            showStatus(`
+                <div class="max-w-md mx-auto text-left animate-pulse" aria-hidden="true">
+                    <div class="h-4 w-44 bg-slate-800 rounded mb-4"></div>
+                    ${`<div class="h-10 bg-slate-800/70 rounded-lg mb-2"></div>`.repeat(6)}
+                </div>
+                <div class="text-sm text-slate-400 mt-3">Loading latest scan…</div>`);
             try {
                 const res = await fetch(DATA_BASE + "breakouts.json", { cache: "no-store" });
                 if (!res.ok) throw new Error("HTTP " + res.status);
@@ -853,13 +945,43 @@
             } catch (e) { /* no US data yet -- non-fatal */ }
 
             wireControls();
+            wirePromptModal();
             wireChartToggle();
             initTooltips();
             initAskAi();
+            initKeyboardNav();
+            initSectionNav();
             await initMyWatchlist();
+
+            // Deep link: #m=IN&s=SYMBOL overrides the remembered market. Reuses the
+            // module-level parseHash()/syncHash() pair (URLSearchParams format) so a
+            // link the app itself generates round-trips back to the same stock.
+            const dl = parseHash();
+            if (dl.symbol) {
+                if (dl.market) MARKET = dl.market;
+                pendingDeepLinkSymbol = dl.symbol;
+            }
+
+            // Live hash edits (or a link click on an already-open tab) should work
+            // too. No feedback loop: selectStock writes via replaceState, which
+            // does NOT fire hashchange.
+            window.addEventListener("hashchange", () => {
+                const h = parseHash();
+                if (!h.symbol) return;
+                if (h.market && h.market !== MARKET) {
+                    pendingDeepLinkSymbol = h.symbol;
+                    switchMarket(h.market);
+                } else if (!current || current.symbol !== h.symbol) {
+                    if (STOCKS.some(s => s.symbol === h.symbol)) selectStock(h.symbol, true);
+                }
+            });
             switchMarket(MARKET);
             $("statusPane").classList.add("hidden");
             $("app").classList.remove("hidden");
+            // Measure the header now that it's actually laid out -- the resize
+            // listener only covers *later* viewport changes, so without this first
+            // call the sticky filter bar's offset would be wrong until the first resize.
+            syncStickyOffsets();
         }
 
         function showStatus(html) {
@@ -868,11 +990,40 @@
             $("statusMsg").innerHTML = html;
         }
 
+        // Symbol requested via URL hash before data finished loading; consumed
+        // (and cleared) by the first switchMarket() after load.
+        let pendingDeepLinkSymbol = null;
+
+        // --- Mobile detail sheet ----------------------------------------------------
+        // Below the lg breakpoint the right column is a full-screen overlay (see the
+        // mobile-pass CSS) rather than a permanently-visible panel, so opening it is
+        // an explicit action (tap a row, follow a deep link) -- not the automatic
+        // "select the top stock" that happens on every load/market switch.
+        const isMobile = () => window.innerWidth < 1024;
+        function openMobileDetail() {
+            if (isMobile()) document.body.classList.add("mobile-detail-open");
+        }
+        function closeMobileDetail() {
+            document.body.classList.remove("mobile-detail-open");
+        }
+        // The header can wrap to two lines on narrow phones, so the sticky filter
+        // bar's offset is measured rather than hardcoded.
+        function syncStickyOffsets() {
+            const h = $("appHeader");
+            if (h) document.documentElement.style.setProperty("--header-h", h.getBoundingClientRect().height + "px");
+        }
+        window.addEventListener("resize", syncStickyOffsets);
+
         function switchMarket(m) {
             MARKET = m;
             localStorage.setItem(MARKET_KEY, m);
             STOCKS = m === "US" ? STOCKS_US : STOCKS_IN;
             const data = m === "US" ? DATA_US : DATA_IN;
+
+            // The soon-to-be-selected top stock belongs to the *new* market, so any
+            // open detail sheet is showing a now-stale name -- close it rather than
+            // let the switch silently swap the sheet's contents underneath the user.
+            closeMobileDetail();
 
             // Live quotes are keyed by bare symbol -- clear on switch so a stray
             // same-ticker collision between markets can't leak a stale price across.
@@ -899,6 +1050,9 @@
             filters.industry = "";
             filters.collection = "";
             expandedSectorGroup = null;
+            // …then restore this market's own saved set (validated against the
+            // taxonomy that's actually in the freshly loaded data).
+            restoreFilters(m);
 
             if (!STOCKS.length) {
                 $("watchlist").innerHTML = `<span class="text-sm text-slate-500 py-2">No ${m === "US" ? "US" : "India"} scan data yet.</span>`;
@@ -916,15 +1070,89 @@
             renderSectorRadar();
             renderFundPanel();
             applyFilters();
-            selectStock(STOCKS[0].symbol);
+
+            // Deep link (#MARKET/SYMBOL) wins over the default top pick, but only
+            // if that symbol actually exists in this market's data.
+            const wasDeepLinked = pendingDeepLinkSymbol && STOCKS.some(s => s.symbol === pendingDeepLinkSymbol);
+            const dlSym = wasDeepLinked
+                ? pendingDeepLinkSymbol
+                : (currentVisible()[0] || STOCKS[0]).symbol;
+            pendingDeepLinkSymbol = null;
+            // A shared deep link should land a phone user straight on the detail
+            // sheet; the plain default top pick should leave them on the list.
+            selectStock(dlSym, wasDeepLinked);
             startLiveQuotePolling();
+        }
+
+        // --- Toasts + prompt modal (non-blocking replacements for alert()/prompt()) ---
+        // Transient status feedback. type ∈ {info, success, error}; auto-dismisses.
+        function showToast(msg, type = "info", ms = 4000) {
+            const host = $("toastHost");
+            if (!host) return;
+            const styles = {
+                error:   "border-rose-500/40 bg-rose-500/10 text-rose-200",
+                success: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+                info:    "border-borderCl bg-cardBg text-slate-200",
+            };
+            const el = document.createElement("div");
+            el.className = "pointer-events-auto max-w-sm px-4 py-2.5 rounded-lg border text-[13px] shadow-xl fade-in " + (styles[type] || styles.info);
+            el.textContent = msg;
+            host.appendChild(el);
+            setTimeout(() => {
+                el.style.transition = "opacity .3s";
+                el.style.opacity = "0";
+                setTimeout(() => el.remove(), 300);
+            }, ms);
+        }
+
+        // Promise-based prompt(). Resolves to the trimmed string, or null on cancel.
+        // Only ever one open at a time -- a second call cancels the pending one first.
+        let _promptResolve = null;
+        function showPrompt({ title = "", message = "", value = "", placeholder = "", password = false } = {}) {
+            return new Promise((resolve) => {
+                if (_promptResolve) { const prev = _promptResolve; _promptResolve = null; prev(null); }
+                _promptResolve = resolve;
+                $("promptTitle").textContent = title;
+                const msgEl = $("promptMsg");
+                msgEl.textContent = message;
+                msgEl.classList.toggle("hidden", !message);
+                const input = $("promptInput");
+                input.type = password ? "password" : "text";
+                input.value = value;
+                input.placeholder = placeholder;
+                $("promptModal").classList.remove("hidden");
+                input.focus();
+                input.select();
+            });
+        }
+        function _closePrompt(result) {
+            const resolve = _promptResolve;
+            _promptResolve = null;
+            $("promptModal").classList.add("hidden");
+            if (resolve) resolve(result);
+        }
+        function wirePromptModal() {
+            $("promptForm").onsubmit = (e) => { e.preventDefault(); _closePrompt($("promptInput").value.trim()); };
+            $("promptCancel").onclick = () => _closePrompt(null);
+            $("promptBackdrop").onclick = () => _closePrompt(null);
+            // Own Escape handler -- the modal isn't in the POPUPS list that the global
+            // keyboard-nav Escape closes, and it must win while it's the top layer.
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && !$("promptModal").classList.contains("hidden")) {
+                    e.stopPropagation();
+                    _closePrompt(null);
+                }
+            }, true);
         }
 
         function wireControls() {
             $("marketBtnIN").onclick = () => { if (MARKET !== "IN") switchMarket("IN"); };
             $("marketBtnUS").onclick = () => { if (MARKET !== "US") switchMarket("US"); };
-            $("perfLink").onclick = () => {
-                if (prompt("Access code:") === "1234") window.location.href = "performance.html";
+            $("perfLink").onclick = async () => {
+                const code = await showPrompt({ title: "Performance dashboard", message: "Enter access code.", password: true });
+                if (code === null) return;
+                if (code === "1234") window.location.href = "performance.html";
+                else showToast("Incorrect access code.", "error");
             };
             $("fltSearch").oninput = (e) => { filters.query = e.target.value; applyFilters(); };
             $("fltSector").onchange = (e) => { setSectorFilter(e.target.value); applyFilters(); };
@@ -1075,8 +1303,297 @@
             }
         }
 
+        // --- Filter persistence: each market remembers its own filter set across
+        // reloads (the two sector taxonomies and collection chips differ, so IN and
+        // US are stored under separate keys and never cross-contaminate).
+        const FILTERS_KEY = (m) => "breakoutai_filters_" + m;
+
+        function persistFilters() {
+            try { localStorage.setItem(FILTERS_KEY(MARKET), JSON.stringify(filters)); }
+            catch (e) { /* storage blocked/full — persistence is best-effort */ }
+        }
+
+        function restoreFilters(m) {
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem(FILTERS_KEY(m)) || "null"); }
+            catch (e) { /* corrupt entry — fall through to defaults */ }
+            if (saved) {
+                filters.query = saved.query || "";
+                filters.sort = SORTERS[saved.sort] ? saved.sort : "conviction";
+                filters.primedOnly = !!saved.primedOnly;
+                filters.setup = saved.setup || "";
+                filters.collection = saved.collection || "";
+                // Only restore a sector/industry that still exists in this market's
+                // current data — otherwise a renamed group would silently zero out
+                // every match with no visible cause.
+                const groups = new Set(STOCKS.map(sectorGroup));
+                filters.sector = saved.sector && groups.has(saved.sector) ? saved.sector : "";
+                filters.industry = filters.sector ? (saved.industry || "") : "";
+                FUND_FIELDS.forEach(f => {
+                    const r = (saved.fundamentals || {})[f.key] || {};
+                    filters.fundamentals[f.key] = { min: r.min ?? null, max: r.max ?? null };
+                });
+            }
+            syncFilterControls();
+        }
+
+        // Push filter state back into the header controls (search box, selects, the
+        // Primed toggle's styling) after a restore or a pill-click mutation.
+        function syncFilterControls() {
+            $("fltSearch").value = filters.query;
+            $("fltSector").value = filters.sector;
+            $("fltSort").value = filters.sort;
+            $("fltPrimed").className = "px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all " +
+                (filters.primedOnly
+                    ? "bg-purple-600/20 border-purple-500 text-white"
+                    : "bg-slate-800 border-borderCl text-slate-300");
+        }
+
+        function clearAllFilters() {
+            filters.query = "";
+            filters.sector = "";
+            filters.industry = "";
+            filters.setup = "";
+            filters.collection = "";
+            filters.primedOnly = false;
+            FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
+            expandedSectorGroup = null;
+            syncFilterControls();
+            renderCollections();
+            renderSetupBreakdown();
+            renderSectorRadar();
+            renderFundPanel();
+            applyFilters();
+        }
+
+        // Active-filter pills: one removable chip per live filter (query, sector,
+        // industry, setup, collection, Primed, each fundamentals range) + Clear all.
+        function renderActivePills() {
+            const host = $("activePills");
+            const pills = [];
+            const add = (label, clear) => pills.push({ label, clear });
+            if (filters.query.trim()) add(`“${filters.query.trim()}”`, () => { filters.query = ""; });
+            if (filters.sector) add(filters.sector, () => {
+                filters.sector = ""; filters.industry = ""; expandedSectorGroup = null; renderSectorRadar();
+            });
+            if (filters.industry) add(filters.industry, () => { filters.industry = ""; renderSectorRadar(); });
+            if (filters.setup) add("Setup: " + filters.setup, () => { filters.setup = ""; renderSetupBreakdown(); });
+            if (filters.collection) {
+                const c = COLLECTIONS.find(x => x.key === filters.collection);
+                add(c ? c.label : filters.collection, () => { filters.collection = ""; renderCollections(); });
+            }
+            if (filters.primedOnly) add("Primed only", () => { filters.primedOnly = false; });
+            FUND_FIELDS.forEach(f => {
+                const r = filters.fundamentals[f.key];
+                if (r.min == null && r.max == null) return;
+                const rng = r.min != null && r.max != null ? `${r.min}–${r.max}`
+                    : r.min != null ? `≥ ${r.min}` : `≤ ${r.max}`;
+                add(`${f.label} ${rng}`, () => {
+                    filters.fundamentals[f.key] = { min: null, max: null }; renderFundPanel();
+                });
+            });
+
+            host.innerHTML = "";
+            host.classList.toggle("hidden", !pills.length);
+            host.classList.toggle("flex", !!pills.length);
+            if (!pills.length) return;
+            pills.forEach(p => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full border border-purple-500/60 bg-purple-600/15 text-purple-200 hover:bg-purple-600/30";
+                b.append(document.createTextNode(p.label));   // textNode: query is user input
+                const x = document.createElement("span");
+                x.className = "text-purple-300";
+                x.textContent = "×";
+                b.appendChild(x);
+                b.onclick = () => { p.clear(); syncFilterControls(); applyFilters(); };
+                host.appendChild(b);
+            });
+            const clr = document.createElement("button");
+            clr.type = "button";
+            clr.className = "px-2.5 py-1 text-[11px] font-semibold rounded-full border border-borderCl bg-slate-800 text-slate-300 hover:border-slate-500";
+            clr.textContent = "Clear all";
+            clr.onclick = clearAllFilters;
+            host.appendChild(clr);
+        }
+
+        // --- Sticky section nav (scroll-spy) + collapsible detail cards ---------
+        // Built from the DOM itself (each card's <h3>), not a hand-maintained list.
+        const COLLAPSED_KEY = "breakoutai_collapsed_cards";
+        let collapsedCards = new Set();
+        try { collapsedCards = new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]")); }
+        catch (e) { /* corrupt entry -- start fully expanded */ }
+
+        let sectionNavItems = [];
+        const NAV_BTN_IDLE = "text-slate-400 hover:text-slate-200 border-transparent";
+        const NAV_BTN_ACTIVE = "text-white bg-purple-600/25 border-purple-500";
+
+        function cardLabel(card) {
+            if (card.querySelector("#indicatorStrip")) return "Chart";   // chart card has no h3
+            const h = card.querySelector("h3");
+            if (!h) return null;
+            // First text node only -- h3s often carry info-i / badge spans.
+            const t = Array.from(h.childNodes).find(n => n.nodeType === 3 && n.textContent.trim());
+            return (t ? t.textContent : h.innerText).trim().replace(/\s+/g, " ") || null;
+        }
+
+        // The card's direct child that contains its heading (usually the header row).
+        function headerRowOf(card) {
+            const h = card.querySelector("h3");
+            if (!h) return null;
+            let row = h;
+            while (row.parentElement && row.parentElement !== card) row = row.parentElement;
+            return row;
+        }
+
+        function setCardCollapsed(card, collapsed, save = true) {
+            const row = headerRowOf(card);
+            if (!row) return;
+            let past = false;
+            Array.from(card.children).forEach(ch => {
+                if (past) ch.style.display = collapsed ? "none" : "";
+                if (ch === row) past = true;
+            });
+            card.dataset.collapsed = collapsed ? "1" : "";
+            const btn = card.querySelector(".card-collapse-btn");
+            if (btn) {
+                btn.textContent = collapsed ? "▸" : "▾";
+                btn.title = collapsed ? "Expand section" : "Collapse section";
+            }
+            if (save) {
+                collapsed ? collapsedCards.add(card.id) : collapsedCards.delete(card.id);
+                try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsedCards])); }
+                catch (e) { /* best-effort */ }
+            }
+        }
+
+        function addCollapseToggle(card) {
+            const row = headerRowOf(card);
+            // Only cards whose heading row is the first *content* child get a toggle
+            // (decorative absolute-positioned overlays like the verdict card's blur
+            // glow don't count); anywhere else the collapse boundary wouldn't match
+            // what the user expects.
+            const firstContent = Array.from(card.children).find(ch => !ch.classList.contains("absolute"));
+            if (!row || row !== firstContent) return;
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "card-collapse-btn flex-none ml-2 w-6 h-6 rounded-md border border-borderCl text-slate-400 hover:text-white hover:border-slate-500 text-xs leading-none";
+            btn.textContent = "▾";
+            btn.title = "Collapse section";
+            btn.onclick = () => setCardCollapsed(card, card.dataset.collapsed !== "1");
+            row.appendChild(btn);
+            if (collapsedCards.has(card.id)) setCardCollapsed(card, true, false);
+        }
+
+        function initSectionNav() {
+            const nav = $("sectionNav");
+            const col = nav.parentElement;
+            sectionNavItems = [];
+            nav.innerHTML = "";
+
+            const topBtn = document.createElement("button");
+            topBtn.type = "button";
+            topBtn.className = "flex-none px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap";
+            topBtn.textContent = "▲ Top";
+            topBtn.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
+            nav.appendChild(topBtn);
+
+            // Cards sit either directly in the column or nested one level down in
+            // layout grids (Read+News row, the detail-cards grid), so collect every
+            // TOP-MOST .bg-cardBg box in document order rather than col.children.
+            const cards = Array.from(col.querySelectorAll(".bg-cardBg"))
+                .filter(el => !el.parentElement.closest(".bg-cardBg"));
+            cards.forEach(card => {
+                const label = cardLabel(card);
+                if (!label) return;
+                if (!card.id) card.id = "sec-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+                card.style.scrollMarginTop = "56px";
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.dataset.base = "flex-none px-2.5 py-1 text-[11px] font-semibold rounded-lg border whitespace-nowrap transition-all ";
+                btn.className = btn.dataset.base + NAV_BTN_IDLE;
+                btn.textContent = label;
+                btn.onclick = () => card.scrollIntoView({ behavior: "smooth", block: "start" });
+                nav.appendChild(btn);
+                sectionNavItems.push({ card, btn });
+                addCollapseToggle(card);
+            });
+
+            if (!sectionNavItems.length) return;
+            nav.classList.remove("hidden");
+
+            // Spy on scroll + on card visibility flips (cards hide when the selected
+            // stock has no data for them, e.g. no news / no holdings trend).
+            let ticking = false;
+            const schedule = () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => { ticking = false; updateSectionSpy(); });
+            };
+            window.addEventListener("scroll", schedule, { passive: true });
+            const mo = new MutationObserver(schedule);
+            sectionNavItems.forEach(it => mo.observe(it.card, { attributes: true, attributeFilter: ["class"] }));
+            updateSectionSpy();
+        }
+
+        function updateSectionSpy() {
+            let active = null;
+            sectionNavItems.forEach(it => {
+                const visible = it.card.offsetParent !== null;   // display:none => null
+                it.btn.style.display = visible ? "" : "none";
+                if (visible && it.card.getBoundingClientRect().top <= 64) active = it;
+            });
+            if (!active) active = sectionNavItems.find(it => it.btn.style.display !== "none");
+            sectionNavItems.forEach(it => {
+                it.btn.className = it.btn.dataset.base + (it === active ? NAV_BTN_ACTIVE : NAV_BTN_IDLE);
+            });
+        }
+
+        // --- Keyboard navigation: "/" focuses search, ↑/↓ step through the visible
+        // list (works from the search box too), Enter in search opens the top match,
+        // Esc closes whichever popup is open / blurs the field.
+        function initKeyboardNav() {
+            const POPUPS = ["sectorPopup", "myWatchlistPanel", "askAiPanel"];
+            document.addEventListener("keydown", (e) => {
+                const el = document.activeElement;
+                const typing = el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
+                if (e.key === "Escape") {
+                    const open = POPUPS.map($).find(p => p && !p.classList.contains("hidden"));
+                    if (open) { open.classList.add("hidden"); e.preventDefault(); }
+                    else if (typing) el.blur();
+                    return;
+                }
+                if (e.key === "/" && !typing) {
+                    e.preventDefault();
+                    $("fltSearch").focus();
+                    $("fltSearch").select();
+                    return;
+                }
+                if (e.key === "Enter" && el === $("fltSearch")) {
+                    const vis = currentVisible().slice(0, MAX_RESULTS);
+                    if (vis.length) { selectStock(vis[0].symbol, true); el.blur(); }
+                    return;
+                }
+                if ((e.key === "ArrowDown" || e.key === "ArrowUp") && (!typing || el === $("fltSearch"))) {
+                    const vis = currentVisible().slice(0, MAX_RESULTS);
+                    if (!vis.length) return;
+                    e.preventDefault();
+                    const idx = current ? vis.findIndex(s => s.symbol === current.symbol) : -1;
+                    const next = e.key === "ArrowDown"
+                        ? vis[Math.min(idx + 1, vis.length - 1)]
+                        : vis[Math.max(idx - 1, 0)];
+                    if (!next || (current && next.symbol === current.symbol)) return;
+                    selectStock(next.symbol);
+                    const row = $("wl-" + next.symbol);
+                    if (row) row.scrollIntoView({ block: "nearest" });
+                }
+            });
+        }
+
         function applyFilters() {
             renderIndustryChip();
+            renderActivePills();
+            persistFilters();
             const list = currentVisible();
             renderWatchlist(list);
             const shown = Math.min(list.length, MAX_RESULTS);
@@ -1101,7 +1618,16 @@
             const wl = $("watchlist");
             wl.innerHTML = "";
             if (!list.length) {
-                wl.innerHTML = `<span class="text-sm text-slate-500 py-2">No stock matches these filters.</span>`;
+                wl.innerHTML = `
+                    <div class="py-8 text-center">
+                        <div class="text-2xl mb-2">🔍</div>
+                        <div class="text-sm font-semibold text-slate-400">No stock matches these filters</div>
+                        <div class="text-xs text-slate-500 mt-1 mb-3">Try widening the search or removing a filter.</div>
+                        <button type="button" onclick="clearAllFilters()"
+                                class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-500 bg-purple-600/20 text-purple-200 hover:bg-purple-600/30">
+                            Clear all filters
+                        </button>
+                    </div>`;
                 return;
             }
             const trackedSet = new Set(MY_WATCHLIST.filter(it => it.market === MARKET).map(it => it.symbol));
@@ -1119,7 +1645,7 @@
                 row.id = "wl-" + s.symbol;
                 row.setAttribute("role", "button");
                 row.tabIndex = 0;
-                row.onclick = () => selectStock(s.symbol);
+                row.onclick = () => selectStock(s.symbol, true);
                 row.className = "wl-row w-full text-left px-3 py-2 rounded-lg border transition-all bg-slate-800/60 border-slate-700/60 hover:border-slate-500 cursor-pointer";
                 row.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
@@ -1413,11 +1939,21 @@
             });
         }
 
-        function selectStock(symbol) {
+        // openOnMobile: only explicit user picks (tapping a row, following a deep
+        // link, choosing from the watchlist) should slide the mobile detail sheet up.
+        // The automatic "select the top match" that fires on load/filter changes must
+        // NOT yank a phone user off the list they're scanning.
+        function selectStock(symbol, openOnMobile = false) {
             current = STOCKS.find(s => s.symbol === symbol);
             if (!current) return;
             const s = current;
             highlightActive();
+            if (openOnMobile) openMobileDetail();
+
+            // Keep the URL shareable. replaceState, not assignment -- arrow-key
+            // browsing through the list must not pile entries onto the back button.
+            try { history.replaceState(null, "", "#" + MARKET + "/" + encodeURIComponent(s.symbol)); }
+            catch (e) { /* sandboxed iframe / file:// edge cases -- non-fatal */ }
 
             $("metaTitle").innerText = s.name;
             $("metaSector").innerText = s.sector || "Unclassified";
@@ -1461,10 +1997,15 @@
         // STOCKS at render time -- only {symbol, date_added, entry_price} live server-side.
         const WATCHLIST_SECRET_KEY = "breakoutai_watchlist_secret";
 
-        function getWatchlistSecret(promptIfMissing) {
+        async function getWatchlistSecret(promptIfMissing) {
             let secret = localStorage.getItem(WATCHLIST_SECRET_KEY) || "";
             if (!secret && promptIfMissing) {
-                secret = (prompt("Enter your watchlist secret (the WATCHLIST_SECRET you set on Vercel):") || "").trim();
+                secret = (await showPrompt({
+                    title: "Watchlist secret",
+                    message: "Enter the WATCHLIST_SECRET you set on Vercel. It's stored on this device only.",
+                    placeholder: "secret",
+                    password: true,
+                }) || "").trim();
                 if (secret) localStorage.setItem(WATCHLIST_SECRET_KEY, secret);
             }
             return secret;
@@ -1478,7 +2019,7 @@
         }
 
         async function fetchMyWatchlist() {
-            const secret = getWatchlistSecret(false);
+            const secret = await getWatchlistSecret(false);
             if (!secret) { renderMyWatchlist(); return; }
             try {
                 const res = await fetch("/api/watchlist", { headers: { "X-Watchlist-Secret": secret } });
@@ -1500,7 +2041,7 @@
         }
 
         async function addToWatchlist(stock) {
-            const secret = getWatchlistSecret(true);
+            const secret = await getWatchlistSecret(true);
             if (!secret) return;
             try {
                 const res = await fetch("/api/watchlist", {
@@ -1514,12 +2055,12 @@
                 MY_WATCHLIST.unshift(item);
                 refreshWatchlistUI();
             } catch (err) {
-                alert("Couldn't add to watchlist: " + err.message);
+                showToast("Couldn't add to watchlist: " + err.message, "error");
             }
         }
 
         async function removeFromWatchlist(symbol, market) {
-            const secret = getWatchlistSecret(true);
+            const secret = await getWatchlistSecret(true);
             if (!secret) return;
             try {
                 const res = await fetch(`/api/watchlist?symbol=${encodeURIComponent(symbol)}&market=${encodeURIComponent(market)}`, {
@@ -1530,7 +2071,7 @@
                 MY_WATCHLIST = MY_WATCHLIST.filter(it => !(it.symbol === symbol && it.market === market));
                 refreshWatchlistUI();
             } catch (err) {
-                alert("Couldn't remove from watchlist: " + err.message);
+                showToast("Couldn't remove from watchlist: " + err.message, "error");
             }
         }
 
@@ -1551,7 +2092,7 @@
         // that's what lets both an India and a US pick show correct data at the same time.
         function selectWatchlistItem(symbol, market) {
             if (market !== MARKET) switchMarket(market);
-            selectStock(symbol);
+            selectStock(symbol, true);
             $("myWatchlistPanel").classList.add("hidden");
         }
 
@@ -2173,7 +2714,7 @@
                     : "text-slate-400 bg-slate-500/10 border-slate-500/30");
 
             const rs = READINESS_STYLE[s.readiness.score] || READINESS_STYLE.low;
-            $("verdictGlow").className = "absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10 " + rs.glow;
+            $("verdictGlow").className = "absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none " + rs.glow;
             $("readinessLabel").innerText = s.readiness.label;
             $("readinessLabel").className = "text-2xl font-black tracking-tight mb-1 fade-in " + (s.readiness.score === "low" ? "text-slate-300" : "text-white");
             if (s.readiness.watch) {
@@ -2539,8 +3080,9 @@
             // Volume pane (thin band just under the candles). Colored the same
             // green/red as the candle body per day so a surge is visually obvious
             // without a separate legend entry.
+            let volSeries = null;
             if (data.volume) {
-                const volSeries = chart.addHistogramSeries({
+                volSeries = chart.addHistogramSeries({
                     priceScaleId: "volume", priceFormat: { type: "volume" },
                     lastValueVisible: false, priceLineVisible: false,
                 });
@@ -2554,8 +3096,9 @@
             }
 
             // RSI pane (bottom band) — 30/70 reference lines mark oversold/overbought.
+            let rsiSeries = null;
             if (data.rsi) {
-                const rsiSeries = chart.addLineSeries({
+                rsiSeries = chart.addLineSeries({
                     color: "#22d3ee", lineWidth: 2, priceScaleId: "rsi",
                     lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
                 });
@@ -2594,12 +3137,77 @@
                     title: srTitle("Support", supZone),
                 });
             }
-            if (data.breakouts && data.breakouts.length) {
-                candles.setMarkers(data.breakouts.map(d => ({
-                    time: d, position: "belowBar", color: "#10b981", shape: "arrowUp", text: "BO",
-                })));
+            // VCP contraction overlay (latest_vcp_structure via export_ohlc.py): a thin
+            // zigzag through the alternating pivot-high/trough points of each
+            // contraction leg, plus a dotted line at the pivot (buy) level. Only
+            // emitted by the exporter when the whole base fits in the drawn window.
+            const vcp = data.vcp;
+            if (vcp && vcp.points && vcp.points.length >= 3) {
+                const zig = chart.addLineSeries({
+                    color: "#e2e8f0", lineWidth: 1, priceLineVisible: false,
+                    lastValueVisible: false, crosshairMarkerVisible: false,
+                });
+                zig.setData(vcp.points.map(([t, p]) => ({ time: t, value: p })));
+                if (vcp.pivot != null) {
+                    candles.createPriceLine({
+                        price: vcp.pivot, color: "#facc15", lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true,
+                        title: "VCP pivot",
+                    });
+                }
+            }
+
+            // One setMarkers call for everything — it replaces (not appends), so
+            // breakout arrows and the VCP confirmation dot must go in together,
+            // sorted ascending by time as lightweight-charts requires.
+            const markers = (data.breakouts || []).map(d => ({
+                time: d, position: "belowBar", color: "#10b981", shape: "arrowUp", text: "BO",
+            }));
+            if (vcp && vcp.confirmed) {
+                markers.push({ time: vcp.confirmed, position: "aboveBar", color: "#facc15", shape: "circle", text: "VCP" });
+            }
+            if (markers.length) {
+                markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+                candles.setMarkers(markers);
             }
             chart.timeScale().fitContent();
+
+            // Crosshair tooltip — OHLC + day change, volume and RSI for the hovered
+            // bar. The three "panes" are one chart, so one floating readout beats
+            // squinting at the axis; hidden whenever the cursor leaves the bars.
+            host.style.position = "relative";
+            const tip = document.createElement("div");
+            tip.className = "hidden absolute z-10 pointer-events-none rounded border border-borderCl bg-slate-900/95 px-2 py-1.5 text-[10px] leading-4 text-slate-300 shadow-lg";
+            host.appendChild(tip);
+            const fmtVol = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+            // v4 quirk: bars fed as "YYYY-MM-DD" strings come back from the crosshair
+            // as BusinessDay objects, so re-format either shape.
+            const fmtTime = (t) => typeof t === "string"
+                ? t
+                : `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`;
+            chart.subscribeCrosshairMove((param) => {
+                const c = param.time && param.point ? param.seriesData.get(candles) : null;
+                if (!c) { tip.classList.add("hidden"); return; }
+                const chg = c.open ? ((c.close - c.open) / c.open) * 100 : 0;
+                const rows = [
+                    `<div class="font-semibold text-slate-100">${fmtTime(param.time)}</div>`,
+                    `<div>O ${c.open} · H ${c.high} · L ${c.low} · C ${c.close} <span class="${chg >= 0 ? "text-emerald-400" : "text-rose-400"}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</span></div>`,
+                ];
+                const v = volSeries ? param.seriesData.get(volSeries) : null;
+                if (v && v.value != null) rows.push(`<div>Vol ${fmtVol.format(v.value)}</div>`);
+                const r = rsiSeries ? param.seriesData.get(rsiSeries) : null;
+                if (r && r.value != null) rows.push(`<div>RSI(14) ${r.value.toFixed(1)}</div>`);
+                tip.innerHTML = rows.join("");
+                tip.classList.remove("hidden");
+                // Flip to the other side of the cursor near the right/bottom edges so
+                // the readout never clips outside the pane.
+                const pad = 12;
+                let x = param.point.x + pad, y = param.point.y + pad;
+                if (x + tip.offsetWidth > host.clientWidth - 4) x = param.point.x - tip.offsetWidth - pad;
+                if (y + tip.offsetHeight > host.clientHeight - 4) y = param.point.y - tip.offsetHeight - pad;
+                tip.style.left = Math.max(4, x) + "px";
+                tip.style.top = Math.max(4, y) + "px";
+            });
 
             // keep it sized to the container
             lwResizeObs = new ResizeObserver(() => {

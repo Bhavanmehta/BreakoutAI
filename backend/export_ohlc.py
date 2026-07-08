@@ -25,6 +25,7 @@ import pandas as pd
 
 import settings
 from levels import resolve_display_levels
+from methods import latest_vcp_structure
 
 # ~10 months of daily context -- enough to give the 200-day EMA real runway to show its
 # own trend (not just a flat-looking tail) without bloating each file too much further.
@@ -71,11 +72,42 @@ def _line(zone: dict | None) -> dict | None:
             "confirmed": bool(zone.get("confirmed"))}
 
 
+def _vcp_obj(g: pd.DataFrame, drawn_start: int) -> dict | None:
+    """Most recent qualifying VCP contraction → the compact object the chart draws a
+    zigzag from: {"points": [[date, price], ...], "pivot": level, "confirmed": date|None}.
+    Points interleave pivot highs and leg troughs (high, low, high, low, ..., high) so
+    the frontend can draw the contraction legs directly. Omitted (None) when no window
+    qualifies or when the base starts before the drawn BARS window (a partial zigzag
+    would be misleading)."""
+    s = latest_vcp_structure(g)
+    if not s or s["pivots"][0] < drawn_start:
+        return None
+    dates = g["date"].tolist()
+    highs = g["high"].tolist()
+    lows = g["low"].tolist()
+
+    def _pt(pos: int, price: float) -> list:
+        return [pd.Timestamp(dates[pos]).strftime("%Y-%m-%d"), _r(price)]
+
+    points = []
+    for i, p in enumerate(s["pivots"]):
+        points.append(_pt(p, highs[p]))
+        if i < len(s["troughs"]):
+            points.append(_pt(s["troughs"][i], lows[s["troughs"][i]]))
+    return {
+        "points": points,
+        "pivot": _r(s["pivot_level"]),
+        "confirmed": (pd.Timestamp(dates[s["confirmed"]]).strftime("%Y-%m-%d")
+                      if s["confirmed"] is not None else None),
+    }
+
+
 def _emit_one(sym: str, g: pd.DataFrame) -> dict:
     g = g.sort_values("date")
     # Detect levels on the full available history (pivots need the context), then tail
     # to BARS for the drawn candles.
     levels = resolve_display_levels(g)
+    vcp = _vcp_obj(g.reset_index(drop=True), max(0, len(g) - BARS))
     g = g.tail(BARS)
     bars, volume, ema8, ema21, ema50, ema200, rsi, breakouts = [], [], [], [], [], [], [], []
     for _, row in g.iterrows():
@@ -102,6 +134,7 @@ def _emit_one(sym: str, g: pd.DataFrame) -> dict:
         "ema200": ema200,
         "rsi": rsi,
         "breakouts": breakouts,
+        "vcp": vcp,
     }
 
 
