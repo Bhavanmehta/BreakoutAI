@@ -34,6 +34,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Restore forward-only ledgers from the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # See daily-scan.yml for the full rationale: the append-only performance /
+          # track-record ledgers are gitignored (they live on the orphan `data` branch),
+          # so a fresh checkout has none and the ledger reset to "today only" every run.
+          # Pull the previous US copies (under us/) into data/us/ so the scan accumulates.
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          PREV="$(mktemp -d)"
+          if git clone --depth 1 --branch data "$REPO_URL" "$PREV/d" 2>/dev/null; then
+            mkdir -p data/us
+            for f in performance.json track_record.json predictions_log.jsonl; do
+              [ -f "$PREV/d/us/$f" ] && cp "$PREV/d/us/$f" "data/us/$f" || true
+            done
+          fi
+
       - name: Run the pipeline
         working-directory: backend
         run: python run_scan.py
@@ -56,7 +74,8 @@ jobs:
             cp -r "$PUB/cur/." "$PUB/pub" || mkdir -p "$PUB/pub"
           rm -rf "$PUB/pub/.git"
           mkdir -p "$PUB/pub/us"
-          cp data/us/breakouts.json data/us/track_record.json data/us/performance.json "$PUB/pub/us/"
+          cp data/us/breakouts.json data/us/track_record.json data/us/performance.json \
+             data/us/predictions_log.jsonl "$PUB/pub/us/"
           [ -f data/us/social.json ] && cp data/us/social.json "$PUB/pub/us/" || true
           rm -rf "$PUB/pub/us/ohlc" && cp -r data/us/ohlc "$PUB/pub/us/ohlc"
           cd "$PUB/pub"

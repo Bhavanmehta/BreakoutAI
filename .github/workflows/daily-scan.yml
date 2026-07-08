@@ -27,6 +27,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Restore forward-only ledgers from the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The performance/track-record ledgers are append-only DIARIES that must
+          # persist across runs (build_performance/track load the prior file, append
+          # today, rewrite). They're gitignored -- serving data lives on the orphan
+          # `data` branch -- so a fresh checkout of main has none, and without this the
+          # ledger reset to "today only" every run (past days were pushed to the branch
+          # but never read back). Pull the previous copies into data/ so the scan
+          # accumulates onto them and republishes the union.
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          PREV="$(mktemp -d)"
+          if git clone --depth 1 --branch data "$REPO_URL" "$PREV/d" 2>/dev/null; then
+            mkdir -p data
+            for f in performance.json track_record.json predictions_log.jsonl; do
+              [ -f "$PREV/d/$f" ] && cp "$PREV/d/$f" "data/$f" || true
+            done
+          fi
+
       - name: Run the pipeline
         working-directory: backend
         run: python run_scan.py
@@ -58,7 +79,8 @@ jobs:
           # Overlay this run's fresh India artifacts. The branch mirrors data/ with the
           # data/ prefix stripped, so India files sit at the root, US under us/. The ohlc
           # tree is swapped wholesale (rm+cp, no rsync dependency) so stale symbols drop.
-          cp data/breakouts.json data/track_record.json data/performance.json "$PUB/pub/"
+          cp data/breakouts.json data/track_record.json data/performance.json \
+             data/predictions_log.jsonl "$PUB/pub/"
           [ -f data/news.json ] && cp data/news.json "$PUB/pub/" || true
           [ -f data/fii_dii_history.json ] && cp data/fii_dii_history.json "$PUB/pub/" || true
           rm -rf "$PUB/pub/ohlc" && cp -r data/ohlc "$PUB/pub/ohlc"
