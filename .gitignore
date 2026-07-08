@@ -34,3 +34,9 @@ venv/
 
 # Throwaway research artifacts (e.g. the G/H method exploration scratch dumps)
 scratch_*
+
+# Local scratch / verification tooling (one-off scripts, screenshots, branch dumps).
+# Kept on disk but never committed: methods.py / CLAUDE.md reference a couple of these
+# as ongoing cross-checks. Regenerable; nothing here is source of record.
+/scratchpad/
+_verify_*
