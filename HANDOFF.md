@@ -1,6 +1,6 @@
 # BreakoutAI — Session Handoff
 
-_Last updated: 2026-07-06 (session 9, US market branch `feature/us-market`). Read this +
+_Last updated: 2026-07-06 (session 10, Card-UX/rationale layer). Read this +
 `CLAUDE.md` (durable project record) to resume._
 _When you start a fresh chat, point it here first._
 
@@ -8,6 +8,15 @@ _When you start a fresh chat, point it here first._
 
 Seven independent, **uncommitted** threads are open right now (session 9 is on the
 `feature/us-market` branch; sessions 0-5 below are on `main`'s working tree):
+-2. **Session 10 — Card-UX cluster: the "why" / rationale layer** (backend + frontend,
+   Sprint 2). New `backend/signals.py::build_rationale(rec)` derives, per record, a two-column
+   confirming/risk signal set, an edge-vs-risk RSS roll-up (`{edge, risk, net, confidence}`), a
+   one-line make-or-break trigger, and advisory gates (liquidity / volume-confirm / uptrend /
+   earnings-veto). Stored as `rec["rationale"]`, wired into `run_scan.py` after enrichment,
+   backfilled onto both `breakouts.json` files. **Transparency only — never the ranker**; the
+   conviction score in `score.py` stays purely technical. Frontend renders it in the detail pane
+   and degrades gracefully on old JSON. Verified via `_verify_frontend.py` (IN + US). See
+   "Session 10" below.
 -1. **Session 9 — US market conviction score validated + recalibrated + 2 new
    high-conviction tiers** (backend + frontend). The US mirror (`data/us/`,
    `BREAKOUTAI_MARKET=US`) had never had its score backtested. Found the US Method-A
@@ -43,6 +52,50 @@ Sessions 4, 6, 7, 8 are one continuous line of work (same conversation) and touc
 files (`backend/find_breakouts.py`, `run_scan.py`, `analyze_reliability.py`,
 `combined_breakout_scanner_platform.html`, the regenerated `data/*.json`) — resume/commit them
 together as one body of work. Sessions 3 (Ask AI) and 5 (Claude Skills) remain independent.
+
+---
+
+## Session 10: Card-UX cluster — the "why" / rationale layer
+
+### Why
+The conviction score (`score.py`) ranks stocks well but is a single opaque number. The
+Card-UX cluster (competitor-ideas #1–#4) asked for a **transparency layer**: for each pick,
+show *why* it's on the list, what would confirm or kill it, and the one thing to watch — in
+plain language, without touching the ranker.
+
+### What shipped
+- **`backend/signals.py`** — `build_rationale(rec)` derives, per enriched record:
+  - a two-column **confirming / risk** signal set (readiness, base depth, distance-to-resistance,
+    volume, trend, method — read off fields already on the record);
+  - an edge-vs-risk **RSS** roll-up `{edge, risk, net, confidence}` (magnitudes combined in
+    quadrature, not a new score — purely a display summary);
+  - a one-line **make-or-break** trigger (the price level / event that decides the setup);
+  - advisory **gates** (liquidity / volume-confirm / uptrend / earnings-veto), thresholds from
+    the new gate-constants block in `settings.py` (`GATE_MIN_AVG_TURNOVER`, `GATE_VOL_CONFIRM_MULT`,
+    `REQUIRE_UPTREND`, `GATE_EARNINGS_VETO_DAYS`).
+  - Result stored as `rec["rationale"]`. `python signals.py` backfills an existing
+    `breakouts.json` in place.
+- **`run_scan.py`** — calls `build_rationale` on every record *after* the holdings/sectors/
+  fundamentals enrichment merges, so the rationale sees the fully-populated record.
+- **Frontend** — detail pane renders it via `renderRationale` / `renderMakeOrBreak` /
+  `renderGates`; the whole block auto-hides when a record has no `rationale`, so old JSON
+  degrades to the classic read.
+
+### Discipline held
+The rationale is a **transparency layer only — never the ranker.** `score.py` stays purely
+technical (reliability + base depth + method). RSS/edge/risk are display-only summaries of
+signals already on the record; nothing here feeds back into sort order or conviction.
+
+### Verified
+Backfilled both `data/breakouts.json` and `data/us/breakouts.json`; schema validated. Ran
+`_verify_frontend.py` over `http.server` for IN + US on rich and sparse picks — all checks
+pass, only the pre-existing `/api/quotes` 404 remains.
+
+### Still open / not done
+Backfill + docs are committed to the working tree but **not yet pushed to the `data`
+serving branch** — next scheduled `run_scan.py` regenerates it there. Gate thresholds are
+first-pass defaults, not yet backtested for predictiveness (same display-only discipline as
+the pattern badge until validated).
 
 ---
 

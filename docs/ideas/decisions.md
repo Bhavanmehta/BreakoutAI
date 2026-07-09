@@ -36,5 +36,9 @@ See `docs/ideas/later-todos.md`.
 
 ## Suggested build order (agreed)
 1. **First sprint:** #9 Hindsight Loop + #11 Benchmark + expectancy — highest leverage, lowest risk, directly counters Delvantic; we already hold the data.
-2. Card-UX cluster: #1 / #2 / #3 / #4.
+2. ~~Card-UX cluster: #1 / #2 / #3 / #4.~~ **Done (Sprint 2)** — shipped as the rationale layer
+   (`backend/signals.py::build_rationale`): two-column confirming/risk signals (#1), an
+   edge-vs-risk RSS roll-up (#2, display-only summary — **not** folded into the ranker), a
+   make-or-break line (#3), and advisory gates (#4). Detail-pane UI + both `breakouts.json`
+   backfilled. See HANDOFF.md "Session 10".
 3. Remainder of the Adopt pile.

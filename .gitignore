@@ -40,3 +40,4 @@ scratch_*
 # as ongoing cross-checks. Regenerable; nothing here is source of record.
 /scratchpad/
 _verify_*
+_httpserver.log

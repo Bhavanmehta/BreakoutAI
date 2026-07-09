@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Read — Layout Samples</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: { colors: { darkBg: '#0b1120', cardBg: '#1e293b', borderCl: '#334155' } } }
+  }
+</script>
+<style>
+  html { color-scheme: dark; }
+  .info-i { display:inline-flex; align-items:center; justify-content:center; flex:none;
+    width:15px; height:15px; border:1px solid #475569; border-radius:9999px; color:#94a3b8;
+    font-size:10px; font-weight:700; font-style:normal; line-height:1; vertical-align:middle; }
+  .conv-ring { position:relative; width:60px; height:60px; border-radius:9999px; flex:none; }
+  .conv-ring::after { content:""; position:absolute; inset:6px; border-radius:9999px; background:#0f172a; }
+  .conv-ring-val { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:1; font-size:13px; font-weight:800; }
+  .crux { border-left:3px solid #f59e0b; background:rgba(245,158,11,.08); }
+  .sig-tok { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:4px 7px;
+    border-radius:7px; border:1px solid; font-size:11px; line-height:1.3; }
+  .sig-pos { color:#6ee7b7; background:rgba(16,185,129,.08); border-color:rgba(16,185,129,.28); }
+  .sig-neg { color:#fda4af; background:rgba(244,63,94,.08); border-color:rgba(244,63,94,.28); }
+  .sig-w { flex:none; font-weight:800; font-size:10px; padding:1px 5px; border-radius:5px;
+    background:rgba(148,163,184,.15); color:#cbd5e1; }
+  .gate-chip { font-size:10px; padding:2px 7px; border-radius:9999px; border:1px solid rgba(148,163,184,.28);
+    color:#cbd5e1; background:rgba(148,163,184,.1); }
+  .sample-label { font-size:12px; letter-spacing:.08em; }
+</style>
+</head>
+<body class="min-h-screen bg-darkBg text-gray-200 font-sans">
+<div class="max-w-[1200px] mx-auto px-6 py-10 space-y-14">
+
+  <div class="border-b border-borderCl pb-4">
+    <h1 class="text-2xl font-bold text-white">The Read — 3 layout samples</h1>
+    <p class="text-sm text-slate-400 mt-1">Same content, three arrangements. The goal: make "The Read" shorter/wider so it stops towering over News &amp; Sentiment. Scroll through and pick one.</p>
+  </div>
+
+  <!-- =============== SAMPLE 1 : 3-UP ROW =============== -->
+  <section>
+    <div class="sample-label uppercase font-bold text-purple-400 mb-1">Sample 1 — 3-up row</div>
+    <p class="text-sm text-slate-400 mb-4">One row above the chart: <b>Breaking-out verdict</b> · <b>Edge vs Risk</b> · <b>News</b>. Most compact vertically; columns get narrow on smaller screens.</p>
+    <div id="s1" class="grid grid-cols-1 lg:grid-cols-3 gap-5"></div>
+  </section>
+
+  <!-- =============== SAMPLE 2 : READ FULL-WIDTH, NEWS BELOW =============== -->
+  <section>
+    <div class="sample-label uppercase font-bold text-purple-400 mb-1">Sample 2 — Read full-width, News below</div>
+    <p class="text-sm text-slate-400 mb-4">The Read spans full width with <b>Verdict (left)</b> / <b>Edge vs Risk (right)</b>. News &amp; Sentiment becomes its own full-width card underneath. Roomiest for the two Read halves.</p>
+    <div id="s2" class="space-y-5"></div>
+  </section>
+
+  <!-- =============== SAMPLE 3 : SPLIT READ, NEWS STAYS RIGHT =============== -->
+  <section>
+    <div class="sample-label uppercase font-bold text-purple-400 mb-1">Sample 3 — Split Read, News stays right</div>
+    <p class="text-sm text-slate-400 mb-4">Keeps the current <b>[Read | News]</b> two-column row, but splits The Read internally into <b>Verdict-left / Edge-vs-Risk-right</b>. Closest to today; the two Read halves are the most cramped.</p>
+    <div id="s3" class="grid grid-cols-1 lg:grid-cols-2 gap-5"></div>
+  </section>
+
+</div>
+
+<script>
+  const CARD = "p-5 border border-borderCl rounded-xl bg-cardBg shadow-xl";
+
+  // ---- Verdict ("Breaking out now") ----
+  function verdict() {
+    return `
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">The Read</h3>
+        <div class="flex items-center gap-1 flex-wrap justify-end">
+          <span class="px-2 py-1 text-[10px] font-bold rounded-full border whitespace-nowrap border-emerald-500/40 text-emerald-300 bg-emerald-500/10">Strong uptrend</span>
+          <span class="px-2 py-1 text-[10px] font-bold rounded-full border whitespace-nowrap border-emerald-500/40 text-emerald-300 bg-emerald-500/10">Bullish news</span>
+        </div>
+      </div>
+      <div class="text-xl font-black text-white tracking-tight mb-1">Breaking out now</div>
+      <div class="text-xs text-purple-300 font-medium mb-2">Conviction 82 · high reliability</div>
+      <p class="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50">
+        Closed above a resistance level touched 3× since March, on volume 2.1× its 20-day average — the breakout trigger has fired today. The base tightened into the move and the trend backdrop is strong.
+      </p>
+      <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+        <span class="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Fundamentals</span>
+        <span class="text-slate-300">P/E <b class="text-slate-100">24.1</b></span>
+        <span class="text-slate-300">Rev YoY <b class="text-emerald-400">+18%</b></span>
+        <span class="text-slate-300">ROE <b class="text-emerald-400">16%</b></span>
+        <span class="text-slate-300">D/E <b class="text-slate-100">0.4</b></span>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">Pattern: multi-leg contraction, base depth 12% over 40 days.</p>`;
+  }
+
+  // ---- Edge vs Risk ----
+  function edgeRisk() {
+    return `
+      <h4 class="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center mb-2.5">
+        Edge vs risk <span class="info-i ml-1">i</span>
+      </h4>
+      <div class="flex items-center gap-3 mb-3">
+        <div class="conv-ring" style="background:conic-gradient(#10b981 0% 72%, #f43f5e 72% 100%)"><span class="conv-ring-val text-emerald-300">72%</span></div>
+        <div class="text-[11px] text-slate-400 leading-snug">Roughly <b class="text-emerald-300">72%</b> of the weighted evidence is confirming the setup, 28% is flagging risk.</div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div>
+          <div class="text-[9px] font-bold uppercase tracking-wider text-emerald-400/80 mb-1.5">✓ Confirming</div>
+          <div class="space-y-1.5">
+            <div class="sig-tok sig-pos"><span>Volume 2.1× average</span><span class="sig-w">+3</span></div>
+            <div class="sig-tok sig-pos"><span>Above rising 50-EMA</span><span class="sig-w">+2</span></div>
+            <div class="sig-tok sig-pos"><span>Resistance broken 3× base</span><span class="sig-w">+2</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="text-[9px] font-bold uppercase tracking-wider text-rose-400/80 mb-1.5">⚠ Risk</div>
+          <div class="space-y-1.5">
+            <div class="sig-tok sig-neg"><span>Earnings in 6 days</span><span class="sig-w">−2</span></div>
+            <div class="sig-tok sig-neg"><span>Extended from 21-EMA</span><span class="sig-w">−1</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="crux text-xs text-amber-200/90 leading-relaxed p-2.5 rounded-r-lg mb-3">
+        <b>Make-or-break:</b> holds above the ₹635 pivot on a pullback → the base is real; loses it on volume → the breakout failed.
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <span class="gate-chip">Turnover OK</span>
+        <span class="gate-chip">Uptrend confirmed</span>
+        <span class="gate-chip">⚠ Earnings soon</span>
+      </div>`;
+  }
+
+  // ---- News & Sentiment ----
+  function news() {
+    return `
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold tracking-wider text-slate-400 uppercase">News &amp; Sentiment</h3>
+        <span class="text-[10px] text-slate-500">as of 6 Jul</span>
+      </div>
+      <div class="flex items-center mb-3">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500 mr-2">News sentiment</span>
+        <span class="px-2.5 py-1 text-xs font-bold rounded-full border whitespace-nowrap border-emerald-500/40 text-emerald-300 bg-emerald-500/10">Bullish</span>
+        <span class="text-[10px] text-slate-500 ml-2">score +4 · from headlines</span>
+      </div>
+      <div class="space-y-2 max-h-[350px] overflow-y-auto">
+        ${[
+          ["Company posts record quarterly deliveries, beats street estimates","Reuters","6 Jul","Marketaux"],
+          ["Brokerage upgrades to Buy on margin expansion, ₹720 target","Mint","5 Jul","NewsData.io"],
+          ["Sector demand outlook raised on new capacity additions","ET Markets","4 Jul","Google News"],
+        ].map(([t,src,d,prov]) => `
+          <a href="#" class="block p-2.5 rounded-lg bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all">
+            <div class="text-sm text-slate-200 leading-snug">${t}</div>
+            <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+              <span>${src}</span><span>· ${d}</span>
+              <span class="ml-auto uppercase tracking-wider">${prov}</span>
+            </div>
+          </a>`).join("")}
+      </div>`;
+  }
+
+  // ---- Sample 1: 3-up ----
+  document.getElementById("s1").innerHTML =
+    `<div class="${CARD}">${verdict()}</div>` +
+    `<div class="${CARD}">${edgeRisk()}</div>` +
+    `<div class="${CARD}">${news()}</div>`;
+
+  // ---- Sample 2: Read full-width (2 cols), News below full-width ----
+  document.getElementById("s2").innerHTML =
+    `<div class="${CARD}">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+         <div>${verdict()}</div>
+         <div class="md:border-l md:border-slate-700/50 md:pl-6">${edgeRisk()}</div>
+       </div>
+     </div>` +
+    `<div class="${CARD}">${news()}</div>`;
+
+  // ---- Sample 3: [Read (2 inner cols) | News] ----
+  document.getElementById("s3").innerHTML =
+    `<div class="${CARD}">
+       <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+         <div>${verdict()}</div>
+         <div class="xl:border-l xl:border-slate-700/50 xl:pl-5">${edgeRisk()}</div>
+       </div>
+     </div>` +
+    `<div class="${CARD}">${news()}</div>`;
+</script>
+</body>
+</html>

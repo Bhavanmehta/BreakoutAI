@@ -63,6 +63,9 @@
         <!-- Summary tiles -->
         <div id="tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"></div>
 
+        <!-- Edge analytics: expectancy + benchmark tiles, then hindsight calibration -->
+        <div id="analytics" class="mb-6"></div>
+
         <!-- Per-signal breakdown -->
         <div class="bg-cardBg border border-borderCl rounded-xl p-4 mb-6">
             <h2 class="text-sm font-bold text-white mb-3">By signal type <span class="text-slate-500 font-normal">· live vs backtest</span></h2>
@@ -218,6 +221,94 @@ function renderTiles() {
         </div>`).join("");
 }
 
+// --- Edge analytics: expectancy, benchmark, hindsight calibration. Rendered from
+// the precomputed DATA.analytics block (the whole live record, independent of the
+// signal/status/date filters above -- it's a fixed read on the strategy's edge). ---
+function renderAnalytics() {
+    const a = DATA && DATA.analytics;
+    const host = $("analytics");
+    if (!a || !a.resolved_n) {   // nothing graded yet -> hide the whole section
+        host.innerHTML = "";
+        return;
+    }
+    const ex = a.expectancy || {};
+    const bm = a.benchmark;
+    const pct = (v, dp = 1) => v == null ? "—" : fmtPct(v, dp);
+    const rTxt = (v) => v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R";
+    const signCls = (v) => v == null ? "text-slate-500" : v >= 0 ? "text-emerald-400" : "text-red-400";
+
+    // Expectancy + benchmark tiles
+    const tiles = [
+        { label: "Expectancy / call",
+          value: rTxt(ex.expectancy_r),
+          sub: `${ex.won || 0}W · ${ex.lost || 0}L over ${a.resolved_n} resolved · +1R win / −1R loss`,
+          cls: signCls(ex.expectancy_r) },
+        { label: "Avg win / loss",
+          value: ex.avg_win_r == null && ex.avg_loss_r == null ? "—"
+                 : `${rTxt(ex.avg_win_r)} / ${rTxt(ex.avg_loss_r)}`,
+          sub: ex.win_rate == null ? "no resolved calls yet"
+               : `win rate ${(ex.win_rate * 100).toFixed(0)}% · mean window move ${pct(ex.mean_window_return_pct)}`,
+          cls: "text-slate-200" },
+    ];
+    if (bm) {
+        tiles.push({
+            label: `Alpha vs ${bm.label || bm.ticker}`,
+            value: pct(bm.mean_alpha_pct),
+            sub: `call ${pct(bm.mean_call_return_pct)} vs index ${pct(bm.mean_bm_return_pct)} · beat ${(bm.beat_rate * 100).toFixed(0)}% of ${bm.n}`,
+            cls: signCls(bm.mean_alpha_pct) });
+    } else {
+        tiles.push({ label: "Alpha vs index", value: "—",
+                     sub: "benchmark comparison unavailable for this record", cls: "text-slate-500" });
+    }
+    const tilesHtml = tiles.map(t => `
+        <div class="bg-cardBg border border-borderCl rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">${t.label}</div>
+            <div class="text-2xl font-bold mt-1 ${t.cls}">${t.value}</div>
+            <div class="text-[11px] text-slate-400 mt-1">${t.sub}</div>
+        </div>`).join("");
+
+    // Hindsight: does our own conviction score stratify live follow-through?
+    const h = a.hindsight || {};
+    const rowsB = (h.conviction_buckets || []).map(b => {
+        const wr = b.hit_rate;
+        return `<tr class="border-t border-borderCl/60">
+            <td class="py-1.5 pr-3 text-slate-300 font-semibold">${b.lo}–${b.hi}</td>
+            <td class="text-right px-3 text-slate-400">${b.n}</td>
+            <td class="text-right px-3 text-emerald-400">${b.won}</td>
+            <td class="text-right px-3 text-red-400">${b.lost}</td>
+            <td class="text-right pl-3 font-semibold ${wr == null ? "text-slate-500" : wr >= 0.5 ? "text-emerald-400" : "text-red-400"}">${wr == null ? "—" : (wr * 100).toFixed(0) + "%"}</td>
+        </tr>`;
+    }).join("");
+    const monoTag = h.monotonic == null ? ""
+        : h.monotonic
+            ? `<span class="text-[10px] font-semibold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 rounded px-1.5 py-0.5">▲ monotonic — higher score, higher hit-rate</span>`
+            : `<span class="text-[10px] font-semibold text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded px-1.5 py-0.5">not monotonic yet</span>`;
+
+    host.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">${tilesHtml}</div>
+        <div class="bg-cardBg border border-borderCl rounded-xl p-4">
+            <div class="flex items-baseline gap-2 mb-3 flex-wrap">
+                <h2 class="text-sm font-bold text-white">Hindsight <span class="text-slate-500 font-normal">· does our conviction score predict follow-through?</span></h2>
+                ${monoTag}
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-slate-500 uppercase text-[10px] tracking-wider">
+                            <th class="text-left py-1.5 pr-3">Conviction</th>
+                            <th class="text-right py-1.5 px-3">Resolved</th>
+                            <th class="text-right py-1.5 px-3">Won</th>
+                            <th class="text-right py-1.5 px-3">Lost</th>
+                            <th class="text-right py-1.5 pl-3">Hit rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsB || `<tr><td colspan="5" class="py-3 text-slate-500">No conviction-scored calls yet.</td></tr>`}</tbody>
+                </table>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">${h.note || ""}</p>
+        </div>`;
+}
+
 function renderSignalTable() {
     const eps = statsPool();
     const rows = Object.keys(SIGNAL_META)
@@ -353,6 +444,7 @@ function renderList() {
                             <span class="text-slate-600 mx-1">→</span>
                             <span class="text-slate-200 font-semibold">${e.closes.length ? fmtPrice(e.closes[e.closes.length - 1]) : "…"}</span>
                             <span class="ml-1.5 font-bold ${ret == null ? "text-slate-600" : ret >= 0 ? "text-emerald-400" : "text-red-400"}">${ret == null ? "" : fmtPct(ret)}</span>
+                            ${e.alpha == null ? "" : `<span class="ml-1 text-[10px] font-semibold border rounded px-1 ${e.alpha >= 0 ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : "text-red-300 border-red-500/30 bg-red-500/10"}" title="Return vs ${DATA.analytics && DATA.analytics.benchmark ? (DATA.analytics.benchmark.label || DATA.analytics.benchmark.ticker) : "the index"} over the same window (call ${fmtPct(e.ret)} − index ${fmtPct(e.bm_ret)})">${fmtPct(e.alpha)} α</span>`}
                             <div class="text-[10px] text-slate-600 mt-0.5" title="The grading levels set on the call date: stop = resistance × ${DATA.stop_loss_fraction}, target = entry + 1R">stop ${fmtPrice(e.stop)} · target ${fmtPrice(e.target)}</div>
                             ${e.status === "open" ? `<div class="perf-live-line text-[11px] mt-0.5 hidden"></div>` : ""}
                         </div>
@@ -368,6 +460,7 @@ function renderList() {
 function render() {
     if (!DATA) return;
     renderTiles();
+    renderAnalytics();
     renderSignalTable();
     renderChips();
     renderDateFilter();

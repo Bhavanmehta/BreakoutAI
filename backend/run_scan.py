@@ -203,6 +203,21 @@ def run():
         for s in summaries:
             s["social"] = None
 
+    # --- Build the per-stock rationale (transparency layer, never scored) ---
+    # Runs AFTER every enrichment merge above, because the earnings-window gate needs
+    # the merged `earnings.next.date`. Best-effort per stock, like the enrichers: a
+    # single bad record logs + carries rationale: null rather than aborting the scan.
+    from signals import build_rationale
+    n_rat = 0
+    for s in summaries:
+        try:
+            s["rationale"] = build_rationale(s)
+            n_rat += 1
+        except Exception as e:
+            print(f"  rationale FAILED for {s.get('symbol')} (non-fatal): {e}")
+            s["rationale"] = None
+    print(f"  built rationale for {n_rat}/{len(summaries)} stocks")
+
     # --- Store into DuckDB (local research layer) ---
     prices_df = pd.concat(all_prices, ignore_index=True)
     features_df = pd.concat(all_features, ignore_index=True)
@@ -245,7 +260,8 @@ def run():
     # A forward-only diary of the site's published calls, tracked ~2 weeks each;
     # feeds performance.html. Best-effort: never aborts the scan.
     try:
-        new_eps, total_eps = build_performance.update_from_scan(feat_by_symbol, summaries, as_of)
+        new_eps, total_eps = build_performance.update_from_scan(
+            feat_by_symbol, summaries, as_of, benchmark=benchmark)
         print(f"  performance ledger: +{new_eps} new calls today, {total_eps} tracked")
     except Exception as e:
         print(f"  performance ledger FAILED (non-fatal): {e}")

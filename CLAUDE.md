@@ -356,6 +356,17 @@ A Python pipeline produces all computed data. See `backend/README.md` for detail
     bullet) — switching to an ATR-scaled band would raise the US base rate to a volatility-neutral
     ~42% but changes the displayed stop/history/track record sitewide; flagged as a live option,
     not decided.
+12. ~~Card-UX cluster (competitor-ideas #1–#4)~~ — **done (Sprint 2)**: the "why" / rationale
+    layer. `backend/signals.py::build_rationale(rec)` derives, per record, a two-column
+    confirming/risk signal set, an edge-vs-risk **RSS** roll-up (`{edge, risk, net, confidence}`),
+    a single **make-or-break** line, and advisory **gates** (liquidity / volume-confirm / uptrend /
+    earnings-veto — thresholds in `settings.py`). Stored as `rec["rationale"]`. It is a
+    **transparency layer only — never the ranker**; the conviction score in `score.py` stays purely
+    technical (reliability + base depth + method). Wired into `run_scan.py` after the enrichment
+    merges and backfilled onto both `breakouts.json` files. Frontend renders it in the detail pane
+    via `renderRationale`/`renderMakeOrBreak`/`renderGates`; the block auto-hides when a record has
+    no `rationale` (old JSON degrades to the classic read). Verified via `_verify_frontend.py`
+    (IN + US, rich + sparse picks, zero new console errors).
 
 When resuming, read `HANDOFF.md` first (session-by-session detail + what's committed vs. not), then
 check `data/breakouts.json` / `data/us/breakouts.json` + `track_record.json` / `performance.json`

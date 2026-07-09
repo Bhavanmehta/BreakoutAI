@@ -160,6 +160,18 @@ ATR_LONG = 30             # baseline volatility window (ratio < 1 => "coiling")
 RESISTANCE_TOUCH_PCT = 2.0  # a day counts as "touching" resistance if within this % of it
 FORWARD_WINDOWS = [5, 10, 20]  # trading days ahead used to score historical breakouts
 
+# --- Advisory gates (signals.build_rationale) --------------------------------
+# Thresholds for the pass/fail "hard gates" shown in the detail pane's rationale
+# layer (Sprint 2, competitor-idea #4). ADVISORY ONLY this pass: they annotate a
+# setup, they do NOT cap the tier or change the sort order / conviction (which stay
+# governed solely by score.py). Market-aware so IN/US read in native units.
+GATE_EARNINGS_VETO_DAYS = 3          # earnings within this many days = a "window" veto flag
+GATE_VOL_CONFIRM_MULT = VOL_SURGE_MULT  # breakout-bar volume must clear this ×avg to confirm
+# Liquidity floor as average daily TURNOVER (price × 20d avg volume), in native
+# currency. US reuses the HC share-count floor (HC_MIN_AVG_VOL_SHARES) scaled to a
+# rough dollar turnover; IN uses a ₹1cr/day tradeability floor (cf. MIN_TURNOVER).
+GATE_MIN_AVG_TURNOVER = 5_000_000 if MARKET == "US" else 1_00_00_000
+
 # --- Displayed support/resistance zones (levels.py) --------------------------
 # These drive the horizontal lines drawn on the annotated chart and the
 # "Key Levels" card. Unlike the rolling LOOKBACK_HIGH high/low (which fires on a
