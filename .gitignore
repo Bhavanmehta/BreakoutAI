@@ -41,3 +41,10 @@ scratch_*
 /scratchpad/
 _verify_*
 _httpserver.log
+
+# Local scratch copies of serving data pulled while wiring the live-record join
+# (breakouts/live dumps are multi-MB and belong on the orphan `data` branch, NOT
+# main — see the /data/ note above). Regenerate with `cd backend; python run_scan.py`.
+_check.json
+_live_breakouts.json
+pub_breakouts.json

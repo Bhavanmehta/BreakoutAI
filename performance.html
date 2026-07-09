@@ -120,6 +120,13 @@ let MARKET = localStorage.getItem(MARKET_KEY) === "US" ? "US" : "IN";
 let DATA_IN = null, DATA_US = null, DATA = null;
 const filters = { signal: "", status: "", date: "", q: "" };
 const collapsedDates = new Set();
+// Pagination (roadmap 1b). The graded live record runs to hundreds of calls;
+// rendering every row at once produced a ~26,000px page that buried the summary
+// and live calls. We cap the DOM at renderLimit rows (grown in PAGE_SIZE batches
+// via an explicit "show more" button that states how many remain) so nothing is
+// hidden or cherry-picked -- the full record is always one honest click away.
+const PAGE_SIZE = 25;
+let renderLimit = PAGE_SIZE;
 
 // Serving JSON lives on the orphan `data` branch in production (see the daily
 // workflows), but locally it's the plain data/ folder. Same switch on the main page.
@@ -411,12 +418,20 @@ function renderList() {
         $("list").innerHTML = `<div class="text-sm text-slate-500 py-8 text-center">No calls match the current filters.</div>`;
         return;
     }
+    // Order the whole matching set exactly as it renders (newest date first, then
+    // conviction within a day) BEFORE paging, so the first batch is genuinely the
+    // most recent calls -- visible() returns raw episode order, not display order.
+    const ordered = eps.slice().sort((a, b) =>
+        (a.date < b.date ? 1 : a.date > b.date ? -1 : 0) ||
+        ((b.conviction || 0) - (a.conviction || 0)));
+    const shown = ordered.slice(0, renderLimit);
+    const remaining = ordered.length - shown.length;
     const byDate = {};
-    eps.forEach(e => (byDate[e.date] = byDate[e.date] || []).push(e));
+    shown.forEach(e => (byDate[e.date] = byDate[e.date] || []).push(e));
     const dates = Object.keys(byDate).sort().reverse();
 
-    $("list").innerHTML = dates.map(d => {
-        const rows = byDate[d].slice().sort((a, b) => (b.conviction || 0) - (a.conviction || 0));
+    const listHtml = dates.map(d => {
+        const rows = byDate[d];  // already conviction-sorted via `ordered`
         const collapsed = collapsedDates.has(d);
         return `
         <div class="mb-5 fade-in">
@@ -455,10 +470,27 @@ function renderList() {
             </div>
         </div>`;
     }).join("");
+
+    // Explicit, honest "show more" -- states how many calls remain hidden (never
+    // silently truncates), or confirms the whole matching record is on screen.
+    const moreHtml = remaining > 0
+        ? `<div class="text-center mt-5">
+               <button id="loadMoreBtn" class="px-4 py-2 rounded-lg border border-borderCl bg-slate-800 text-xs font-semibold text-slate-200 hover:text-white hover:border-slate-500 transition-all">
+                   Show ${Math.min(PAGE_SIZE, remaining)} more<span class="text-slate-500"> · ${remaining} of ${ordered.length} still hidden</span>
+               </button>
+           </div>`
+        : (ordered.length > PAGE_SIZE
+            ? `<div class="text-center mt-5 text-[11px] text-slate-600">All ${ordered.length} matching calls shown</div>`
+            : "");
+    $("list").innerHTML = listHtml + moreHtml;
+
+    const moreBtn = $("loadMoreBtn");
+    if (moreBtn) moreBtn.onclick = () => { renderLimit += PAGE_SIZE; renderList(); applyLiveToList(); };
 }
 
 function render() {
     if (!DATA) return;
+    renderLimit = PAGE_SIZE;  // any filter/market change restarts paging from the top
     renderTiles();
     renderAnalytics();
     renderSignalTable();

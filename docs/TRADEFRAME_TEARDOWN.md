@@ -56,3 +56,20 @@ Lens: everything below is filtered through BreakoutAI's real constraints — **s
 
 ## 4. The one-sentence takeaway
 TradeFrame is a masterclass in **onboarding and presentation** wrapped around signals with **no proof**. Take their onboarding (tour + checklist + section microcopy) almost wholesale, take the Drawdown module because we can actually compute it, and everywhere they show a number, **show ours with the backtested receipt underneath.** That's a category they structurally can't follow us into.
+
+---
+
+## 5. Competitor refresh — 2026-07-06 (Firecrawl scrapes)
+
+Scraped live: Chartink, Finviz, Trade-Ideas, StockEdge, screener.in, Simply Wall St. TradingView skipped (page too heavy to scrape usefully — revisit with a targeted feature-page URL).
+
+| Competitor | What they do well | Steal for BreakoutAI | Verdict |
+|---|---|---|---|
+| **screener.in** (India) | Query-language screens, custom ratios, **watchlist email alerts**, annual-report snippets inline | Daily watchlist email digest from the GitHub Action — zero backend needed | Steal now (roadmap R5) |
+| **Trade-Ideas** | Markets "Holly AI" on a *transparent daily trade record* — their entire pitch is provable performance | We genuinely have a live record; they market theirs harder than we do. Homepage live-record strip, losses included | Steal now (roadmap R4) |
+| **Finviz** | One-screen density: sector heatmaps, breadth, futures at a glance | Sector heatmap from breadth data the Action already computes | Tier B |
+| **Simply Wall St** | Narrative visual reports: snowflake, **Rewards/Risks bullet pairs**, valuation visuals — "data condensed into visual insights" | Rewards/Risks bullets per card from fundamentals we already fetch (P/E, growth, ROE, D/E are on the card today as raw numbers) | Tier B |
+| **StockEdge** (India) | Delivery %, FII/DII flows, sector rotation, combination scans, Learn modules | Delivery % + FII/DII as India signal inputs; Learn is Tier C | Tier B |
+| **Chartink** (India) | Community-shared scans, **shareable scan permalinks**, real-time NSE screeners | Encode filter state in the URL for shareable radar views | Tier B |
+
+**Pattern across all six:** everyone sells signals; only Trade-Ideas even gestures at a live record, and none publish graded, unbackfilled outcomes with a stated breakeven line the way performance.html does. The refresh confirms §4: presentation is stealable everywhere, **proof is the moat** — so the top of the roadmap is honesty-hardening (conviction badges, live-record strip), not new signals.

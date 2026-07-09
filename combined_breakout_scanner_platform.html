@@ -245,6 +245,7 @@
                             <span class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-center" data-tip="A single 0–100 score the whole list ranks by. It blends two things a whole-market study found actually predict follow-through: (1) <b>imminence</b> — how close this stock is to breaking out (its readiness tier, ~55%), and (2) <b>reliability</b> — how well this stock's own past breakouts followed through, plus base depth and relative-strength / trend confirmation (~45%). It deliberately ignores ADX, chart-pattern names and the single historical analog (which didn't hold up in testing). <b>Technical only</b> — it does not yet factor in fundamentals like P/E or profit growth.">Conviction<span class="info-i ml-1">i</span></span>
                             <span id="metaConviction" class="text-2xl font-black leading-none">—</span>
                             <span id="metaHighConvBadge" class="hidden" title="This scanner's single strongest, most selective backtested signal — a volatility squeeze releasing into a confirmed breakout, still close to the trigger.">★ High conviction</span>
+                            <span id="metaConvLive" class="hidden mt-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-full border whitespace-nowrap"></span>
                         </div>
                         <div class="h-8 w-px bg-slate-700 hidden sm:block"></div>
                         <div class="flex gap-6 sm:gap-8">
@@ -624,6 +625,12 @@
         let STOCKS = [];
         let STOCKS_IN = [];
         let STOCKS_US = [];
+        // Live-record (performance.json) per market -- the SAME JSON performance.html
+        // reads. Held here so conviction scores can be joined to their realized live
+        // follow-through (hindsight buckets) and rendered honestly on the cards.
+        let PERF = null;      // active market's performance record
+        let PERF_IN = null;
+        let PERF_US = null;
         let current = null;
         let MY_WATCHLIST = [];
         const $ = (id) => document.getElementById(id);
@@ -675,6 +682,42 @@
             if (c >= 65) return "text-emerald-300";
             if (c >= 40) return "text-amber-300";
             return "text-slate-400";
+        }
+        // Conviction honesty layer (roadmap 1a). A conviction score is a *prediction*;
+        // this joins it to the site's own realized live follow-through so we never imply
+        // a number is validated when the record says otherwise. We read the SAME
+        // performance.json performance.html publishes, find the hindsight bucket the
+        // score falls in, and surface it. The backend leaves a bucket's hit_rate null
+        // until it has >=HINDSIGHT_MIN_N resolved (graded) live calls -- below that the
+        // rate is statistical noise -- so we show an explicit "unproven live -- N graded"
+        // caveat instead of a hit rate. Once enough resolve we show the real live hit
+        // rate, coloured honestly (losing buckets render red). Nothing is backfilled.
+        const HINDSIGHT_MIN_N = 5;
+        function convLiveBadge(conv) {
+            if (conv == null || !PERF) return null;
+            const h = PERF.analytics && PERF.analytics.hindsight;
+            const buckets = h && h.conviction_buckets;
+            if (!buckets || !buckets.length) return null;
+            const b = buckets.find(x => conv >= x.lo && conv <= x.hi);
+            if (!b) return null;
+            const graded = (b.won || 0) + (b.lost || 0);
+            if (b.hit_rate == null) {
+                // Fewer than HINDSIGHT_MIN_N resolved -> not enough live evidence to trust.
+                return {
+                    text: `unproven live · ${graded} graded`,
+                    cls: "text-amber-400 border-amber-500/40 bg-amber-500/10",
+                    title: `This conviction band (${b.lo}–${b.hi}) has only ${graded} resolved live call${graded === 1 ? "" : "s"} so far (${b.won || 0}W/${b.lost || 0}L) — fewer than ${HINDSIGHT_MIN_N}, so its live hit-rate isn't yet meaningful. Live forward record, not backfilled; see performance.html.`
+                };
+            }
+            const pct = Math.round(b.hit_rate * 100);
+            const good = b.hit_rate >= 0.5;
+            return {
+                text: `live: ${pct}% hit · ${graded} graded`,
+                cls: good
+                    ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+                    : "text-rose-400 border-rose-500/40 bg-rose-500/10",
+                title: `Of ${graded} resolved live calls in this conviction band (${b.lo}–${b.hi}), ${b.won || 0} hit +1R before the stop (${pct}%). Live forward record, not backfilled; see performance.html.`
+            };
         }
         // Market cap is stored RAW, in the stock's native currency (see backend/
         // fundamentals.py) -- this function owns all display formatting, keyed on the
@@ -998,6 +1041,19 @@
                 }
             } catch (e) { /* no US data yet -- non-fatal */ }
 
+            // Live-record join (1a): pull the SAME performance.json performance.html
+            // reads for each market so conviction scores can be shown against their
+            // realized hindsight buckets. Non-fatal -- a missing/404 record just means
+            // no live badge renders (cards fall back to the bare score), never an error.
+            try {
+                const resPerf = await fetch(DATA_BASE + "performance.json", { cache: "no-store" });
+                if (resPerf.ok) PERF_IN = await resPerf.json();
+            } catch (e) { /* no live record yet -- non-fatal */ }
+            try {
+                const resPerfUs = await fetch(DATA_BASE + "us/performance.json", { cache: "no-store" });
+                if (resPerfUs.ok) PERF_US = await resPerfUs.json();
+            } catch (e) { /* no US live record yet -- non-fatal */ }
+
             wireControls();
             wirePromptModal();
             wireChartToggle();
@@ -1073,6 +1129,7 @@
             localStorage.setItem(MARKET_KEY, m);
             STOCKS = m === "US" ? STOCKS_US : STOCKS_IN;
             const data = m === "US" ? DATA_US : DATA_IN;
+            PERF = m === "US" ? PERF_US : PERF_IN;
 
             // The soon-to-be-selected top stock belongs to the *new* market, so any
             // open detail sheet is showing a now-stale name -- close it rather than
@@ -1694,6 +1751,7 @@
                 const chg = s.change_pct ?? 0;
                 const chgCls = chg >= 0 ? "text-emerald-400" : "text-rose-400";
                 const conv = s.readiness.conviction;
+                const clb = convLiveBadge(conv); // 1a: realized live hit-rate for this score
                 const tracked = trackedSet.has(s.symbol);
                 const row = document.createElement("div");
                 row.id = "wl-" + s.symbol;
@@ -1717,6 +1775,7 @@
                         </span>
                     </div>
                     <div class="text-[11px] text-slate-500 truncate mt-0.5">${s.name || ""}</div>
+                    ${clb ? `<div class="mt-1"><span class="inline-block px-1.5 py-0.5 text-[9px] font-semibold rounded-full border ${clb.cls}" title="${clb.title.replace(/"/g, "&quot;")}">${clb.text}</span></div>` : ""}
                     <div class="flex items-center justify-between gap-2 mt-1">
                         <span class="wl-price text-[11px] text-slate-400">${fmtPrice(s.price ?? 0)}</span>
                         <span class="wl-change text-[10px] font-semibold ${chgCls}">${chg >= 0 ? "+" : ""}${chg}%</span>
@@ -2028,6 +2087,16 @@
             hcBadge.className = s.readiness.signal === "high_conviction"
                 ? "inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 whitespace-nowrap"
                 : "hidden";
+            // Conviction honesty layer (1a): show this score's realized live hit rate.
+            const convLiveEl = $("metaConvLive");
+            const clb = convLiveBadge(conv);
+            if (clb) {
+                convLiveEl.textContent = clb.text;
+                convLiveEl.title = clb.title;
+                convLiveEl.className = "inline-block mt-1 ml-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-full border whitespace-nowrap " + clb.cls;
+            } else {
+                convLiveEl.className = "hidden";
+            }
             applyLiveQuoteToDetail(); // overlay a cached live price/change if one exists for this symbol
 
             renderVerdict(s);
