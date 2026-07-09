@@ -17,7 +17,7 @@ Your job has THREE phases. Do them in order. Do not write implementation code �
   4. **Mobile commuter (one thumb, 30 seconds, on the train)**: can I triage today's scan and act without a keyboard or a second hand?
 - Also run the **watchlist loop** end-to-end (add → review → evaluate a pick) as any persona.
 - Read `HANDOFF.md`, `CLAUDE.md`, and skim the scoring pipeline so your ideas respect how signals actually work — the backtest discipline (measured +1R follow-through, per-market base rates, Bayesian-shrunk reliability) is the real moat; ideas should amplify it, not paper over it.
-- Record every point of confusion, dead weight, jargon, slow load, layout break, or console error you hit. Rate each journey 1–10 with the single biggest fix.
+- Record every point of confusion, dead weight, jargon, slow load, layout break, or console error you hit. Rate each journey 1–10 with the single biggest fix. (Known local-serve artifact — ignore it, don't report it as a bug: `/api/quotes` 404s and live prices won't refresh, because that endpoint only exists in production; the page correctly renders all scan data from the committed JSON. Everything else you see is real.)
 
 ## Phase 2 — Critique like a pro
 Score the current site (1–10 each, with one-line justification and the highest-leverage fix):
