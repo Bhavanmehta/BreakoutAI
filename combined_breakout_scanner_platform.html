@@ -693,7 +693,14 @@
         // caveat instead of a hit rate. Once enough resolve we show the real live hit
         // rate, coloured honestly (losing buckets render red). Nothing is backfilled.
         const HINDSIGHT_MIN_N = 5;
+        // FEATURE FLAG (roadmap 1a). The conviction live-record badge is fully built
+        // and dormant, not deleted. We're hiding it during the initial phase until the
+        // live record has enough resolved calls per bucket to be worth surfacing. All
+        // logic below is intact; flip this to `true` to bring the badge back everywhere
+        // (desktop watchlist rows + mobile detail card) with zero other changes.
+        const SHOW_CONV_LIVE_BADGE = false;
         function convLiveBadge(conv) {
+            if (!SHOW_CONV_LIVE_BADGE) return null; // dormant during initial phase — see flag above
             if (conv == null || !PERF) return null;
             const h = PERF.analytics && PERF.analytics.hindsight;
             const buckets = h && h.conviction_buckets;
