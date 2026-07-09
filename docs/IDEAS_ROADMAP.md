@@ -85,3 +85,16 @@ Include the live-record line from R4 in the footer of every email.
 
 - **Tier B:** sector heatmap (Finviz) · Rewards/Risks bullets (SWS) · delivery %/FII-DII inputs (StockEdge) · shareable filter permalinks (Chartink) · feed live outcomes back into conviction calibration (perf page already says "not (yet) fed back into it" — make that sentence expire).
 - **Tier C:** shared/community watchlists · Ask-AI deep links per card · education modules (StockEdge Learn) · US options/futures breadth.
+
+### Edge-vs-Risk factor explainers (info tooltips) — Tier B / UX
+Each Confirming and Risk factor in the "Edge vs Risk" card (e.g. "Extended 24.8%
+above the pivot", "Deep base — 53% correction", "Above 2 of 3 short-term EMAs",
+"Strong trend (ADX 53)", "Proven follow-through (60%)") should carry a small **ⓘ
+icon** that reveals a one-line plain-English explanation of what that factor means
+and why it helps/hurts. New users don't know what "pivot", "base depth", or "ADX"
+mean, so the numbers are opaque. Keep copy to ~1 sentence; mirror the wording used
+in chat when these were explained. Mobile: tap-to-toggle (no hover). Source the
+factor→explanation map from one place so desktop + mobile stay in sync. Factors
+are generated in the copy step of the Action / `combined_breakout_scanner_platform.html`
+Edge-vs-Risk renderer — add the tooltip text alongside where each factor string
+and its severity weight are produced. (Requested from live card review 2026-07-06.)
