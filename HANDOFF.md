@@ -1,8 +1,67 @@
 # BreakoutAI — Session Handoff
 
-_Last updated: 2026-07-06 (session 10, Card-UX/rationale layer). Read this +
+_Last updated: 2026-07-06 (session 11, kill-list execution). Read this +
 `CLAUDE.md` (durable project record) to resume._
 _When you start a fresh chat, point it here first._
+
+---
+
+## ⏭️ NEXT SESSION — START HERE (2026-07-06)
+
+**Plan of record:** `docs/IDEAS_ROADMAP.md` — work the **kill/fix list §2 in
+strict order first**, then R1→R5. Do not reorder or jump to new features.
+
+### ✅ Done so far
+- **Kill-list #1 (R1) — Conviction honesty badge.** Live-record badge added to
+  desktop + mobile scanner cards; joins the same live-record JSON
+  `performance.html` reads, threshold `HINDSIGHT_MIN_N=5`
+  ("unproven live — N graded" until a bucket has ≥5 resolved). _Commit `5c808a99`._
+- **Kill-list #2 (R2) — 26k-px performance page.** Calls now render as collapsed
+  rows, default filter "graded", `PAGE_SIZE=25` client-side load-more; summary /
+  hindsight / by-signal tables untouched. _Commit `5c808a99`._
+- **1a — Badge gated behind a flag (currently OFF).** Per decision to stay quiet
+  during the initial phase, `convLiveBadge()` early-returns `null` when
+  `const SHOW_CONV_LIVE_BADGE = false` (defined next to `HINDSIGHT_MIN_N` in
+  `combined_breakout_scanner_platform.html`). All logic preserved and dormant;
+  both consumers (desktop row ~L1785, mobile detail card ~L2100) already treat
+  `null` as "render nothing". _Commit `15f556a0`._
+  - **To re-enable:** flip that one line to `true`, re-run the Playwright
+    screenshots (1440px + 390px, IN + US), commit. ~30-sec change.
+  - **⚠️ Open tension:** roadmap still marks kill-list #1 as ✅ DONE, but with the
+    badge OFF the naked-conviction credibility gap is technically visible again.
+    Decide next session: (a) leave fully off, (b) show only the cautionary amber
+    "unproven" badge and hide proven green/red, or (c) turn back on. If staying
+    off, annotate the roadmap so the ✅ isn't misleading.
+
+### 📋 To do — remaining kill/fix list (do these before R3+)
+- [ ] **1c — Kill the mixed-signal copy.** One card, one verdict: "Breaking out
+      now" and "On watch" must never co-render. Fix in the copy-generation step
+      of the Action. _(This was queued as the next task.)_
+- [ ] **#4 — Two mobile 404 assets + tap interception.** Fix z-index /
+      pointer-events on the Ask-AI FAB and sticky header; fix the 404s. (Overlaps
+      with R3.)
+- [ ] **#5 — Reconcile backtest vs live inline.** Wherever a historical
+      reliability % appears, append "live so far: X/Y" from the same JSON.
+
+### 🗺️ Then the roadmap (in order)
+- [ ] **R3 — Watchlist reliability pass** (absorbs #4): reproduce at 390px/1440px,
+      fix intercepted taps + 404s, re-run tap script until zero retries.
+- [ ] **R4 — Homepage live-record strip** (Trade-Ideas steal): slim strip under
+      header from performance JSON, losses in red, links to performance.html.
+- [ ] **R5 — Watchlist email digest** (screener.in steal): daily GitHub Action
+      email for an exported watchlist; include R4 live-record line in footer.
+- [ ] **Backlog (Tier B/C):** sector heatmap, Rewards/Risks bullets, delivery
+      %/FII-DII inputs, shareable permalinks, feed outcomes into calibration —
+      see roadmap §5. Only after the kill-list + R3–R5.
+
+### ⚙️ Notes for whoever resumes
+- Uncommitted: `scripts/` (local Playwright verification tooling) is untracked and
+  gitignored — not part of any commit.
+- Verification recipe used this session: Playwright screenshots at 1440×900 and
+  390×844 for both IN and US markets; local serve `/api/quotes` 404 is expected.
+- Working tree is otherwise clean; latest commit is `15f556a0`.
+
+---
 
 ## TL;DR of where things stand
 
