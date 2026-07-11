@@ -159,7 +159,9 @@ def collect_events(watchlist: dict):
                 pattern = detect_pattern(feat.iloc[: idx + 1])
                 avg_vol = ev["avg_vol"]
                 resistance = float(ev["resistance"]) if pd.notna(ev["resistance"]) else np.nan
-                stop = resistance * settings.STOP_LOSS_FRACTION if pd.notna(resistance) else np.nan
+                stop = settings.stop_from(resistance, ev.get("atr_short"))
+                if stop is None:
+                    stop = np.nan
                 price = float(ev["close"])
                 # Do the two "expensive"/score-only extras (nearest analog, co-firing
                 # of the validated method signals) only for Method-A events — that's the

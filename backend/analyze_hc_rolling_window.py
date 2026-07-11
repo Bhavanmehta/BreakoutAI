@@ -15,8 +15,8 @@ a one-day alert), would a user who acts on day+1..+6 after the fire still get a
 good hit rate, or does the edge decay too fast within the week to justify it?
 
 Shortcut used: find_breakouts.add_indicators() already computes `followthrough` /
-`r_multiple` UNCONDITIONALLY for every bar (entry = that day's close, stop = that
-day's resistance * STOP_LOSS_FRACTION) -- so grading a lagged entry at
+`r_multiple` UNCONDITIONALLY for every bar (entry = that day's close, stop =
+settings.stop_from(that day's resistance, that day's 10-day ATR)) -- so grading a lagged entry at
 fire_idx + lag is just reading feat.iloc[fire_idx + lag]['followthrough']; no new
 grading math needed, only the lagged lookup + re-aggregation.
 

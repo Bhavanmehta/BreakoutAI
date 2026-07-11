@@ -15,6 +15,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import ai_verdict
 import ask_ai
 
 PORT = int(os.environ.get("PORT", "8010"))
@@ -64,9 +65,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/api/ask":
+        if self.path == "/api/ask":
+            self._handle_ask()
+        elif self.path == "/api/verdict":
+            self._handle_verdict()
+        else:
             self._send_json(404, {"error": "not found"})
-            return
+
+    def _handle_ask(self):
         length = int(self.headers.get("Content-Length", 0) or 0)
         try:
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -75,6 +81,26 @@ class Handler(BaseHTTPRequestHandler):
                 question=body.get("question", ""),
                 history=body.get("history"),
             )
+            self._send_json(200, result)
+        except ValueError as exc:
+            self._send_json(400, {"error": str(exc)})
+        except Exception as exc:
+            self._send_json(500, {"error": str(exc)})
+
+    def _handle_verdict(self):
+        # Local-dev-only stand-in for the Vercel api/verdict.py function (see that file's
+        # module docstring for prod behaviour -- Redis caching + isolation constraints don't
+        # apply here; this just needs analyze_stock(deep=True) reachable at :8010 so the
+        # frontend's Deep Dive button works without `vercel dev`. No caching: fine for the
+        # low-volume, on-demand nature of manual local testing.
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+            stock = body.get("stock")
+            if not isinstance(stock, dict):
+                self._send_json(400, {"error": "'stock' (object) is required"})
+                return
+            result = ai_verdict.analyze_stock(stock, deep=True)
             self._send_json(200, result)
         except ValueError as exc:
             self._send_json(400, {"error": str(exc)})
@@ -92,5 +118,6 @@ if __name__ == "__main__":
             "WARNING: GROQ_API_KEY not set. Create backend/.env with GROQ_API_KEY=gsk_... "
             "(free key: https://console.groq.com/keys) or export it before running.\n"
         )
-    print(f"Ask AI backend listening on http://localhost:{PORT}  (POST /api/ask, GET /api/health)")
+    print(f"Ask AI backend listening on http://localhost:{PORT}  "
+          f"(POST /api/ask, POST /api/verdict, GET /api/health)")
     ThreadingHTTPServer(("localhost", PORT), Handler).serve_forever()

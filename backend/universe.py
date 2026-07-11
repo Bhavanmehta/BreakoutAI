@@ -85,6 +85,26 @@ def discover_us_universe(size: int | None = -1) -> dict:
     # -- the US equivalent of excluding ETF/fund units on the India side (ISIN prefix
     # there; finviz's own Industry tag does the same job cleanly here).
     all_rows = all_rows[all_rows["Industry"] != "Shell Companies"]
+
+    # Clinical-stage (pre-revenue) biotech: these move on binary trial readouts and
+    # FDA decisions, not the base-and-breakout structure this scanner reads, so they
+    # pollute US results with un-chartable gap risk. We can't directly see "has an
+    # approved drug", but finviz gives profitability for free as a clean proxy: a
+    # Biotechnology name with no positive P/E has no earnings => still pre-commercial.
+    # This deliberately KEEPS profitable large-cap biotechs (Amgen/Gilead/Vertex/
+    # Regeneron all carry a P/E), which do trend technically -- so it excludes
+    # "clinical-stage biotech", not "all biotech".
+    is_biotech = all_rows["Industry"] == "Biotechnology"
+    if "P/E" in all_rows.columns:
+        profitable = pd.to_numeric(all_rows["P/E"], errors="coerce") > 0
+    else:
+        profitable = pd.Series(False, index=all_rows.index)   # can't tell -> treat as pre-revenue
+    clinical_biotech = is_biotech & ~profitable
+    n_clinical = int(clinical_biotech.sum())
+    all_rows = all_rows[~clinical_biotech]
+    if n_clinical:
+        print(f"  [universe] US: excluded {n_clinical} clinical-stage (unprofitable) biotech names.")
+
     all_rows = all_rows.drop_duplicates(subset="Ticker", keep="first")
     nasdaq_symbols = _nasdaq_listed_symbols()
 

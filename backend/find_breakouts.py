@@ -97,14 +97,16 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
         df[f"fwd_ret_{w}d"] = df["close"].shift(-w) / df["close"] - 1
 
     # --- Follow-through: did price hit +1R before -1R (stop) within WINDOW days? ---
-    # R = entry - stop, where stop = resistance * STOP_LOSS_FRACTION — the same stop the
-    # entry guidance shows. This scales per-stock/event automatically (unlike a fixed %
-    # target) and checks which level is hit FIRST, so a trade that drops through the stop
-    # and later recovers past the old target no longer counts as "worked".
+    # R = entry - stop, where stop = settings.stop_from(resistance, 10-day ATR) — the
+    # SAME stop the entry guidance shows. This scales per-stock/event automatically
+    # (unlike a fixed % target) and checks which level is hit FIRST, so a trade that
+    # drops through the stop and later recovers past the old target no longer counts
+    # as "worked".
     highs = df["high"].values
     lows = df["low"].values
     closes = df["close"].values
     resistances = df["resistance"].values
+    atr_shorts = df["atr_short"].values
     n = len(df)
     W = settings.FOLLOWTHROUGH_WINDOW
     worked = np.full(n, np.nan, dtype=object)
@@ -116,7 +118,9 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
         if not res or np.isnan(res):
             continue
         entry = closes[i]
-        stop = res * settings.STOP_LOSS_FRACTION
+        stop = settings.stop_from(res, atr_shorts[i])
+        if stop is None:
+            continue
         risk = entry - stop
         if risk <= 0:
             continue
@@ -436,8 +440,11 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
         trigger = (f"Watch for a close above {cur}{resistance:,.2f} on above-average volume "
                    f"to confirm a breakout.")
         suggested_entry = f"{cur}{resistance:,.2f}+ (breakout close on volume)"
-        stop = round(resistance * settings.STOP_LOSS_FRACTION, 2)
-        stop_loss = f"{cur}{stop:,.2f} (~-6% below the trigger)"
+        latest_atr = float(latest["atr_short"]) if pd.notna(latest["atr_short"]) else None
+        stop = round(settings.stop_from(resistance, latest_atr), 2)
+        drop_pct = (1 - stop / resistance) * 100
+        basis = "sized to volatility" if (settings.ATR_STOP_ENABLED and latest_atr) else "fixed"
+        stop_loss = f"{cur}{stop:,.2f} (~-{drop_pct:.1f}% below the trigger, {basis})"
     else:
         trigger = "Not enough history to define a clear resistance level yet."
         suggested_entry = "—"

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roadmap Preview — remaining features (static mockup)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  /* Tooltip: click-to-toggle (mobile friendly) + hover on desktop */
+  .tip { position: relative; }
+  .tip > .tip-body {
+    position: absolute; left: 0; top: 125%; z-index: 30; width: 16rem;
+    opacity: 0; pointer-events: none; transform: translateY(-4px);
+    transition: opacity .12s ease, transform .12s ease;
+  }
+  .tip:hover > .tip-body, .tip.open > .tip-body { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .badge-mock { font-variant-numeric: tabular-nums; }
+  .note { border-left: 3px solid #8b5cf6; }
+  /* device frame for the two responsive previews */
+  .phone { width: 390px; }
+  .toggle-live.on { background:#059669; }
+  .toggle-live.on .dot { transform: translateX(1.15rem); }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-200 antialiased">
+
+<!-- ================= PAGE HEADER ================= -->
+<header class="max-w-5xl mx-auto px-5 pt-10 pb-6">
+  <div class="flex items-center gap-3 mb-2">
+    <span class="text-[10px] uppercase tracking-widest font-bold text-purple-300 bg-purple-500/15 border border-purple-500/30 rounded px-2 py-1">Static mockup</span>
+    <span class="text-[10px] uppercase tracking-widest text-slate-500">not wired to data · sample values only</span>
+  </div>
+  <h1 class="text-2xl font-bold text-white">Remaining-features preview</h1>
+  <p class="text-sm text-slate-400 mt-2 max-w-2xl leading-relaxed">
+    A look at how each roadmap item <em>would</em> render before we build it for real against
+    <code class="text-slate-300">combined_breakout_scanner_platform.html</code> and
+    <code class="text-slate-300">performance.html</code>. Numbers here are hand-picked to show each state — nothing is live.
+    The naked-conviction live badge (kill-list&nbsp;#1) is intentionally shown OFF, matching
+    <code class="text-slate-300">SHOW_CONV_LIVE_BADGE = false</code>.
+  </p>
+  <nav class="flex flex-wrap gap-2 mt-5 text-xs">
+    <a href="#f1c" class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">1c · Single verdict</a>
+    <a href="#f5"  class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">#5 · Backtest vs live</a>
+    <a href="#tip" class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">Edge-vs-Risk tooltips</a>
+    <a href="#r3"  class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">R3 · Watchlist tap</a>
+    <a href="#r4"  class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">R4 · Homepage strip</a>
+    <a href="#r5"  class="rounded-full border border-slate-700 px-3 py-1 hover:bg-slate-800">R5 · Email digest</a>
+  </nav>
+</header>
+
+<main class="max-w-5xl mx-auto px-5 pb-24 space-y-14">
+
+  <!-- ================= 1c — SINGLE VERDICT ================= -->
+  <section id="f1c">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">1c · Kill the mixed-signal contradiction</h2>
+      <span class="text-xs text-slate-500">one card, one verdict</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">Today a card can say “Strong breakout” in the header and “weak / wait” lower down. Fix: derive one verdict and render it once.</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- BEFORE -->
+      <div class="rounded-xl border border-rose-500/30 bg-slate-900 p-4">
+        <div class="text-[10px] uppercase tracking-widest text-rose-300 mb-3">Before · contradictory</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-white font-bold text-lg">TATAMOTORS</div>
+            <div class="text-emerald-400 text-sm font-semibold">Strong breakout ↑</div>
+          </div>
+          <div class="text-right text-sm text-slate-400">₹1,032.40<br><span class="text-emerald-400">+2.1%</span></div>
+        </div>
+        <div class="mt-3 text-xs text-amber-300 bg-amber-500/10 rounded px-2 py-1 inline-block">Signal: weak — wait for confirmation</div>
+        <div class="mt-2 text-xs text-slate-500">Volume below average · risk elevated</div>
+      </div>
+      <!-- AFTER -->
+      <div class="rounded-xl border border-emerald-500/30 bg-slate-900 p-4">
+        <div class="text-[10px] uppercase tracking-widest text-emerald-300 mb-3">After · single verdict</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-white font-bold text-lg">TATAMOTORS</div>
+            <div class="text-amber-300 text-sm font-semibold">Watch — not confirmed yet</div>
+          </div>
+          <div class="text-right text-sm text-slate-400">₹1,032.40<br><span class="text-emerald-400">+2.1%</span></div>
+        </div>
+        <div class="mt-3 text-xs text-slate-300 leading-relaxed">
+          Price cleared the pivot but on <span class="text-amber-300">below-average volume</span>.
+          One clean line — no “strong” + “weak” at once.
+        </div>
+        <div class="mt-3 flex gap-2 text-[11px]">
+          <span class="rounded bg-slate-800 px-2 py-0.5 text-slate-400">Verdict logic: <span class="text-slate-200">min(price, volume, risk)</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= #5 — BACKTEST vs LIVE ================= -->
+  <section id="f5">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">#5 · Backtest reliability reconciled with live record</h2>
+      <span class="text-xs text-slate-500">inline, on the card</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">Show the historical hit-rate right next to how the same setup has actually done on <em>live</em> calls so far, so the two never look disconnected.</p>
+    <div class="rounded-xl border border-slate-700 bg-slate-900 p-4 max-w-md">
+      <div class="flex items-center justify-between">
+        <div class="text-white font-bold">BREAKOUT · 20-day high</div>
+        <div class="text-xs text-slate-500">NSE</div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div class="rounded-lg bg-slate-800/60 p-3">
+          <div class="text-[10px] uppercase tracking-widest text-slate-400">Backtest reliability</div>
+          <div class="text-2xl font-bold text-white mt-1 badge-mock">72<span class="text-base text-slate-400">%</span></div>
+          <div class="text-[11px] text-slate-500 mt-1">2018–2025 · 431 setups</div>
+        </div>
+        <div class="rounded-lg bg-slate-800/60 p-3">
+          <div class="text-[10px] uppercase tracking-widest text-slate-400">Live so far</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1 badge-mock">4<span class="text-base text-slate-500"> / 6</span></div>
+          <div class="text-[11px] text-slate-500 mt-1">resolved calls · matches range</div>
+        </div>
+      </div>
+      <div class="mt-3 text-[11px] text-slate-400 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+        Live tracking within backtest band — no contradiction
+      </div>
+    </div>
+    <!-- divergence variant -->
+    <div class="rounded-xl border border-amber-500/30 bg-slate-900 p-4 max-w-md mt-3">
+      <div class="text-[10px] uppercase tracking-widest text-amber-300 mb-2">Variant · live below backtest → honest caution</div>
+      <div class="flex items-center gap-4">
+        <div><span class="text-xl font-bold text-white badge-mock">68%</span> <span class="text-xs text-slate-500">backtest</span></div>
+        <div class="text-slate-600">vs</div>
+        <div><span class="text-xl font-bold text-rose-400 badge-mock">1 / 5</span> <span class="text-xs text-slate-500">live</span></div>
+        <div class="ml-auto text-[11px] text-amber-300">running cold vs history</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= EDGE-vs-RISK TOOLTIPS ================= -->
+  <section id="tip">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">Backlog · Edge-vs-Risk factor tooltips</h2>
+      <span class="text-xs text-slate-500">tap / hover the ⓘ</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">Every factor in the Edge-vs-Risk block gets a plain-English “what is this and why does it matter” tooltip. Click each ⓘ below (works on hover too).</p>
+    <div class="rounded-xl border border-slate-700 bg-slate-900 p-5 max-w-lg">
+      <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+        <!-- Edge column -->
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-emerald-300 mb-3">Edge</div>
+          <ul class="space-y-3">
+            <li class="flex items-center gap-2">
+              <span class="text-slate-300">Volume surge</span>
+              <button class="tip text-slate-500 hover:text-slate-200" onclick="this.classList.toggle('open')">ⓘ
+                <span class="tip-body rounded-lg border border-slate-700 bg-slate-800 p-3 text-xs text-slate-300 text-left shadow-xl">
+                  <b class="text-white">Volume surge</b> — today’s volume vs its 20-day average. Above ~1.5× means real buying interest is behind the move, not a thin drift.
+                </span>
+              </button>
+              <span class="ml-auto text-emerald-400 font-semibold">2.3×</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-slate-300">Trend alignment</span>
+              <button class="tip text-slate-500 hover:text-slate-200" onclick="this.classList.toggle('open')">ⓘ
+                <span class="tip-body rounded-lg border border-slate-700 bg-slate-800 p-3 text-xs text-slate-300 text-left shadow-xl">
+                  <b class="text-white">Trend alignment</b> — is price above its 50 & 200-day averages? Breakouts with the longer trend behind them follow through more often.
+                </span>
+              </button>
+              <span class="ml-auto text-emerald-400 font-semibold">Aligned</span>
+            </li>
+          </ul>
+        </div>
+        <!-- Risk column -->
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-rose-300 mb-3">Risk</div>
+          <ul class="space-y-3">
+            <li class="flex items-center gap-2">
+              <span class="text-slate-300">Distance to resistance</span>
+              <button class="tip text-slate-500 hover:text-slate-200" onclick="this.classList.toggle('open')">ⓘ
+                <span class="tip-body rounded-lg border border-slate-700 bg-slate-800 p-3 text-xs text-slate-300 text-left shadow-xl" style="left:auto;right:0;">
+                  <b class="text-white">Distance to resistance</b> — how far the next overhead ceiling is. Close resistance caps upside and raises the odds of a stall.
+                </span>
+              </button>
+              <span class="ml-auto text-rose-400 font-semibold">1.4%</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-slate-300">Volatility</span>
+              <button class="tip text-slate-500 hover:text-slate-200" onclick="this.classList.toggle('open')">ⓘ
+                <span class="tip-body rounded-lg border border-slate-700 bg-slate-800 p-3 text-xs text-slate-300 text-left shadow-xl" style="left:auto;right:0;">
+                  <b class="text-white">Volatility</b> — recent daily swing size. Higher volatility means wider stops and a bumpier hold, even if the direction is right.
+                </span>
+              </button>
+              <span class="ml-auto text-amber-300 font-semibold">Elevated</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">Tooltips are copy-only — no new data pipeline needed.</div>
+    </div>
+  </section>
+
+  <!-- ================= R3 — WATCHLIST TAP ================= -->
+  <section id="r3">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">R3 · Watchlist tap reliability (mobile)</h2>
+      <span class="text-xs text-slate-500">bigger hit area</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">The ★ tap target is currently tiny and misfires. Fix: full-height tappable row area with a clear pressed state. Preview at 390px width.</p>
+    <div class="flex flex-wrap gap-4">
+      <!-- before -->
+      <div class="phone rounded-2xl border border-slate-800 bg-slate-900 p-3">
+        <div class="text-[10px] uppercase tracking-widest text-rose-300 mb-2 px-1">Before · 20px star only</div>
+        <div class="flex items-center justify-between py-2 px-1 border-b border-slate-800">
+          <div><div class="text-white font-semibold text-sm">INFY</div><div class="text-xs text-slate-500">₹1,540</div></div>
+          <button class="text-slate-500 text-xs">★</button>
+        </div>
+        <div class="flex items-center justify-between py-2 px-1">
+          <div><div class="text-white font-semibold text-sm">WIPRO</div><div class="text-xs text-slate-500">₹242</div></div>
+          <button class="text-slate-500 text-xs">★</button>
+        </div>
+        <div class="text-[11px] text-rose-400/80 mt-2 px-1">↑ easy to miss / mis-tap</div>
+      </div>
+      <!-- after -->
+      <div class="phone rounded-2xl border border-slate-800 bg-slate-900 p-3">
+        <div class="text-[10px] uppercase tracking-widest text-emerald-300 mb-2 px-1">After · full-row 44px target</div>
+        <button class="w-full flex items-center justify-between py-3 px-2 rounded-lg border-b border-slate-800 active:bg-slate-800 hover:bg-slate-800/50 transition text-left">
+          <span><span class="text-white font-semibold text-sm block">INFY</span><span class="text-xs text-slate-500">₹1,540</span></span>
+          <span class="text-amber-300 text-lg">★</span>
+        </button>
+        <button class="w-full flex items-center justify-between py-3 px-2 rounded-lg active:bg-slate-800 hover:bg-slate-800/50 transition text-left">
+          <span><span class="text-white font-semibold text-sm block">WIPRO</span><span class="text-xs text-slate-500">₹242</span></span>
+          <span class="text-slate-600 text-lg">☆</span>
+        </button>
+        <div class="text-[11px] text-emerald-400/80 mt-2 px-2">↑ whole row is the button</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= R4 — HOMEPAGE STRIP ================= -->
+  <section id="r4">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">R4 · Homepage live-record strip</h2>
+      <span class="text-xs text-slate-500">above the fold</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">A compact, honest scoreboard the moment you land — real resolved calls, not a marketing number. Links into performance.html.</p>
+    <div class="rounded-xl border border-slate-700 bg-gradient-to-b from-slate-900 to-slate-900/60 p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-sm font-semibold text-white">Live record <span class="text-slate-500 font-normal">· last 90 days</span></div>
+        <a href="#" class="text-xs text-purple-300 hover:underline">Full track record →</a>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div><div class="text-2xl font-bold text-white badge-mock">37</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">Calls resolved</div></div>
+        <div><div class="text-2xl font-bold text-emerald-400 badge-mock">24</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">Hit target</div></div>
+        <div><div class="text-2xl font-bold text-rose-400 badge-mock">13</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">Stopped out</div></div>
+        <div><div class="text-2xl font-bold text-white badge-mock">65%</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">Hit rate</div></div>
+      </div>
+      <div class="mt-4 h-2 rounded-full overflow-hidden bg-slate-800 flex">
+        <div class="bg-emerald-500" style="width:65%"></div>
+        <div class="bg-rose-500" style="width:35%"></div>
+      </div>
+      <div class="mt-2 text-[11px] text-slate-500">Updated nightly · unresolved/open calls excluded from this count.</div>
+    </div>
+  </section>
+
+  <!-- ================= R5 — EMAIL DIGEST ================= -->
+  <section id="r5">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-white">R5 · Weekly email digest</h2>
+      <span class="text-xs text-slate-500">rendered as it would arrive</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-4 max-w-2xl">A plain, list-based email (safe across clients) summarising the week’s new setups and how prior calls resolved.</p>
+    <div class="max-w-md mx-auto sm:mx-0 rounded-lg border border-slate-700 bg-white text-slate-800 overflow-hidden shadow-2xl">
+      <div class="bg-slate-900 px-5 py-3 text-white">
+        <div class="font-bold">BreakoutAI · Weekly</div>
+        <div class="text-xs text-slate-400">Week of 6 Jul 2026</div>
+      </div>
+      <div class="p-5 space-y-4 text-sm">
+        <div>
+          <div class="font-semibold text-slate-900 mb-1">This week’s record</div>
+          <p class="text-slate-600">3 calls resolved · <span class="text-emerald-600 font-semibold">2 hit</span> · <span class="text-rose-600 font-semibold">1 stopped</span>.</p>
+        </div>
+        <div>
+          <div class="font-semibold text-slate-900 mb-1">New high-conviction setups</div>
+          <ul class="divide-y divide-slate-200">
+            <li class="py-2 flex justify-between"><span>TATAMOTORS <span class="text-slate-400">· 20d high</span></span><span class="text-slate-500">₹1,032</span></li>
+            <li class="py-2 flex justify-between"><span>SBIN <span class="text-slate-400">· cup &amp; handle</span></span><span class="text-slate-500">₹842</span></li>
+          </ul>
+        </div>
+        <div class="pt-2 border-t border-slate-200 text-xs text-slate-400">
+          You’re getting this because you subscribed. <a href="#" class="text-purple-600 underline">View on web</a> · <a href="#" class="underline">Unsubscribe</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer note -->
+  <div class="note pl-4 py-2 text-sm text-slate-400">
+    All sections above are static HTML. When approved, each becomes a template change in
+    <code class="text-slate-300">combined_breakout_scanner_platform.html</code> /
+    <code class="text-slate-300">performance.html</code>, wired to the existing live-record JSON — no new data pipeline except R5’s send job.
+  </div>
+</main>
+
+<script>
+  // close open tooltips when tapping elsewhere (mobile)
+  document.addEventListener('click', function(e){
+    document.querySelectorAll('.tip.open').forEach(function(t){
+      if(!t.contains(e.target)) t.classList.remove('open');
+    });
+  });
+</script>
+</body>
+</html>

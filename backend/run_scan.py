@@ -218,6 +218,37 @@ def run():
             s["rationale"] = None
     print(f"  built rationale for {n_rat}/{len(summaries)} stocks")
 
+    # --- AI Verdict, Lite pass (backend/ai_verdict.py) ---------------------------
+    # Gated to the same handful of already-high-conviction names OPTIONS_FLOW uses
+    # (settings.AI_VERDICT_MIN_CONVICTION/MAX_STOCKS) -- spending an LLM call on every
+    # one of ~1,800 stocks a day isn't worth it (cost + free-tier rate limits) when the
+    # rule-based conviction score has already ranked them. Every stock still gets an
+    # ai_verdict key (null if ungated or if every backend failed) so the frontend never
+    # has to special-case a missing field. Best-effort per stock, matching every other
+    # enrichment above: one bad call logs + carries ai_verdict: null, never aborts the scan.
+    from ai_verdict import analyze_stock, _build_lite_chain
+    for s in summaries:
+        s["ai_verdict"] = None
+    if not _build_lite_chain():
+        print("  AI verdict SKIPPED (no free-tier AI backend configured)")
+    else:
+        gated = [s for s in summaries
+                 if (s.get("readiness") or {}).get("conviction", 0) >= settings.AI_VERDICT_MIN_CONVICTION]
+        gated.sort(key=lambda s: (s.get("readiness") or {}).get("conviction", 0), reverse=True)
+        gated = gated[:settings.AI_VERDICT_MAX_STOCKS]
+        n_ok = n_fail = 0
+        t_ai = time.time()
+        for s in gated:
+            result = analyze_stock(s, deep=False)
+            if result.get("error"):
+                n_fail += 1
+            else:
+                n_ok += 1
+            s["ai_verdict"] = result
+        print(f"  AI verdict (Lite): {n_ok}/{len(gated)} ok, {n_fail} failed "
+              f"(gate: conviction>={settings.AI_VERDICT_MIN_CONVICTION}, cap {settings.AI_VERDICT_MAX_STOCKS}) "
+              f"in {time.time()-t_ai:.1f}s")
+
     # --- Store into DuckDB (local research layer) ---
     prices_df = pd.concat(all_prices, ignore_index=True)
     features_df = pd.concat(all_features, ignore_index=True)

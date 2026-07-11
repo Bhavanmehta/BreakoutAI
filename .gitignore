@@ -35,6 +35,10 @@ venv/
 # Throwaway research artifacts (e.g. the G/H method exploration scratch dumps)
 scratch_*
 
+# Internal design/handoff notes — kept on disk for Fable/us to reason over, not
+# committed as public repo content.
+backend/OPTIONS_FLOW_TRADIER_NOTES.md
+
 # Local scratch / verification tooling (one-off scripts, screenshots, branch dumps).
 # Kept on disk but never committed: methods.py / CLAUDE.md reference a couple of these
 # as ongoing cross-checks. Regenerable; nothing here is source of record.

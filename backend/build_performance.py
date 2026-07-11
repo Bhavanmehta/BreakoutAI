@@ -191,10 +191,12 @@ def refresh_outcomes(episodes: list[dict], feat_by_symbol: dict[str, pd.DataFram
         closes = df["close"].to_numpy(dtype=float)
         res = df["resistance"].to_numpy(dtype=float)[i]
         entry = closes[i]
-        if not res or np.isnan(res) or entry - res * settings.STOP_LOSS_FRACTION <= 0:
+        atr_i = (df["atr_short"].to_numpy(dtype=float)[i]
+                 if "atr_short" in df.columns else None)
+        stop = settings.stop_from(res, atr_i)
+        if stop is None or entry - stop <= 0:
             drop.append(ep)   # ungradeable under the site's own rule -- see docstring
             continue
-        stop = res * settings.STOP_LOSS_FRACTION
         target = entry + (entry - stop)
         status, resolved_in = _grade(df["high"].to_numpy(dtype=float),
                                      df["low"].to_numpy(dtype=float),
@@ -353,7 +355,8 @@ def _write(episodes: list[dict], as_of: str | None, analytics: dict | None = Non
         "live_since": min((e["date"] for e in episodes), default=None),
         "grade_window": settings.FOLLOWTHROUGH_WINDOW,
         "track_bars": settings.PERF_TRACK_BARS,
-        "stop_loss_fraction": settings.STOP_LOSS_FRACTION,
+        "stop_loss_fraction": settings.STOP_LOSS_FRACTION,   # legacy/fallback; see stop_model
+        "stop_model": settings.STOP_MODEL_DESC,
         "reference_rates": REFERENCE_RATES.get(settings.MARKET, {}),
         "disclaimer": ("Educational content only, not investment advice. A live, "
                        "forward-only record of the site's own published calls -- nothing "

@@ -209,7 +209,55 @@ MIN_HISTORY_BARS = max(TREND_EMA_LONG + EMA200_SLOPE_LOOKBACK, 252)
 # which grades low-vol large-caps as failures and high-beta names as successes regardless
 # of whether the setup itself was any good.
 FOLLOWTHROUGH_WINDOW = 10
-STOP_LOSS_FRACTION = 0.94   # stop = resistance * this (~6% below); defines 1R = entry - stop
+STOP_LOSS_FRACTION = 0.94   # legacy flat stop = resistance * this (~6% below). Kept as the
+                            # fallback when ATR is unknown, and as the IN model (its live
+                            # ledger was graded on it). See stop_from() below.
+
+# --- Volatility-scaled stop (US) ------------------------------------------------
+# A flat 6% below the trigger ignores how much a stock actually moves: it's a
+# hair-trigger on a sleepy mega-cap and pure noise on a high-ATR small-cap, so the
+# same setup grades as a failure or a success for reasons that have nothing to do
+# with the setup. Instead, set the stop a fixed multiple of the stock's OWN recent
+# range (the 10-day ATR already computed in find_breakouts.add_indicators) below the
+# trigger, then clamp the resulting distance so risk never gets absurdly tight or
+# wide. 1R = entry - stop flows from this, so the target and the +1R-before-stop
+# grade scale with it automatically -- and every call site (live entry card,
+# historical follow-through grader, performance ledger, live tracker) MUST go
+# through stop_from() so they stay bit-identical.
+ATR_STOP_ENABLED = MARKET == "US"   # IN keeps the flat 6% its published ledger was graded on
+ATR_STOP_MULT = 1.5                 # stop = trigger - 1.5 * 10-day ATR
+ATR_STOP_MIN_PCT = 4.0              # ...but never tighter than 4% below the trigger
+ATR_STOP_MAX_PCT = 12.0             # ...and never wider than 12% (matches G_ATR_CEILING_PCT)
+
+
+def stop_from(resistance, atr_short=None):
+    """Single source of truth for the protective stop, in price terms, from the
+    trigger (resistance) and the stock's 10-day ATR. Returns the stop price, or None
+    when there is no usable resistance. Falls back to the flat STOP_LOSS_FRACTION
+    when the ATR model is disabled (IN) or ATR is unavailable, so behaviour is
+    bit-identical to the old code on that path."""
+    try:
+        res = float(resistance)
+    except (TypeError, ValueError):
+        return None
+    if not res or res != res:            # 0 or NaN -> risk isn't well-defined
+        return None
+    atr_ok = atr_short is not None and float(atr_short) == float(atr_short) and float(atr_short) > 0
+    if not ATR_STOP_ENABLED or not atr_ok:
+        return res * STOP_LOSS_FRACTION
+    dist = ATR_STOP_MULT * float(atr_short)
+    dist = min(max(dist, res * ATR_STOP_MIN_PCT / 100.0), res * ATR_STOP_MAX_PCT / 100.0)
+    return res - dist
+
+
+# Human-readable description of the active stop model, surfaced in performance.json /
+# track_record.json and rendered in the performance-page tooltip.
+STOP_MODEL_DESC = (
+    (f"stop = {ATR_STOP_MULT:g}x the 10-day ATR below the trigger, "
+     f"clamped {ATR_STOP_MIN_PCT:.0f}-{ATR_STOP_MAX_PCT:.0f}% of price")
+    if ATR_STOP_ENABLED else
+    f"stop = resistance x {STOP_LOSS_FRACTION} (~{(1 - STOP_LOSS_FRACTION) * 100:.0f}% below the trigger)"
+)
 
 # --- Performance page (build_performance.py -> data/performance.json) --------
 # The feed behind performance.html: a live, forward-only ledger of every
@@ -375,6 +423,67 @@ MOOD_TREND_CLAMP_PCT = 10.0      # +/- this % distance from the SMA maps to the 
 # (India VIX and CBOE VIX aren't on the same historical scale) -- not redefined here.
 MOOD_FII_ROLLING_DAYS = 21       # window today's net FII flow is z-scored against
 MOOD_FII_CLAMP_Z = 2.0           # a z-score of +/- this many std-devs maps to the full 0-100 range
+
+# --- Options-flow research prototype (options_flow_scan.py -- NOT part of the daily
+# scan/run_scan.py, and NOT wired into the served site. US-only (yfinance/jugaad-data
+# above are equities; this is a separate, standalone research script for exploring
+# "unusual" single-leg options activity via Polygon.io's free tier). See
+# options_flow_scan.py's docstring for exactly what it can/can't detect on a free key
+# (no aggressor/side without tick-level NBBO comparison -- only volume/notional/avg
+# trade size, from one daily-aggregate call per contract).
+OPTIONS_FLOW_JSON = (REPO_DIR / "data" / "us" / "options_flow_research.json")
+POLYGON_MIN_REQUEST_GAP_SEC = 13.0     # free tier: 5 calls/min -- stay safely under
+OPTIONS_FLOW_MAX_CONTRACTS_PER_TICKER = 10   # keeps one ticker's scan to ~2-3 min
+OPTIONS_FLOW_MONEYNESS_PCT = 10.0      # only strikes within this % of prev-close spot
+OPTIONS_FLOW_MAX_DTE_DAYS = 60         # only expirations within this many days out
+OPTIONS_FLOW_MIN_VOLUME = 500          # contracts traded that day, floor to even record
+OPTIONS_FLOW_MIN_NOTIONAL = 250_000    # volume * vwap * 100 floor to flag as "unusual"
+OPTIONS_FLOW_MIN_AVG_TRADE_SIZE = 20   # volume/transactions floor ("big prints" proxy)
+
+# --- Universe selection: drive the options scan FROM our own high-conviction
+# breakout list (breakouts.json) instead of a fixed mega-cap watchlist, so the flow
+# we pull is for names we already have a technical thesis on. Two free pre-gates run
+# BEFORE any options API call, to avoid burning the rate limit on names that either
+# have no listed options or whose stock is too thin for options to matter:
+OPTIONS_FLOW_MIN_CONVICTION = 60       # only scan breakouts.json names at/above this conviction (0-100)
+OPTIONS_FLOW_MIN_TURNOVER_USD = 20_000_000  # equity pre-gate: price * avg daily volume floor.
+                                       #   Sub-$20M/day names almost never have liquid options -- skip
+                                       #   them for free using data breakouts.json already carries.
+OPTIONS_FLOW_MAX_TICKERS = 40          # hard cap on how many survivors to scan (rate-limit budget);
+                                       #   highest-conviction first if more than this clear the gates.
+# has_options cache: whether a ticker has ANY listed options basically never changes,
+# so we persist the yes/no per ticker and only re-check monthly, saving one reference
+# call per known name on every run.
+OPTIONS_FLOW_HAS_OPTIONS_CACHE = (REPO_DIR / "data" / "us" / "options_has_options_cache.json")
+OPTIONS_FLOW_HAS_OPTIONS_TTL_DAYS = 30
+
+# --- AI Verdict ("Lite" pass, backend/ai_verdict.py) -------------------------
+# Runs once per stock during run_scan.py, batched over the whole universe, so it needs
+# the same kind of rate-limit-conscious pre-gate as the options flow above rather than
+# firing ~1,800 LLM calls a day. Reuses OPTIONS_FLOW_MIN_CONVICTION's precedent: only
+# the names that already cleared our own technical bar get an AI opinion spent on them.
+AI_VERDICT_MIN_CONVICTION = 60          # only Lite-pass names at/above this conviction (0-100)
+AI_VERDICT_MAX_STOCKS = 80             # hard cap on Lite-pass calls per scan (rate-limit budget);
+                                       #   highest-conviction survivors first if more clear the gate.
+# The Deep pass (richer prompt, slower reasoning model) is NEVER run inside run_scan.py --
+# it's on-demand only, from the frontend's "Deep dive" button, via api/verdict.py (Redis-
+# cached per symbol/day so repeat clicks/viewers don't re-spend the reasoning-tier quota).
+
+# --- Tradier chain provider (open-interest + greeks + spread) ----------------
+# Polygon's free tier gives volume/vwap but NOT open interest. Tradier's free
+# sandbox does, and isn't as rate-crippled (~120 req/min vs Polygon's 5), so we use
+# it for the primary "unusual" signal and keep Polygon's avg-trade-size as enrichment.
+# TRADIER_ACCESS_TOKEN + TRADIER_API_URL come from backend/.env (sandbox is paper-only,
+# 15-min delayed -- fine for this research prototype; see options_flow_scan.py docstring).
+TRADIER_MIN_REQUEST_GAP_SEC = 0.6      # ~100 req/min, comfortably under sandbox's ~120
+
+# Flag logic (Tradier): a contract is "unusual" when day-volume runs hot vs the
+# standing open interest AND the OI itself is deep enough to matter AND the market is
+# tight enough to actually trade -- all three must clear, so a thin illiquid strike
+# with one lucky print can't trip the flag.
+OPTIONS_FLOW_MIN_VOL_OI_RATIO = 3.0    # day volume >= 3x open interest = new positioning
+OPTIONS_FLOW_MIN_OPEN_INTEREST = 500   # OI floor: ignore contracts too small to be meaningful
+OPTIONS_FLOW_MAX_SPREAD_PCT = 15.0     # (ask-bid)/mid*100 ceiling: skip untradeable wide markets
 
 # --- Indicator windows -------------------------------------------------------
 # 8 & 21 are the responsive Fibonacci "momentum/trend" EMAs (catch moves early);

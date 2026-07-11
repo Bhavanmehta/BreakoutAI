@@ -460,7 +460,7 @@ function renderList() {
                             <span class="text-slate-200 font-semibold">${e.closes.length ? fmtPrice(e.closes[e.closes.length - 1]) : "…"}</span>
                             <span class="ml-1.5 font-bold ${ret == null ? "text-slate-600" : ret >= 0 ? "text-emerald-400" : "text-red-400"}">${ret == null ? "" : fmtPct(ret)}</span>
                             ${e.alpha == null ? "" : `<span class="ml-1 text-[10px] font-semibold border rounded px-1 ${e.alpha >= 0 ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : "text-red-300 border-red-500/30 bg-red-500/10"}" title="Return vs ${DATA.analytics && DATA.analytics.benchmark ? (DATA.analytics.benchmark.label || DATA.analytics.benchmark.ticker) : "the index"} over the same window (call ${fmtPct(e.ret)} − index ${fmtPct(e.bm_ret)})">${fmtPct(e.alpha)} α</span>`}
-                            <div class="text-[10px] text-slate-600 mt-0.5" title="The grading levels set on the call date: stop = resistance × ${DATA.stop_loss_fraction}, target = entry + 1R">stop ${fmtPrice(e.stop)} · target ${fmtPrice(e.target)}</div>
+                            <div class="text-[10px] text-slate-600 mt-0.5" title="The grading levels set on the call date: ${DATA.stop_model || ("stop = resistance × " + DATA.stop_loss_fraction)}; target = entry + 1R">stop ${fmtPrice(e.stop)} · target ${fmtPrice(e.target)}</div>
                             ${e.status === "open" ? `<div class="perf-live-line text-[11px] mt-0.5 hidden"></div>` : ""}
                         </div>
                         <div>${barStrip(e)}</div>
