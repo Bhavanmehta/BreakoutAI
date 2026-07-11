@@ -1,0 +1,73 @@
+name: India post-mortem re-run (Jul-20)
+
+# One-shot scheduled re-run of the India-market post-mortem, requested 2026-07-10.
+# WHY: on Jul-10 the book was working (148 resolved, 57% win, +0.135R, +0.63% alpha
+# vs Nifty). The only durable caution was that the 80+ conviction tier underperforms
+# (47%, 15 resolved) vs the 60s bucket (62%). This job re-runs the analysis once the
+# tier has more resolved calls and OPENS A GITHUB ISSUE with the verdict -- which
+# emails you via GitHub notifications ("go take a look at the results").
+#
+# 14:00 UTC = 19:30 IST, ~9h after the daily-scan workflow (10:30 UTC) refreshes the
+# ledger on the `data` branch, so we analyse fresh Jul-20 numbers.
+# NOTE: the cron re-fires every July 20; it's harmless (runs once a year) -- delete
+# this file after the first run if you don't want the annual repeat.
+on:
+  schedule:
+    - cron: "0 14 20 7 *"
+  workflow_dispatch: {}   # lets you trigger it by hand from the Actions tab to test
+
+permissions:
+  contents: read
+  issues: write           # so the job can open the results issue (emails you)
+
+jobs:
+  postmortem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo (for the analysis script)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull the fresh IN ledger from the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The forward-only ledger lives on the orphan `data` branch (force-pushed
+          # daily by daily-scan.yml). Pull just the two files the analysis needs.
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          D="$(mktemp -d)"
+          git clone --depth 1 --branch data "$REPO_URL" "$D/d"
+          mkdir -p data
+          cp "$D/d/performance.json" data/performance.json
+          cp "$D/d/sectors.json"     data/sectors.json
+
+      - name: Run the post-mortem (stdlib only, no deps)
+        run: python scripts/postmortem_in.py data
+
+      - name: Open a GitHub issue with the results (this is the email alert)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "India post-mortem re-run — $(date -u +%Y-%m-%d) (80+ conviction check)" \
+            --body-file postmortem_report.md \
+            --assignee "${GITHUB_REPOSITORY_OWNER}" \
+            --label "postmortem" 2>/dev/null \
+          || gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "India post-mortem re-run — $(date -u +%Y-%m-%d) (80+ conviction check)" \
+            --body-file postmortem_report.md \
+            --assignee "${GITHUB_REPOSITORY_OWNER}"
+
+      - name: Also keep the report as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: india-postmortem-report
+          path: postmortem_report.md
