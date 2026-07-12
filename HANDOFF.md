@@ -6,6 +6,40 @@ _When you start a fresh chat, point it here first._
 
 ---
 
+## 🔬 RESEARCH NOTE — composite-score portability + orthogonal combos (2026-07)
+
+Ran `analyze_reliability.py` whole-market (US, 200,858 graded events / 4,179 stocks /
+36 methods, overall hit 36.1%). Research-only, no production code written. Two questions:
+
+**Q1 — does the shipped composite score (rel .6 / depth .25 / method .15) stratify
+follow-through on I and K the way it does on A?** (Previously only validated on A's own
+event days — §2b.)
+- **A_donchian_minervini:** +14.3 pts low→high, p=0.000 ✅
+- **I_volume_profile:** +10.3 pts (30.9%→41.2%), p=0.000 ✅ — **same score works, no re-tune.**
+- **K_anchored_vwap:** +2.1 pts best case, p=0.379 ❌ — **flat / not significant across all
+  three weightings.** Mechanism: K fires 1.5 events/stock (vs A 5.1, I 4.3), so its
+  dominant term (shrunk trailing reliability, w=0.6) has almost no per-stock history and
+  collapses to the prior → score barely varies (only 2 buckets form). **Do NOT rank K by
+  this composite.**
+
+**Q2 — do any orthogonal same-day agreements beat their components?** (I/J/K are near-
+independent: Jaccard I-J 8%, I-K 4%, J-K 3%.)
+- **JK_combo (J∧K same day): 44.2%, n=328** — vs J 34.9% p=0.0005, vs base 36.1% p=0.002
+  (both real); vs K 38.2% p=0.036 (borderline, samples overlap). **Only combo that lifts.**
+  Tied with the best existing tiers (HC 43.9%, L2 43.9%). ~1–2 picks/wk over 3yr.
+- **IJ_combo: 33.3%** — significantly *worse* than I (p=0.006). Agreement HURT here.
+- **IK_combo: 36.9%** — no different from K (p=0.55). No benefit.
+- **IJK_combo: 40.5%, n=131** — not sig vs base (p=0.29), underpowered.
+
+**Verdict / decision pending user:** (a) K should not carry a composite score — surface it
+only when it co-fires with J; (b) JK is the one promising new high-conviction path but n=328
+demands live confirmation before shipping. Nothing productionized yet.
+_Harness changes committed to scratch only: generalized `test_score()` to replay on any
+method's own events + IJ/IK/JK/IJK added to `COMBOS` in `backend/analyze_reliability.py`.
+Run log: `scratch_reliability_round3.log`._
+
+---
+
 ## ⏭️ NEXT SESSION — START HERE (2026-07-06)
 
 **Plan of record:** `docs/IDEAS_ROADMAP.md` — work the **kill/fix list §2 in
@@ -111,6 +145,137 @@ Sessions 4, 6, 7, 8 are one continuous line of work (same conversation) and touc
 files (`backend/find_breakouts.py`, `run_scan.py`, `analyze_reliability.py`,
 `combined_breakout_scanner_platform.html`, the regenerated `data/*.json`) — resume/commit them
 together as one body of work. Sessions 3 (Ask AI) and 5 (Claude Skills) remain independent.
+
+---
+
+## Session 12: 5 new breakout methods (I/J/K/L/M) — whole-market reliability backtest
+
+### Why
+Continuing session 4's method-comparison research thread: try five more breakout
+definitions on top of A/B/C/D/D2/E/E2/F/G/G2/H (+ the SB/HC conviction tiers) and
+see if any beat the existing baselines on the full US whole-market backtest.
+
+### What was built
+`backend/methods.py` gained 5 new detectors, each with its own settings block in
+`backend/settings.py`, all registered in `analyze_reliability.py`'s
+`BASE_METHODS`/`COMBOS`:
+- **I_volume_profile** — breakout confirmed by a volume-profile value-area check
+  (price clearing the point-of-control / value-area high on rising volume).
+- **J_ttm_squeeze** — classic TTM Squeeze (Bollinger inside Keltner) firing on
+  release.
+- **K_anchored_vwap** — price reclaiming/holding an anchored VWAP from a
+  volatility-event low.
+- **L_sb_deep_base / L2_hc_deep_base** — the existing SB_tier2/HC_tier1
+  conviction tiers gated additionally on `DEEP_BASE_MIN_DEPTH_PCT` (base depth
+  must exceed a minimum drawdown threshold).
+- **M_shakeout_rebreak** — a failed-breakdown-then-reclaim (shakeout) pattern.
+
+### Results (whole market, 4,179 stocks / 198,352 graded events, run 2026-07-11)
+Full output: `scratch_reliability_round2.log` (not committed — regenerate via
+`analyze_reliability.py`, see session 4's "How to re-run").
+
+**Method hit rates** (baseline `A_donchian_minervini` = 31.0%, n=19,853):
+
+| Method | n | hit rate | vs A |
+|---|---|---|---|
+| I_volume_profile | 16,087 | 36.6% | +5.6pt |
+| J_ttm_squeeze | 9,204 | 34.9% | +3.9pt |
+| K_anchored_vwap | 2,524 | 38.1% | +7.1pt |
+| L_sb_deep_base | 2,988 | 39.1% | ≈ SB_tier2 (39.1%) |
+| L2_hc_deep_base | 727 | 43.7% | ≈ HC_tier1 (43.7%) |
+| M_shakeout_rebreak | 9,889 | 31.6% | +0.6pt (noise) |
+| AI_combo (A AND I) | 4,668 | 29.9% | **worse** than A alone |
+| AJ_combo (A AND J) | 3,132 | 29.1% | **worse** than A alone |
+
+**Key findings, in priority order:**
+1. **I and K are the standouts** — large-enough samples, clear lift over A, and
+   (Jaccard overlap table) only ~15%/2% overlap with A, so they're mostly
+   catching *different* events, not re-labeling A's. Candidates to promote to
+   production as independent alert types (like E/E2 were in session 6) — not as
+   AND-filters on A.
+2. **Combining hurts, don't AND-filter.** `AI_combo` and `AJ_combo` both score
+   *below* A alone, even though I and J standalone beat A. The intersection of
+   "A fired AND I fired" is a worse subset than "A fired" or "I fired" alone.
+   Lesson: layering new methods as extra required conditions on top of A is the
+   wrong integration pattern; treat them as parallel independent signals instead
+   (same conclusion the session-4 combos AD/ED/AED already hinted at — all three
+   were also worse than their parents).
+3. **L/L2 are ≈100%/99% Jaccard-identical to SB_tier2/HC_tier1** — the
+   `DEEP_BASE_MIN_DEPTH_PCT` gate almost never excludes anything additional, so
+   these aren't adding real discrimination beyond the existing tiers. Not worth
+   shipping as separate methods; the underlying insight (deeper base = better,
+   see finding 5 below) is better spent tightening the *existing* score weight.
+4. **M ties baseline (31.6% vs 31.0%, n=9,889)** — lowest priority of the 5; no
+   real edge over plain A.
+5. **Feature-level findings (pooled, whole universe, all significant p<0.05
+   unless noted):**
+   - **Base depth confirmed strongly predictive** — deeper bases (-28.6% to
+     -98.7% drawdown) hit 37.6% vs shallow bases (-18% to -0.6%) at 23.7%.
+     Matches Minervini's "deeper/more mature base" prior; validates weighting it
+     in the composite score (already done).
+   - **Distance from 52-week high — counterintuitive.** Within the existing
+     ≤25% cap, breakouts *farther* from the high (2.7–25%) hit 36.9% vs
+     breakouts right at the high (<0.64%) at only 24.2%. Being right at fresh
+     highs is *not* an advantage here; there may be room to loosen or re-weight
+     any "must be near the high" filter.
+   - **Volume surge multiple — inverted, worth flagging.** Bigger breakout-day
+     volume spikes predict *lower* hit rate (31.9% at 1.5–1.8x avg volume down
+     to 30.2% at >2.5x), not higher. Possible explanation: extreme spikes are
+     often already-priced news/gap events, not quiet accumulation. Do not
+     increase volume-surge weight in the score; consider whether it should stay
+     flat or invert.
+   - **ADX (trend strength) — not predictive at all** (31.3% / 30.3% / 31.5%
+     across terciles, p=0.764). Confirms it's fine that ADX isn't a scored
+     input, just a display metric.
+   - **Volatility contraction ratio** — mildly predictive (29.5% → 32.7% as
+     contraction increases), smaller effect than base depth or distance-from-
+     high.
+   - **Method G (original pre-breakout composite) as a filter on A's own
+     events — inverted and significant** (low-G bucket 33.7% > high-G bucket
+     29.7%, p=0.000). G actively *hurts* if used to rank/gate A alerts. G2 (the
+     retuned version) fixed the inversion (no longer harmful) but is now flat/
+     not significant (p=0.707) — no added lift either. Method H (Pressure
+     Cooker) as an A-event filter is also flat (p=0.096).
+   - **Pattern type at breakout** — Tight Consolidation (21.4%) and Ascending
+     Triangle (23.0%) underperform badly; Head & Shoulders, used bullishly here,
+     underperforms too (27.7%), as expected for a reversal pattern; "no clear
+     pattern" (35.7%) and Double Bottom (34.0%) do best. Worth a caution flag on
+     Tight Consolidation / Ascending Triangle rather than a boost.
+6. **Composite score re-validated.** All three scoring formulations tested
+   (trailing-reliability alone, rel+depth, and the shipped
+   `rel(0.6)+depth(0.25)+method(0.15)` default) significantly stratify
+   follow-through; the shipped default has the widest spread (+14.4pt
+   top-vs-bottom bucket vs +9.2pt for reliability alone) — confirms blending is
+   still worth it over a single feature.
+7. **Analog "worked/faded" badge re-confirmed as a real-but-modest signal**
+   (35.0% vs 28.6% follow-through, +6.4pt, p=0.000) and closer analog similarity
+   helps a little (27.9% → 31.8%) — consistent with session 8's decision to keep
+   it informational-only, not scored.
+8. **Persistence re-confirmed**: a stock's trailing follow-through rate predicts
+   its *next* breakout's hit rate (28.5% low bucket vs 35.8% high bucket,
+   p=0.000) — validates continuing to use per-stock reliability history.
+
+### Current honest state
+Research-only, same as B/C/D/D2/F/G/H before them. Nothing in this session was
+wired into `run_scan.py`/`score.py`/the frontend. `scratch_reliability_round2.log`
+is a local, uncommitted research artifact.
+
+### Next steps (not yet decided/built)
+- Promote I_volume_profile and K_anchored_vwap to production alert types
+  (mirrors how E/E2 graduated in session 6) — as independent signals, not
+  AND-combos.
+- Decide whether to act on the volume-surge inversion (flatten or drop that
+  score input) and the near-high finding (loosen the distance-from-high
+  filter/weight).
+- Drop L/L2 (redundant with SB_tier2/HC_tier1) and deprioritize M
+  (no edge) rather than building anything on top of them.
+- Re-verify Method G/G2 aren't used anywhere as an A-event gate in production
+  (currently they aren't — G/G2 are research-only), so no live behavior changed.
+
+### How to re-run
+Same harness as session 4: `python backend/analyze_reliability.py` (whole
+market, US, ~4,200 stocks; several minutes). See session 4's "How to re-run"
+for flags/output-file conventions.
 
 ---
 
