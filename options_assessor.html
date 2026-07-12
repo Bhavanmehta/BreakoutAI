@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BreakoutAI | Options Trade Assessor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: {
+                darkBg: '#0b1120', cardBg: '#1e293b', borderCl: '#334155',
+            } } }
+        }
+    </script>
+    <style>
+        body { -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0b1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        /* Chain rows: tight, monospaced numbers so strikes line up like a real chain. */
+        .num { font-variant-numeric: tabular-nums; }
+        input[type=number] { -moz-appearance: textfield; }
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .chain-row.sel { background: rgba(168,85,247,0.14); }
+    </style>
+    <!-- Pure math (Black-Scholes / greeks / verdict engine). Attaches window.OptionsMath. -->
+    <script src="scripts/options_math.js"></script>
+</head>
+<body class="bg-darkBg text-slate-200 min-h-screen">
+
+    <!-- Header: mirrors the scanner's sticky header so the two pages feel like one app. -->
+    <header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+        <div class="px-4 sm:px-6 py-3 max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span class="text-purple-500 text-2xl">⚡</span>
+                Options<span class="text-purple-400">Assessor</span>
+            </h1>
+            <div class="hidden md:block text-center flex-1">
+                <p class="text-sm text-slate-400">Black-Scholes verdict on a single-leg index-option trade</p>
+            </div>
+            <div class="flex items-center gap-3">
+                                <a href="combined_breakout_scanner_platform.html"
+                   class="px-2.5 py-1 text-xs font-semibold text-slate-300 bg-slate-800 border border-borderCl rounded-md hover:bg-slate-700 hover:text-white transition-colors whitespace-nowrap"
+                   title="Back to the Pre-Breakout Radar">← Scanner</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="px-4 sm:px-6 py-5 max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- ===== LEFT: inputs + chain ===================================== -->
+        <section class="space-y-5">
+
+            <!-- Trade inputs -->
+            <div class="bg-cardBg border border-borderCl rounded-lg p-4">
+                <h2 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <span class="text-purple-400">①</span> Trade inputs
+                </h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Symbol</span>
+                        <input id="fSymbol" type="text" value="NIFTY" list="symbolList" autocomplete="off"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Spot</span>
+                        <input id="fSpot" type="number" step="0.05"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">IV %</span>
+                        <input id="fIv" type="number" step="0.1" value="13"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Days to expiry</span>
+                        <input id="fDays" type="number" step="0.5" value="3"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Strike interval</span>
+                        <input id="fInterval" type="number" step="5" value="50"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Option type</span>
+                        <div id="typeToggle" class="flex items-center rounded-md border border-borderCl bg-slate-800 p-0.5 text-xs font-semibold">
+                            <button id="btnCE" type="button" class="flex-1 px-2 py-1 rounded transition-all">CE</button>
+                            <button id="btnPE" type="button" class="flex-1 px-2 py-1 rounded transition-all">PE</button>
+                        </div>
+                    </div>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Strike</span>
+                        <input id="fStrike" type="number" step="50"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Premium (entry)</span>
+                        <input id="fPremium" type="number" step="0.05"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">SL (underlying)</span>
+                        <input id="fSl" type="number" step="0.05"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Target (underlying)</span>
+                        <input id="fTarget" type="number" step="0.05"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Lot size</span>
+                        <input id="fLotSize" type="number" step="1" value="75"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Lots</span>
+                        <input id="fLots" type="number" step="1" value="1"
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                </div>
+                <p class="mt-3 text-[10px] text-slate-500 leading-snug">
+                    IV is annualised implied vol as a percent (e.g. 13). Premium auto-fills to the
+                    theoretical Black-Scholes mark when you pick a strike below — overwrite it with the
+                    live LTP for a real assessment.
+                </p>
+            </div>
+
+            <!-- Option chain -->
+            <div class="bg-cardBg border border-borderCl rounded-lg p-4">
+                <h2 class="text-sm font-bold text-white mb-3 flex items-center gap-2 flex-wrap">
+                    <span class="text-purple-400">②</span> Strike ladder
+                    <span class="text-[10px] font-normal text-slate-500">— click a premium to load that leg</span>
+                    <span class="ml-auto flex items-center gap-2">
+                        <select id="fExpiry" title="Expiry"
+                                class="bg-slate-800 border border-borderCl rounded px-1.5 py-1 text-[11px] text-slate-200 focus:border-purple-500 focus:outline-none">
+                            <option value="">— expiry —</option>
+                        </select>
+                        <button id="btnFetchChain" type="button"
+                                class="px-2 py-1 text-[11px] font-semibold text-purple-200 bg-purple-900/40 border border-purple-500/30 rounded hover:bg-purple-800/50 transition-colors"
+                                title="Fetch the live option chain for this symbol/expiry from Dhan.">
+                            ⟳ Fetch live
+                        </button>
+                        <span id="chainSourceBadge" class="hidden px-2 py-1 text-[10px] font-bold rounded border whitespace-nowrap"></span>
+                    </span>
+                </h2>
+                <div class="overflow-x-auto -mx-1">
+                    <table class="w-full text-xs num">
+                        <thead>
+                            <tr class="text-[10px] uppercase tracking-wide text-slate-500 border-b border-borderCl">
+                                <th class="text-right py-1.5 px-1 font-semibold text-emerald-400/80">CE δ</th>
+                                <th class="text-right py-1.5 px-1 font-semibold text-emerald-400/80">CE ₹</th>
+                                <th class="text-center py-1.5 px-2 font-bold text-slate-300">Strike</th>
+                                <th class="text-left py-1.5 px-1 font-semibold text-rose-400/80">PE ₹</th>
+                                <th class="text-left py-1.5 px-1 font-semibold text-rose-400/80">PE δ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chainBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== RIGHT: verdict + payoff + save ========================== -->
+        <section class="space-y-5">
+
+            <!-- Verdict card -->
+            <div id="verdictCard" class="bg-cardBg border border-borderCl rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span class="text-purple-400">③</span> Verdict
+                    </h2>
+                    <span id="verdictBadge" class="px-3 py-1 text-sm font-bold rounded-md border">—</span>
+                </div>
+                <ul id="reasonList" class="space-y-1.5 text-[13px] text-slate-300 leading-snug"></ul>
+                <div id="metricGrid" class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center"></div>
+            </div>
+
+            <!-- Payoff -->
+            <div class="bg-cardBg border border-borderCl rounded-lg p-4">
+                <h2 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <span class="text-purple-400">④</span> Expiry payoff
+                    <span id="payoffLegend" class="text-[10px] font-normal text-slate-500"></span>
+                </h2>
+                <div id="payoffWrap" class="w-full">
+                    <svg id="payoffSvg" viewBox="0 0 600 260" preserveAspectRatio="none"
+                         class="w-full h-[220px]" role="img" aria-label="Option expiry payoff diagram"></svg>
+                </div>
+            </div>
+
+            <!-- Save -->
+            <div class="bg-cardBg border border-borderCl rounded-lg p-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="btnSave" type="button"
+                            class="px-4 py-2 text-sm font-semibold text-purple-100 bg-purple-600 hover:bg-purple-500 rounded-md transition-colors">
+                        Save assessment
+                    </button>
+                    <button id="btnCloud" type="button"
+                            class="px-3 py-2 text-xs font-semibold text-slate-300 bg-slate-800 border border-borderCl rounded-md hover:bg-slate-700 hover:text-white transition-colors"
+                            title="Also mirror to Upstash via /api/trades (needs the same WATCHLIST_SECRET as the scanner).">
+                        ☁ Sync to cloud
+                    </button>
+                    <span id="saveMsg" class="text-xs text-slate-400"></span>
+                </div>
+                <div id="savedList" class="mt-3 space-y-1.5"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Symbol suggestions (indices + ~210 F&O stocks, filled by action=symbols) -->
+    <datalist id="symbolList"></datalist>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] hidden px-4 py-2 rounded-md text-sm font-semibold shadow-lg border"></div>
+
+    <script>
+    (function () {
+        "use strict";
+        const M = window.OptionsMath;
+        const $ = (id) => document.getElementById(id);
+        const LS_TRADES = "breakoutai_option_trades";
+        const LS_SECRET = "breakoutai_watchlist_secret"; // same key the scanner uses
+        let TYPE = "CE";
+        let MARKET = "IN";
+        let LIVE_CHAIN = null;   // {source, symbol, expiry, spot, strikes:[{strike,ce,pe}]}, or null pre-fetch
+        let EXPIRIES = [];       // cached expiry list for the current symbol
+        let SYMBOLS = [];        // [{symbol, lot}] from action=symbols, indices first
+        let LADDER_OFF = 0;      // strike-ladder scroll offset, in rows away from ATM
+
+        // ---- helpers ------------------------------------------------------
+        const numOrNull = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+        const fmt = (x, d = 2) => (x == null || !isFinite(x)) ? "—" :
+            Number(x).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+        const fmt0 = (x) => (x == null || !isFinite(x)) ? "—" :
+            Math.round(x).toLocaleString("en-IN");
+
+        function toast(msg, tone) {
+            const t = $("toast");
+            const cls = tone === "bad"
+                ? "bg-rose-900/90 border-rose-500/40 text-rose-100"
+                : "bg-emerald-900/90 border-emerald-500/40 text-emerald-100";
+            t.className = "fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-md text-sm font-semibold shadow-lg border " + cls;
+            t.textContent = msg;
+            t.classList.remove("hidden");
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => t.classList.add("hidden"), 2600);
+        }
+
+        // ---- read/write the form as one trade object ----------------------
+        function readTrade() {
+            return {
+                symbol: ($("fSymbol").value || "NIFTY").trim().toUpperCase(),
+                market: MARKET,
+                spot: numOrNull($("fSpot").value),
+                iv: numOrNull($("fIv").value),
+                days: numOrNull($("fDays").value),
+                interval: numOrNull($("fInterval").value) || 50,
+                type: TYPE,
+                strike: numOrNull($("fStrike").value),
+                premium: numOrNull($("fPremium").value),
+                slUnderlying: numOrNull($("fSl").value),
+                targetUnderlying: numOrNull($("fTarget").value),
+                lotSize: numOrNull($("fLotSize").value) || 75,
+                lots: numOrNull($("fLots").value) || 1
+            };
+        }
+
+        function setType(t) {
+            TYPE = (t === "PE") ? "PE" : "CE";
+            const on = "flex-1 px-2 py-1 rounded transition-all bg-purple-600 text-white";
+            const off = "flex-1 px-2 py-1 rounded transition-all text-slate-400 hover:text-slate-200";
+            $("btnCE").className = TYPE === "CE" ? on : off;
+            $("btnPE").className = TYPE === "PE" ? on : off;
+        }
+
+        // ---- option chain -------------------------------------------------
+        function chainMatchesLive(t) {
+            return LIVE_CHAIN && LIVE_CHAIN.symbol === t.symbol &&
+                LIVE_CHAIN.expiry && LIVE_CHAIN.expiry === $("fExpiry").value;
+        }
+
+        function setChainBadge(source, reason) {
+            const b = $("chainSourceBadge");
+            if (!source) { b.classList.add("hidden"); return; }
+            b.classList.remove("hidden");
+            if (source === "live") {
+                b.textContent = "● LIVE";
+                b.className = "px-2 py-1 text-[10px] font-bold rounded border whitespace-nowrap border-emerald-500/40 bg-emerald-900/30 text-emerald-300";
+                b.title = "Real Dhan option-chain data.";
+            } else {
+                b.textContent = "◆ DEMO DATA";
+                b.className = "px-2 py-1 text-[10px] font-bold rounded border whitespace-nowrap border-amber-500/40 bg-amber-900/30 text-amber-300";
+                b.title = reason ? "Synthetic Black-Scholes chain — live fetch failed: " + reason
+                                  : "Synthetic Black-Scholes chain (no live fetch yet).";
+            }
+        }
+
+        // ---- strike-ladder windowing: show ATM ±5, scroll with ▲/▼ --------
+        function windowRows(strikes, atmStrike) {
+            const sorted = [...strikes].sort((a, b) => a.strike - b.strike);
+            const n = sorted.length, half = 5;
+            if (n <= half * 2 + 1) return { rows: sorted, canUp: false, canDown: false };
+            const atmIdx = Math.max(0, sorted.findIndex((s) => s.strike === atmStrike));
+            const center = Math.min(Math.max(atmIdx + LADDER_OFF, half), n - 1 - half);
+            LADDER_OFF = center - atmIdx; // clamp so scrolling never overshoots the list
+            const lo = center - half, hi = center + half;
+            return { rows: sorted.slice(lo, hi + 1), canUp: lo > 0, canDown: hi < n - 1 };
+        }
+
+        function scrollRow(dir, enabled) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td colspan="5" class="py-0.5 text-center">' + (enabled
+                ? '<button type="button" data-scroll="' + dir + '" class="w-full text-[11px] leading-4 text-slate-500 hover:text-purple-300" title="' +
+                  (dir < 0 ? "Show lower strikes" : "Show higher strikes") + '">' + (dir < 0 ? "▲" : "▼") + '</button>'
+                : '') + '</td>';
+            return tr;
+        }
+
+        // Underlying level at which a long option has lost roughly `pct` of its entry
+        // premium (first-order delta approximation -- an editable default, not gospel).
+        function slForPremiumLoss(spot, premium, delta, pct) {
+            const d = Math.max(Math.abs(delta != null ? delta : 0.5), 0.05);
+            const move = premium * pct / d;
+            return (TYPE === "CE" ? spot - move : spot + move).toFixed(1);
+        }
+
+        function renderChain() {
+            const t = readTrade();
+            const body = $("chainBody");
+            body.innerHTML = "";
+
+            if (chainMatchesLive(t)) {
+                const atm = LIVE_CHAIN.strikes.reduce((best, s) =>
+                    Math.abs(s.strike - LIVE_CHAIN.spot) < Math.abs(best.strike - LIVE_CHAIN.spot) ? s : best,
+                    LIVE_CHAIN.strikes[0]);
+                const win = windowRows(LIVE_CHAIN.strikes, atm.strike);
+                body.appendChild(scrollRow(-1, win.canUp));
+                win.rows.forEach((s) => {
+                    const isAtm = s.strike === atm.strike;
+                    const tr = document.createElement("tr");
+                    tr.className = "chain-row border-b border-borderCl/40 hover:bg-slate-800/60" +
+                        (isAtm ? " bg-slate-800/40" : "");
+                    tr.dataset.strike = s.strike;
+                    const cePrem = s.ce.ltp != null ? s.ce.ltp : 0;
+                    const pePrem = s.pe.ltp != null ? s.pe.ltp : 0;
+                    tr.innerHTML =
+                        '<td class="text-right py-1 px-1 text-slate-500">' + fmt(s.ce.delta, 2) + '</td>' +
+                        '<td class="text-right py-1 px-1 text-emerald-300 cursor-pointer hover:text-emerald-100 font-semibold" data-leg="CE" data-prem="' + cePrem + '">' + fmt(s.ce.ltp, 2) + '</td>' +
+                        '<td class="text-center py-1 px-2 font-bold ' + (isAtm ? "text-purple-300" : "text-slate-200") + '">' + fmt0(s.strike) + (isAtm ? ' <span class="text-[9px] text-purple-400">ATM</span>' : '') + '</td>' +
+                        '<td class="text-left py-1 px-1 text-rose-300 cursor-pointer hover:text-rose-100 font-semibold" data-leg="PE" data-prem="' + pePrem + '">' + fmt(s.pe.ltp, 2) + '</td>' +
+                        '<td class="text-left py-1 px-1 text-slate-500">' + fmt(s.pe.delta, 2) + '</td>';
+                    body.appendChild(tr);
+                });
+                body.appendChild(scrollRow(1, win.canDown));
+                setChainBadge(LIVE_CHAIN.source, LIVE_CHAIN.demo_reason);
+                return;
+            }
+
+            // Fallback: pure Black-Scholes synthetic ladder (no live/mock fetch done yet,
+            // or the fetched chain is for a different symbol/expiry than what's shown now).
+            if (t.spot == null || t.iv == null || t.days == null || t.days <= 0) {
+                body.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-500">Enter spot, IV and days to build the ladder, or click "⟳ Fetch live" above.</td></tr>';
+                setChainBadge(null);
+                return;
+            }
+            const tYears = t.days / 365;
+            const atm = Math.round(t.spot / t.interval) * t.interval;
+            const ladder = M.strikeLadder(t.spot, t.interval, 12).map((k) => ({ strike: k }));
+            const win = windowRows(ladder, atm);
+            body.appendChild(scrollRow(-1, win.canUp));
+            win.rows.forEach(({ strike: k }) => {
+                const ce = M.bsPrice({ spot: t.spot, strike: k, iv: t.iv, tYears, type: "CE" });
+                const pe = M.bsPrice({ spot: t.spot, strike: k, iv: t.iv, tYears, type: "PE" });
+                const gCe = M.bsGreeks({ spot: t.spot, strike: k, iv: t.iv, tYears, type: "CE" });
+                const gPe = M.bsGreeks({ spot: t.spot, strike: k, iv: t.iv, tYears, type: "PE" });
+                const isAtm = k === atm;
+                const tr = document.createElement("tr");
+                tr.className = "chain-row border-b border-borderCl/40 hover:bg-slate-800/60" +
+                    (isAtm ? " bg-slate-800/40" : "");
+                tr.dataset.strike = k;
+                tr.innerHTML =
+                    '<td class="text-right py-1 px-1 text-slate-500">' + fmt(gCe.delta, 2) + '</td>' +
+                    '<td class="text-right py-1 px-1 text-emerald-300 cursor-pointer hover:text-emerald-100 font-semibold" data-leg="CE" data-prem="' + ce.toFixed(2) + '">' + fmt(ce, 2) + '</td>' +
+                    '<td class="text-center py-1 px-2 font-bold ' + (isAtm ? "text-purple-300" : "text-slate-200") + '">' + fmt0(k) + (isAtm ? ' <span class="text-[9px] text-purple-400">ATM</span>' : '') + '</td>' +
+                    '<td class="text-left py-1 px-1 text-rose-300 cursor-pointer hover:text-rose-100 font-semibold" data-leg="PE" data-prem="' + pe.toFixed(2) + '">' + fmt(pe, 2) + '</td>' +
+                    '<td class="text-left py-1 px-1 text-slate-500">' + fmt(gPe.delta, 2) + '</td>';
+                body.appendChild(tr);
+            });
+            body.appendChild(scrollRow(1, win.canDown));
+            setChainBadge(null);
+        }
+
+        // ---- live chain fetch (server-side proxy -- Dhan creds never reach the browser) --
+        async function loadExpiries() {
+            const t = readTrade();
+            const sel = $("fExpiry");
+            try {
+                const res = await fetch("/api/options_chain?action=expirylist&symbol=" + encodeURIComponent(t.symbol));
+                const j = await res.json();
+                if (!res.ok) throw new Error(j.error || res.status);
+                EXPIRIES = (j.expiries || []).slice(0, 5); // nearest 5 only -- weeklies/near-month is all I trade
+                if (j.lot_size != null) $("fLotSize").value = j.lot_size;
+                sel.innerHTML = EXPIRIES.map((e) => '<option value="' + e + '">' + e + '</option>').join("");
+                if (j.source === "mock") toast("Expiry list is DEMO data — " + (j.demo_reason || "live fetch failed"), "bad");
+                return true;
+            } catch (e) {
+                sel.innerHTML = '<option value="">(expiry fetch failed)</option>';
+                toast("Could not load expiries: " + e.message, "bad");
+                return false;
+            }
+        }
+
+        async function fetchLiveChain(showToast) {
+            const t = readTrade();
+            const expiry = $("fExpiry").value;
+            if (!expiry) { if (showToast) toast("Pick an expiry first.", "bad"); return; }
+            const btn = $("btnFetchChain");
+            btn.disabled = true;
+            const prevLabel = btn.textContent;
+            btn.textContent = "⟳ Fetching…";
+            try {
+                const res = await fetch("/api/options_chain?action=chain&symbol=" + encodeURIComponent(t.symbol) + "&expiry=" + encodeURIComponent(expiry));
+                const j = await res.json();
+                if (!res.ok) throw new Error(j.error || res.status);
+                LIVE_CHAIN = j;
+                // Populate the trade inputs from the live chain: spot always; IV only if the
+                // user hasn't already typed a strike-specific premium override for this session.
+                $("fSpot").value = j.spot;
+                const atm = j.strikes.reduce((best, s) =>
+                    Math.abs(s.strike - j.spot) < Math.abs(best.strike - j.spot) ? s : best, j.strikes[0]);
+                const atmIv = [atm.ce.iv, atm.pe.iv].filter((v) => v != null);
+                if (atmIv.length) $("fIv").value = (atmIv.reduce((a, b) => a + b, 0) / atmIv.length).toFixed(2);
+                // Days to expiry: whole calendar days remaining, min 0.5 so BS math never divides by ~0.
+                const expDate = new Date(expiry + "T15:30:00+05:30");
+                const daysLeft = Math.max((expDate.getTime() - Date.now()) / 86400000, 0.5);
+                $("fDays").value = daysLeft.toFixed(2);
+                if (j.lot_size != null) $("fLotSize").value = j.lot_size;
+                LADDER_OFF = 0;
+                renderChain();
+                // Fresh fetch with no leg chosen yet: auto-pick the ATM leg for the
+                // current CE/PE side and default the SL to ~20% of premium away.
+                if (!$("fStrike").value) {
+                    const leg = TYPE === "PE" ? atm.pe : atm.ce;
+                    if (leg && leg.ltp != null) pickLeg(atm.strike, TYPE, leg.ltp); // pickLeg defaults the SL too
+                }
+                recompute();
+                if (showToast) toast(j.source === "live" ? "Live chain loaded ✓" : "Loaded DEMO data — " + (j.demo_reason || "live fetch failed"),
+                    j.source === "live" ? "good" : "bad");
+            } catch (e) {
+                toast("Live fetch failed: " + e.message, "bad");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = prevLabel;
+            }
+        }
+
+        async function refreshLiveData() {
+            const ok = await loadExpiries();
+            if (ok && $("fExpiry").value) await fetchLiveChain(false);
+        }
+
+        function pickLeg(strike, leg, prem) {
+            setType(leg);
+            $("fStrike").value = strike;
+            $("fPremium").value = prem;
+            // Re-default SL for the newly picked leg (~20% premium loss). Editable after.
+            const t = readTrade();
+            let delta = null;
+            if (chainMatchesLive(t)) {
+                const row = LIVE_CHAIN.strikes.find((s) => Number(s.strike) === Number(strike));
+                if (row) delta = leg === "PE" ? row.pe.delta : row.ce.delta;
+            } else if (t.spot != null && t.iv != null && t.days != null && t.days > 0) {
+                delta = M.bsGreeks({ spot: t.spot, strike: Number(strike), iv: t.iv,
+                                     tYears: t.days / 365, type: leg }).delta;
+            }
+            if (t.spot != null && prem != null)
+                $("fSl").value = slForPremiumLoss(t.spot, Number(prem), delta, 0.2);
+            [...document.querySelectorAll(".chain-row")].forEach((r) =>
+                r.classList.toggle("sel", Number(r.dataset.strike) === Number(strike)));
+            recompute();
+        }
+
+        // ---- verdict + metrics -------------------------------------------
+        const toneBadge = {
+            good: "border-emerald-500/40 bg-emerald-900/40 text-emerald-300",
+            warn: "border-amber-500/40 bg-amber-900/40 text-amber-300",
+            bad:  "border-rose-500/40 bg-rose-900/40 text-rose-300"
+        };
+
+        function renderVerdict(t) {
+            const badge = $("verdictBadge");
+            const list = $("reasonList");
+            const grid = $("metricGrid");
+            const ready = t.spot != null && t.strike != null && t.iv != null &&
+                t.days != null && t.premium != null && t.slUnderlying != null &&
+                t.targetUnderlying != null && t.days > 0;
+            if (!ready) {
+                badge.textContent = "Incomplete";
+                badge.className = "px-3 py-1 text-sm font-bold rounded-md border border-borderCl bg-slate-800 text-slate-400";
+                list.innerHTML = '<li class="text-slate-500">Fill spot, IV, days, strike, premium, SL and target to get a verdict.</li>';
+                grid.innerHTML = "";
+                return null;
+            }
+            const a = M.assess({
+                spot: t.spot, strike: t.strike, type: t.type, iv: t.iv, days: t.days,
+                premium: t.premium, slUnderlying: t.slUnderlying,
+                targetUnderlying: t.targetUnderlying, lotSize: t.lotSize, lots: t.lots
+            });
+            badge.textContent = a.verdict;
+            badge.className = "px-3 py-1 text-sm font-bold rounded-md border " + (toneBadge[a.tone] || toneBadge.warn);
+            list.innerHTML = a.reasons.map((r) => {
+                const warn = r.indexOf("⚠") === 0;
+                return '<li class="' + (warn ? "text-amber-300" : "") + '">' +
+                    (warn ? "" : '<span class="text-purple-500 mr-1">›</span>') + escapeHtml(r) + '</li>';
+            }).join("");
+            const m = a.metrics;
+            const cell = (label, val, cls) =>
+                '<div class="bg-slate-800/60 rounded p-2"><div class="text-[9px] uppercase tracking-wide text-slate-500">' +
+                label + '</div><div class="text-sm font-bold num ' + (cls || "text-slate-100") + '">' + val + '</div></div>';
+            grid.innerHTML =
+                cell("POP (touch)", (Math.round(m.pop * 1000) / 10) + "%",
+                    m.pop >= 0.4 ? "text-emerald-300" : m.pop >= 0.3 ? "text-amber-300" : "text-rose-300") +
+                cell("R:R", isFinite(m.rr) ? "1:" + fmt(m.rr, 2) : "∞",
+                    m.rr >= 2 ? "text-emerald-300" : m.rr >= 1 ? "text-amber-300" : "text-rose-300") +
+                cell("Reward", "₹" + fmt0(m.reward), "text-emerald-300") +
+                cell("Risk", "₹" + fmt0(m.risk), "text-rose-300") +
+                cell("Δ delta", fmt(m.delta, 2)) +
+                cell("Θ/day", "₹" + fmt0(m.thetaPerDay), "text-rose-300") +
+                cell("Breakeven", fmt(m.breakeven, 0)) +
+                cell("±1σ move", fmt(m.expectedMove, 0) + " pt");
+            return a;
+        }
+
+        // ---- payoff SVG ---------------------------------------------------
+        function renderPayoff(t) {
+            const svg = $("payoffSvg");
+            const W = 600, H = 260, padL = 8, padR = 8, padT = 14, padB = 22;
+            if (t.strike == null || t.premium == null || t.spot == null) {
+                svg.innerHTML = '<text x="300" y="130" text-anchor="middle" fill="#64748b" font-size="13">Pick a strike + premium to draw the payoff.</text>';
+                $("payoffLegend").textContent = "";
+                return;
+            }
+            const pos = { type: t.type, strike: t.strike, premium: t.premium, lotSize: t.lotSize, lots: t.lots };
+            const span = Math.max((t.expectedMove || 0), t.interval * 6,
+                Math.abs((t.targetUnderlying || t.spot) - t.spot),
+                Math.abs((t.slUnderlying || t.spot) - t.spot)) * 1.2 || t.interval * 6;
+            const lo = t.spot - span, hi = t.spot + span;
+            const pts = M.payoffCurve(pos, lo, hi, 80);
+            let yMin = Infinity, yMax = -Infinity;
+            pts.forEach((p) => { if (p.y < yMin) yMin = p.y; if (p.y > yMax) yMax = p.y; });
+            if (yMin === yMax) { yMin -= 1; yMax += 1; }
+            const padY = (yMax - yMin) * 0.1 || 1;
+            yMin -= padY; yMax += padY;
+            const sx = (x) => padL + (x - lo) / (hi - lo) * (W - padL - padR);
+            const sy = (y) => padT + (yMax - y) / (yMax - yMin) * (H - padT - padB);
+
+            const be = M.breakeven({ strike: t.strike, premium: t.premium, type: t.type });
+            let g = "";
+            // zero line
+            const zeroY = sy(0);
+            g += '<line x1="' + padL + '" y1="' + zeroY + '" x2="' + (W - padR) + '" y2="' + zeroY + '" stroke="#475569" stroke-width="1" stroke-dasharray="4 3"/>';
+            // area under/over split at zero: build profit (green) & loss (red) polylines
+            const line = pts.map((p) => sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1)).join(" ");
+            g += '<polyline points="' + line + '" fill="none" stroke="#a855f7" stroke-width="2"/>';
+            // markers
+            const mark = (x, color, label) => {
+                if (x == null || !isFinite(x) || x < lo || x > hi) return "";
+                const px = sx(x);
+                return '<line x1="' + px.toFixed(1) + '" y1="' + padT + '" x2="' + px.toFixed(1) + '" y2="' + (H - padB) + '" stroke="' + color + '" stroke-width="1" stroke-dasharray="2 2" opacity="0.7"/>' +
+                    '<text x="' + px.toFixed(1) + '" y="' + (H - padB + 15) + '" text-anchor="middle" fill="' + color + '" font-size="10">' + label + '</text>';
+            };
+            g += mark(t.spot, "#94a3b8", "spot");
+            g += mark(be, "#e2e8f0", "BE " + Math.round(be));
+            g += mark(t.strike, "#a855f7", "K");
+            g += mark(t.targetUnderlying, "#34d399", "tgt");
+            g += mark(t.slUnderlying, "#f87171", "SL");
+            svg.innerHTML = g;
+            // Long single-leg: max loss is the full premium paid; upside is open (CE) / capped at strike (PE).
+            const maxLoss = t.premium * t.lotSize * t.lots;
+            $("payoffLegend").textContent = "— max loss ₹" + fmt0(maxLoss) + " (premium paid)";
+        }
+
+        // ---- master recompute --------------------------------------------
+        function recompute() {
+            const t = readTrade();
+            renderVerdict(t);
+            renderPayoff(t);
+        }
+
+        function autofillPremium() {
+            const t = readTrade();
+            if (t.spot != null && t.strike != null && t.iv != null && t.days > 0 &&
+                (!$("fPremium").value)) {
+                const p = M.bsPrice({ spot: t.spot, strike: t.strike, iv: t.iv, tYears: t.days / 365, type: t.type });
+                $("fPremium").value = p.toFixed(2);
+            }
+        }
+
+        // ---- save (local + optional cloud) --------------------------------
+        function currentRecord() {
+            const t = readTrade();
+            const a = renderVerdict(t);
+            return {
+                symbol: t.symbol, market: t.market, opt_type: t.type,
+                spot: t.spot, strike: t.strike, iv: t.iv, days: t.days,
+                premium: t.premium, sl: t.slUnderlying, target: t.targetUnderlying,
+                lot_size: t.lotSize, lots: t.lots,
+                verdict: a ? a.verdict : null, tone: a ? a.tone : null,
+                metrics: a ? a.metrics : null,
+                saved_at: new Date().toISOString()
+            };
+        }
+
+        function loadLocal() {
+            try { return JSON.parse(localStorage.getItem(LS_TRADES) || "[]"); }
+            catch (e) { return []; }
+        }
+        function saveLocal(list) { localStorage.setItem(LS_TRADES, JSON.stringify(list.slice(0, 50))); }
+
+        function renderSaved() {
+            const list = loadLocal();
+            const box = $("savedList");
+            if (!list.length) { box.innerHTML = '<div class="text-[11px] text-slate-600">No saved assessments yet.</div>'; return; }
+            box.innerHTML = list.slice(0, 8).map((r, i) => {
+                const tone = toneBadge[r.tone] || "border-borderCl bg-slate-800 text-slate-400";
+                return '<div class="flex items-center justify-between gap-2 text-xs bg-slate-800/50 rounded px-2 py-1.5">' +
+                    '<span class="num text-slate-300">' + escapeHtml(r.symbol) + ' ' + fmt0(r.strike) + r.opt_type +
+                    ' @' + fmt(r.premium, 1) + '</span>' +
+                    '<span class="flex items-center gap-2"><span class="px-1.5 py-0.5 rounded border text-[10px] font-semibold ' + tone + '">' +
+                    escapeHtml(r.verdict || "—") + '</span>' +
+                    '<button data-del="' + i + '" class="text-slate-500 hover:text-rose-400" title="Remove">✕</button></span></div>';
+            }).join("");
+        }
+
+        function getSecret(prompt_) {
+            let s = localStorage.getItem(LS_SECRET) || "";
+            if (!s && prompt_) {
+                s = (window.prompt("Enter the WATCHLIST_SECRET you set on Vercel (stored on this device only).") || "").trim();
+                if (s) localStorage.setItem(LS_SECRET, s);
+            }
+            return s;
+        }
+
+        async function cloudSync(rec) {
+            const secret = getSecret(true);
+            if (!secret) { toast("Cloud sync cancelled — no secret.", "bad"); return; }
+            try {
+                const res = await fetch("/api/trades", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Watchlist-Secret": secret },
+                    body: JSON.stringify(rec)
+                });
+                if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.status); }
+                toast("Synced to cloud ☁", "good");
+            } catch (e) {
+                toast("Cloud sync failed: " + e.message, "bad");
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (c) =>
+                ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+
+        // ---- init ---------------------------------------------------------
+        async function loadSymbols() {
+            try {
+                const res = await fetch("/api/options_chain?action=symbols");
+                const j = await res.json();
+                if (!res.ok) throw new Error(j.error || res.status);
+                SYMBOLS = j.symbols || [];
+                $("symbolList").innerHTML = SYMBOLS.map((s) =>
+                    '<option value="' + escapeHtml(s.symbol) + '">lot ' + s.lot + '</option>').join("");
+            } catch (e) {
+                // Picker quietly degrades to free text; expirylist still returns a
+                // clear 404 message if the typed symbol has no listed options.
+            }
+        }
+
+        function wire() {
+            setType("CE");
+            ["fSymbol","fSpot","fIv","fDays","fInterval","fStrike","fPremium","fSl","fTarget","fLotSize","fLots"]
+                .forEach((id) => $(id).addEventListener("input", () => {
+                    if (["fSpot","fIv","fDays","fInterval"].includes(id)) renderChain();
+                    recompute();
+                }));
+            $("btnCE").addEventListener("click", () => { setType("CE"); recompute(); });
+            $("btnPE").addEventListener("click", () => { setType("PE"); recompute(); });
+            $("btnFetchChain").addEventListener("click", () => fetchLiveChain(true));
+            $("fExpiry").addEventListener("change", () => fetchLiveChain(true));
+            $("fSymbol").addEventListener("change", () => {
+                LIVE_CHAIN = null;
+                LADDER_OFF = 0;
+                // A new underlying invalidates the picked leg and price levels.
+                ["fStrike", "fPremium", "fSl", "fTarget"].forEach((id) => { $(id).value = ""; });
+                const known = SYMBOLS.find((s) => s.symbol === $("fSymbol").value.trim().toUpperCase());
+                if (known) $("fLotSize").value = known.lot;
+                refreshLiveData();
+            });
+            $("chainBody").addEventListener("click", (e) => {
+                const sc = e.target.closest("[data-scroll]");
+                if (sc) { LADDER_OFF += Number(sc.dataset.scroll); renderChain(); return; }
+                const cell = e.target.closest("[data-leg]");
+                if (!cell) return;
+                const tr = cell.closest(".chain-row");
+                pickLeg(Number(tr.dataset.strike), cell.dataset.leg, cell.dataset.prem);
+            });
+            $("btnSave").addEventListener("click", () => {
+                const rec = currentRecord();
+                if (rec.spot == null || rec.strike == null || rec.premium == null) {
+                    toast("Fill the trade first.", "bad"); return;
+                }
+                const list = loadLocal();
+                list.unshift(rec);
+                saveLocal(list);
+                renderSaved();
+                toast("Saved locally ✓", "good");
+            });
+            $("btnCloud").addEventListener("click", () => {
+                const rec = currentRecord();
+                if (rec.spot == null || rec.strike == null || rec.premium == null) {
+                    toast("Fill the trade first.", "bad"); return;
+                }
+                // Persist locally first (source of truth), then mirror.
+                const list = loadLocal(); list.unshift(rec); saveLocal(list); renderSaved();
+                cloudSync(rec);
+            });
+            $("savedList").addEventListener("click", (e) => {
+                const del = e.target.closest("[data-del]");
+                if (!del) return;
+                const list = loadLocal();
+                list.splice(Number(del.dataset.del), 1);
+                saveLocal(list); renderSaved();
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            if (!M) { document.body.innerHTML = '<p class="p-8 text-rose-400">OptionsMath failed to load (scripts/options_math.js).</p>'; return; }
+            wire();
+            loadSymbols();      // fills the symbol datalist (fire-and-forget)
+            renderChain();
+            autofillPremium();
+            recompute();
+            renderSaved();
+            refreshLiveData();  // best-effort: populates real spot/IV/chain on load, degrades to the blank/manual form above if it fails
+        });
+    })();
+    </script>
+</body>
+</html>
