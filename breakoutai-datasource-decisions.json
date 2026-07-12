@@ -1,0 +1,74 @@
+[
+  {
+    "n": 1,
+    "title": "NSE delivery-% — accumulation vs. intraday churn",
+    "tier": 1,
+    "coverage": "IN",
+    "effort": "Low",
+    "status": "none",
+    "note": "Along with the line, have an i Icon or something to explain what we mean by Delivery %"
+  },
+  {
+    "n": 2,
+    "title": "Short interest + days-to-cover — squeeze fuel",
+    "tier": 1,
+    "coverage": "US",
+    "effort": "Low",
+    "status": "adopt",
+    "note": ""
+  },
+  {
+    "n": 3,
+    "title": "Estimate-revision trajectory + analyst upgrades/downgrades",
+    "tier": 1,
+    "coverage": "both",
+    "effort": "Med",
+    "status": "adopt",
+    "note": ""
+  },
+  {
+    "n": 4,
+    "title": "Insider transactions — Form 4 (US) / SEBI SAST (IN)",
+    "tier": 2,
+    "coverage": "US",
+    "effort": "Med",
+    "status": "adopt",
+    "note": ""
+  },
+  {
+    "n": 5,
+    "title": "13F institutional ownership change — US parity with India holdings",
+    "tier": 2,
+    "coverage": "US",
+    "effort": "Med",
+    "status": "adopt",
+    "note": ""
+  },
+  {
+    "n": 6,
+    "title": "Per-stock IV-rank / IV-percentile / skew",
+    "tier": 2,
+    "coverage": "US",
+    "effort": "Med",
+    "status": "adopt",
+    "note": ""
+  },
+  {
+    "n": 7,
+    "title": "StockTwits / X retail momentum",
+    "tier": 3,
+    "coverage": "both",
+    "effort": "Low",
+    "status": "skip",
+    "note": ""
+  },
+  {
+    "n": 8,
+    "title": "FRED credit spreads / rate-of-change",
+    "tier": 3,
+    "coverage": "US",
+    "effort": "Low",
+    "status": "adopt",
+    "note": "Not sure what this mean/ how it helps, keep it at last. "
+  }
+]
