@@ -84,6 +84,11 @@
         @media (min-width: 1024px) {
             #mobileBackBar { display: none; }
         }
+        /* Index ticker: static single row (all indexes fit without scrolling), so it
+           just sits in place — no marquee/animation needed. Wraps on very narrow
+           viewports rather than clipping. */
+        #idxTickerTrack { display: flex; flex-wrap: wrap; align-items: center;
+                           justify-content: space-between; width: 100%; }
         /* Comfortable touch targets on phones without changing desktop density. */
         @media (max-width: 767px) {
             #app button, #app select, #app input[type="text"] { min-height: 40px; }
@@ -127,7 +132,16 @@
                 <span id="liveBadge" class="px-2.5 py-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/20 rounded-md"
                       data-tip="Price + day-move for the names on screen refreshes every ~90s during market hours (api/quotes.py). The breakout/readiness analysis below it is still computed once daily after close — this badge only covers live price.">Live Data</span>
                 <span id="perfLink" class="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer select-none" title="Performance ledger">◷</span>
+                <!-- Options Trade Assessor: static entry point (always present). The assessor is a standalone page — pick any F&O symbol there; no scanner context is carried over. -->
+                <a id="optionsAssessorLink" href="options_assessor.html" class="px-2.5 py-1 text-xs font-semibold text-purple-300 bg-purple-900/30 border border-purple-500/30 rounded-md hover:bg-purple-900/50 hover:text-purple-200 transition-colors whitespace-nowrap" title="Options Trade Assessor — risk/reward verdict on a single-leg option trade.">⚡ Options</a>
             </div>
+        </div>
+        <!-- Overall-market index strip (Nifty/Sensex or S&P/Dow/Nasdaq): static single
+             row, refreshes every ~90s via api/quotes.py. Hidden until the first
+             successful fetch (e.g. stays hidden when /api isn't available). -->
+        <div id="idxTicker" class="hidden border-t border-borderCl/60 bg-slate-900/60 py-1 px-2"
+             data-tip="Major market indexes — live price refreshes every ~90s (last close when the market is shut).">
+            <div id="idxTickerTrack"></div>
         </div>
     </header>
 
@@ -583,6 +597,38 @@
                 <button id="sectorPopupClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
             </div>
             <div id="sectorRadar" class="p-4 space-y-3 overflow-y-auto wl-scroll"></div>
+        </div>
+    </div>
+
+    <!-- Index detail popup — triggered by clicking a chip in the market index ticker
+         (#idxTicker / openIndexDetail()). Shows the live price move, a quick heuristic
+         "read" (indexes skip the daily readiness/ADX pipeline that stocks get — see
+         indexRead() for why) topped up with an EMA-stack/RSI trend read once history
+         loads (idxTrendNote()), and a candles+EMA+volume+RSI chart (renderIndexChart(),
+         api/index_ohlc.py) — NSE/BSE index data can't be redistributed via TradingView's
+         widget outside tradingview.com, so this doesn't use TradingView at all. -->
+    <div id="indexDetailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div id="indexDetailBackdrop" class="absolute inset-0 bg-black/60"></div>
+        <div class="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-cardBg border border-borderCl rounded-xl shadow-2xl fade-in">
+            <div class="p-4 border-b border-borderCl flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div id="idxDetailName" class="text-sm font-bold text-white">—</div>
+                    <div id="idxDetailSymbol" class="text-[11px] text-slate-500 mt-0.5 font-mono">—</div>
+                </div>
+                <div class="flex items-center gap-3 flex-none">
+                    <div class="text-right">
+                        <div id="idxDetailPrice" class="text-lg font-bold text-slate-100">—</div>
+                        <div id="idxDetailChange" class="text-xs font-semibold">—</div>
+                    </div>
+                    <button id="indexDetailClose" type="button" class="text-slate-400 hover:text-white text-xl leading-none flex-none">×</button>
+                </div>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto wl-scroll">
+                <div id="idxDetailRead" class="p-3 rounded-lg border text-xs leading-relaxed"></div>
+                <div class="h-[360px] rounded-lg overflow-hidden border border-slate-700 bg-slate-900">
+                    <div id="idxLwChart" class="w-full h-full"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1338,6 +1384,8 @@
             };
             $("sectorRadarBtn").onclick = () => $("sectorPopup").classList.remove("hidden");
             $("sectorPopupClose").onclick = () => $("sectorPopup").classList.add("hidden");
+            $("indexDetailClose").onclick = closeIndexDetail;
+            $("indexDetailBackdrop").onclick = closeIndexDetail;
             $("sectorPopupBackdrop").onclick = () => $("sectorPopup").classList.add("hidden");
             $("fundReset").onclick = () => {
                 FUND_FIELDS.forEach(f => { filters.fundamentals[f.key] = { min: null, max: null }; });
@@ -1722,7 +1770,7 @@
         // list (works from the search box too), Enter in search opens the top match,
         // Esc closes whichever popup is open / blurs the field.
         function initKeyboardNav() {
-            const POPUPS = ["sectorPopup", "myWatchlistPanel", "askAiPanel"];
+            const POPUPS = ["sectorPopup", "myWatchlistPanel", "askAiPanel", "indexDetailModal"];
             document.addEventListener("keydown", (e) => {
                 const el = document.activeElement;
                 const typing = el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
@@ -1937,9 +1985,284 @@
         function startLiveQuotePolling() {
             if (liveQuoteTimer) clearInterval(liveQuoteTimer);
             pollLiveQuotes();
+            pollIndexTicker();
             liveQuoteTimer = setInterval(pollLiveQuotes, LIVE_POLL_MS);
         }
-        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pollLiveQuotes(); });
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState !== "visible") return;
+            pollLiveQuotes();
+            pollIndexTicker();
+        });
+
+        // --- Market index ticker ----------------------------------------------------------
+        // Static single-row strip of the major indexes for the active market, so the page
+        // opens with an at-a-glance read of the overall tape. Same /api/quotes endpoint
+        // and ~90s cadence as the live price overlay, but NOT gated on market hours:
+        // index last-close is still the right "overall market" summary off-hours.
+        const INDEX_SYMBOLS = {
+            IN: [["^NSEI", "NIFTY 50"], ["^BSESN", "SENSEX"], ["^NSEBANK", "BANK NIFTY"],
+                 ["^CNXIT", "NIFTY IT"], ["^NSEMDCP50", "NIFTY MIDCAP 50"], ["^CNXSC", "NIFTY SMALLCAP"],
+                 ["^INDIAVIX", "INDIA VIX"]],
+            US: [["^GSPC", "S&P 500"], ["^DJI", "DOW JONES"], ["^IXIC", "NASDAQ"],
+                 ["^RUT", "RUSSELL 2000"], ["^VIX", "VIX"]],
+        };
+        // Latest quote per index symbol, refreshed alongside the ticker strip so the detail
+        // popup (openIndexDetail) can render instantly off cache instead of re-fetching.
+        let LAST_INDEX_QUOTES = {};
+        async function pollIndexTicker() {
+            if (document.visibilityState !== "visible") return;
+            const mkt = MARKET;
+            const defs = INDEX_SYMBOLS[mkt];
+            try {
+                const res = await fetch(`/api/quotes?symbols=${encodeURIComponent(defs.map(d => d[0]).join(","))}&market=${mkt}`, { cache: "no-store" });
+                if (!res.ok || mkt !== MARKET) return; // fail soft / market switched mid-flight
+                const quotes = (await res.json()).quotes || {};
+                const locale = mkt === "US" ? "en-US" : "en-IN";
+                LAST_INDEX_QUOTES = quotes;
+                const seq = defs.filter(([sym]) => quotes[sym]).map(([sym, name]) => {
+                    const q = quotes[sym];
+                    const up = q.change_pct >= 0;
+                    const pts = q.price - q.prev_close;
+                    const colorCls = up ? "text-emerald-400" : "text-rose-400";
+                    return `<button type="button" onclick="openIndexDetail('${sym}')"
+                        class="inline-flex items-center gap-1.5 px-3 py-0.5 text-[11px] font-semibold rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Click for a closer look at ${name}">
+                        <span class="text-slate-400">${name}</span>
+                        <span class="text-slate-200">${q.price.toLocaleString(locale, { maximumFractionDigits: 2 })}</span>
+                        <span class="${colorCls}">${up ? "▲" : "▼"} ${Math.abs(pts).toLocaleString(locale, { maximumFractionDigits: 2 })} (${Math.abs(q.change_pct)}%)</span>
+                    </button>`;
+                }).join("");
+                if (!seq) return;
+                $("idxTickerTrack").innerHTML = seq;
+                $("idxTicker").classList.remove("hidden");
+            } catch (err) {
+                console.warn("Index ticker refresh failed —", err.message); // keep last good strip
+            }
+        }
+        setInterval(pollIndexTicker, LIVE_POLL_MS);
+
+        // --- Index detail popup: click a chip in the index ticker to open it -------------
+        const INDEX_READ_TONE_CLS = {
+            good:    "border-emerald-500/30 bg-emerald-900/20 text-emerald-200",
+            bad:     "border-rose-500/30 bg-rose-900/20 text-rose-200",
+            warn:    "border-amber-500/30 bg-amber-900/20 text-amber-200",
+            neutral: "border-slate-600 bg-slate-800/40 text-slate-300",
+        };
+        // Simple heuristic "read" off today's move — indexes don't have the readiness/ADX/
+        // resistance pipeline stocks do (that's a daily per-stock batch job), so this is a
+        // lightweight, real-time gloss rather than the deep per-stock analysis. Volatility
+        // gauges (VIX / India VIX) are inverted: "up" there means fear rising, not a rally.
+        function indexRead(sym, changePct) {
+            const isVix = sym === "^INDIAVIX" || sym === "^VIX";
+            if (isVix) {
+                if (changePct >= 5)   return { tone: "bad",     label: "Fear spiking",        text: "Volatility is jumping hard — traders are paying up for protection. Risk-off tape; fresh breakouts are less reliable until this cools off." };
+                if (changePct >= 1.5) return { tone: "warn",    label: "Nerves rising",        text: "Volatility is ticking up. Not panic yet, but a good day to size new positions conservatively." };
+                if (changePct <= -5)  return { tone: "good",    label: "Fear draining fast",   text: "Volatility is collapsing — relief-rally conditions, usually supportive for follow-through on breakouts." };
+                if (changePct <= -1.5) return { tone: "good",   label: "Calming down",         text: "Volatility easing off. Generally a tailwind for trend-continuation setups." };
+                return { tone: "neutral", label: "Steady", text: "Volatility little-changed — no strong signal either way from this gauge today." };
+            }
+            if (changePct >= 1.5)  return { tone: "good",    label: "Strong risk-on",   text: "Broad, decisive move higher — a tape like this usually confirms breakouts rather than fighting them." };
+            if (changePct >= 0.3)  return { tone: "good",    label: "Modestly higher",  text: "Buyers in control, unhurried tape. Constructive backdrop for breakout setups." };
+            if (changePct > -0.3)  return { tone: "neutral", label: "Flat / range-bound", text: "Little net movement — the index itself is coiling too. Individual setup quality matters more than the tape today." };
+            if (changePct > -1.5)  return { tone: "warn",    label: "Modestly lower",   text: "Some selling pressure. Fresh breakouts are more likely to get faded; give existing longs a tighter leash." };
+            return { tone: "bad", label: "Risk-off selloff", text: "Sharp, broad-based decline. Expect more stops to get hit and win-rate across the board to run lower until this stabilizes." };
+        }
+        function openIndexDetail(sym) {
+            const defs = INDEX_SYMBOLS[MARKET] || [];
+            const def = defs.find(d => d[0] === sym);
+            if (!def) return;
+            const name = def[1];
+            const q = LAST_INDEX_QUOTES[sym];
+            const locale = MARKET === "US" ? "en-US" : "en-IN";
+            $("idxDetailName").innerText = name;
+            $("idxDetailSymbol").innerText = sym;
+            if (q) {
+                const up = q.change_pct >= 0;
+                const pts = q.price - q.prev_close;
+                $("idxDetailPrice").innerText = q.price.toLocaleString(locale, { maximumFractionDigits: 2 });
+                $("idxDetailChange").innerHTML = `<span class="${up ? "text-emerald-400" : "text-rose-400"}">${up ? "▲" : "▼"} ${Math.abs(pts).toLocaleString(locale, { maximumFractionDigits: 2 })} (${Math.abs(q.change_pct)}%)</span>`;
+                const r = indexRead(sym, q.change_pct);
+                $("idxDetailRead").className = "p-3 rounded-lg border text-xs leading-relaxed " + INDEX_READ_TONE_CLS[r.tone];
+                $("idxDetailRead").innerHTML = `<div class="font-semibold mb-1">${r.label}</div>${r.text}`;
+            } else {
+                $("idxDetailPrice").innerText = "—";
+                $("idxDetailChange").innerHTML = "";
+                $("idxDetailRead").className = "p-3 rounded-lg border text-xs leading-relaxed " + INDEX_READ_TONE_CLS.neutral;
+                $("idxDetailRead").innerText = "Waiting on the next price refresh for a read on this index…";
+            }
+            $("indexDetailModal").classList.remove("hidden");
+            renderIndexChart(sym);
+        }
+        function closeIndexDetail() { $("indexDetailModal").classList.add("hidden"); destroyIdxLwChart(); }
+
+        // Index price-history chart + EMA/RSI trend read. Indexes skip the daily
+        // readiness pipeline stocks get (export_ohlc.py only exports individual symbols),
+        // so this hits api/index_ohlc.py on open instead of a precomputed file — same
+        // EMA8/21/50/200 + RSI(14) conventions as the per-stock annotated chart
+        // (renderAnnotatedChart above), just computed live from ~2y of Yahoo daily bars.
+        let idxLwChart = null;
+        let idxLwResizeObs = null;
+        let idxChartReqId = 0;   // guards a slow fetch for a since-closed/switched index from clobbering the currently-open one
+
+        function destroyIdxLwChart() {
+            if (idxLwResizeObs) { try { idxLwResizeObs.disconnect(); } catch (e) {} idxLwResizeObs = null; }
+            if (idxLwChart) { try { idxLwChart.remove(); } catch (e) {} idxLwChart = null; }
+        }
+
+        // Short EMA-stack / RSI blurb appended below indexRead()'s tone-based text once
+        // history has loaded — that one only reacts to today's % move, this grounds it
+        // in the actual indicator values (same idea as the per-stock chart legend).
+        function idxTrendNote(data) {
+            const lastOf = (arr) => (arr && arr.length ? arr[arr.length - 1] : null);
+            const close = lastOf(data.bars.map(b => b[4]));
+            const e8 = lastOf(data.ema8), e21 = lastOf(data.ema21), e50 = lastOf(data.ema50), e200 = lastOf(data.ema200);
+            const rsi = lastOf(data.rsi);
+            if (close == null) return "";
+            const rows = [];
+            if (e8 != null && e21 != null && e50 != null) {
+                if (close > e8 && e8 > e21 && e21 > e50) rows.push(`<span class="text-emerald-400">Stacked bullish</span> — price above 8/21/50-day EMA, each rising above the next`);
+                else if (close < e8 && e8 < e21 && e21 < e50) rows.push(`<span class="text-rose-400">Stacked bearish</span> — price below 8/21/50-day EMA, each falling below the next`);
+                else rows.push(`EMAs tangled — no clean trend alignment right now`);
+            }
+            if (e200 != null) rows.push(`Price is ${close > e200 ? "above" : "below"} its 200-day EMA (long-term ${close > e200 ? "uptrend" : "downtrend"})`);
+            if (rsi != null) {
+                const tag = rsi >= 70 ? "overbought" : rsi <= 30 ? "oversold" : "neutral";
+                rows.push(`RSI(14) ${rsi.toFixed(1)} — ${tag}`);
+            }
+            return rows.length ? `<div class="idx-trend-note mt-2 pt-2 border-t border-white/10 space-y-0.5">${rows.map(r => `<div>${r}</div>`).join("")}</div>` : "";
+        }
+
+        async function renderIndexChart(sym) {
+            const myReq = ++idxChartReqId;
+            destroyIdxLwChart();
+            const host = $("idxLwChart");
+            host.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-slate-500">Loading chart…</div>`;
+            let data;
+            try {
+                const res = await fetch(`/api/index_ohlc?symbol=${encodeURIComponent(sym)}&market=${MARKET}`, { cache: "no-store" });
+                if (!res.ok) throw new Error("no index ohlc");
+                data = await res.json();
+            } catch (e) {
+                if (myReq !== idxChartReqId) return;
+                host.innerHTML = `<div class="h-full flex items-center justify-center text-center text-xs text-slate-500 px-6">Chart not available for this index right now.</div>`;
+                return;
+            }
+            if (myReq !== idxChartReqId) return;   // user opened a different index while this was in flight
+            if (!data.bars || !data.bars.length) {
+                host.innerHTML = `<div class="h-full flex items-center justify-center text-center text-xs text-slate-500 px-6">Chart not available for this index right now.</div>`;
+                return;
+            }
+            // Some NSE sub-indices (e.g. Nifty Smallcap 100 / ^CNXSC) only have a single
+            // day of history on Yahoo's chart API no matter the range requested — a real
+            // upstream data gap, not a fetch bug. A 1-2 bar "chart" is meaningless (EMAs
+            // all collapse to the latest close, RSI is undefined), so show a plain notice
+            // instead of a broken-looking single floating candle.
+            const MIN_BARS_FOR_CHART = 15;
+            if (data.bars.length < MIN_BARS_FOR_CHART) {
+                host.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center text-xs text-slate-500 px-6 gap-1">
+                    <div>Extended price history isn't available for this index from our data provider.</div>
+                    <div class="text-slate-600">Only ${data.bars.length} day${data.bars.length === 1 ? "" : "s"} of data returned — showing latest quote only.</div>
+                </div>`;
+                return;
+            }
+
+            const readBox = $("idxDetailRead");
+            readBox.querySelector(".idx-trend-note")?.remove();
+            const note = idxTrendNote(data);
+            if (note) readBox.insertAdjacentHTML("beforeend", note);
+
+            host.innerHTML = "";
+            const chart = LightweightCharts.createChart(host, {
+                layout: { background: { color: "#1e293b" }, textColor: "#94a3b8", fontSize: 11 },
+                grid: { vertLines: { color: "#26324a" }, horzLines: { color: "#26324a" } },
+                rightPriceScale: { borderColor: "#334155" },
+                timeScale: { borderColor: "#334155", rightOffset: 4, fixLeftEdge: true },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                width: host.clientWidth, height: host.clientHeight,
+            });
+            idxLwChart = chart;
+            chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.02, bottom: 0.40 } });
+
+            const candles = chart.addCandlestickSeries({
+                upColor: "#10b981", downColor: "#ef4444", borderVisible: false,
+                wickUpColor: "#10b981", wickDownColor: "#ef4444", priceLineVisible: false,
+            });
+            candles.setData(data.bars.map(b => ({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] })));
+
+            const line = (color) => chart.addLineSeries({
+                color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+            });
+            const zip = (arr) => data.bars.map((b, i) => arr[i] == null ? null : { time: b[0], value: arr[i] }).filter(Boolean);
+            if (data.ema8) line("#38bdf8").setData(zip(data.ema8));
+            if (data.ema21) line("#ec4899").setData(zip(data.ema21));
+            if (data.ema50) line("#a855f7").setData(zip(data.ema50));
+            if (data.ema200) line("#f59e0b").setData(zip(data.ema200));
+
+            let volSeries = null;
+            if (data.volume && data.volume.some(v => v != null)) {
+                volSeries = chart.addHistogramSeries({
+                    priceScaleId: "volume", priceFormat: { type: "volume" },
+                    lastValueVisible: false, priceLineVisible: false,
+                });
+                chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.62, bottom: 0.25 }, visible: false });
+                volSeries.setData(data.bars.map((b, i) => (data.volume[i] == null ? null : {
+                    time: b[0], value: data.volume[i],
+                    color: b[4] >= b[1] ? "rgba(16,185,129,0.5)" : "rgba(239,68,68,0.5)",
+                })).filter(Boolean));
+            }
+
+            let rsiSeries = null;
+            if (data.rsi) {
+                rsiSeries = chart.addLineSeries({
+                    color: "#22d3ee", lineWidth: 2, priceScaleId: "rsi",
+                    lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+                });
+                chart.priceScale("rsi").applyOptions({ scaleMargins: { top: 0.80, bottom: 0.02 }, visible: false });
+                rsiSeries.setData(zip(data.rsi));
+                [[70, "#f43f5e"], [30, "#60a5fa"]].forEach(([level, color]) => {
+                    rsiSeries.createPriceLine({
+                        price: level, color, lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: false,
+                    });
+                });
+            }
+            chart.timeScale().fitContent();
+
+            host.style.position = "relative";
+            const tip = document.createElement("div");
+            tip.className = "hidden absolute z-10 pointer-events-none rounded border border-borderCl bg-slate-900/95 px-2 py-1.5 text-[10px] leading-4 text-slate-300 shadow-lg";
+            host.appendChild(tip);
+            const fmtVol = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+            const fmtTime = (t) => typeof t === "string"
+                ? t
+                : `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`;
+            chart.subscribeCrosshairMove((param) => {
+                const c = param.time && param.point ? param.seriesData.get(candles) : null;
+                if (!c) { tip.classList.add("hidden"); return; }
+                const chg = c.open ? ((c.close - c.open) / c.open) * 100 : 0;
+                const rows = [
+                    `<div class="font-semibold text-slate-100">${fmtTime(param.time)}</div>`,
+                    `<div>O ${c.open} · H ${c.high} · L ${c.low} · C ${c.close} <span class="${chg >= 0 ? "text-emerald-400" : "text-rose-400"}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</span></div>`,
+                ];
+                const v = volSeries ? param.seriesData.get(volSeries) : null;
+                if (v && v.value != null) rows.push(`<div>Vol ${fmtVol.format(v.value)}</div>`);
+                const r = rsiSeries ? param.seriesData.get(rsiSeries) : null;
+                if (r && r.value != null) rows.push(`<div>RSI(14) ${r.value.toFixed(1)}</div>`);
+                tip.innerHTML = rows.join("");
+                tip.classList.remove("hidden");
+                const pad = 12;
+                let x = param.point.x + pad, y = param.point.y + pad;
+                if (x + tip.offsetWidth > host.clientWidth - 4) x = param.point.x - tip.offsetWidth - pad;
+                if (y + tip.offsetHeight > host.clientHeight - 4) y = param.point.y - tip.offsetHeight - pad;
+                tip.style.left = Math.max(4, x) + "px";
+                tip.style.top = Math.max(4, y) + "px";
+            });
+
+            idxLwResizeObs = new ResizeObserver(() => {
+                if (idxLwChart) idxLwChart.applyOptions({ width: host.clientWidth, height: host.clientHeight });
+            });
+            idxLwResizeObs.observe(host);
+        }
 
         // Which sector's industry breakdown is currently expanded in the radar popup
         // (accordion-style — one at a time keeps the list compact). Reset on market
@@ -2937,6 +3260,7 @@
             signal_hc: "The scanner's single most selective backtested pattern — a tight coil releasing on volume. Rare, and its highest-quality trigger.",
             signal_strong: "Price has cleared resistance on decisively above-average volume — a confirmed, powered breakout rather than a tentative nudge through.",
             signal_rs: "The stock is making relative-strength highs vs. the broad index (outperforming it). Leaders like this tend to break out first and lead the move.",
+            delivery_confirm: "Delivery % = the share of the day's traded volume that was actually taken to demat (held overnight), not squared off intraday. A high delivery % on the breakout bar means buyers are holding — genuine accumulation, not day-trade churn — so the move is more likely real.",
             // risk
             extended: "Price has already run well past the breakout line, so you'd be chasing — higher odds of buying near a short-term top just before a pullback.",
             deep_base: "The consolidation is deep and loose (a large drawdown), leaving more trapped overhead supply to fight through and a lower breakout success rate.",
@@ -2944,6 +3268,7 @@
             no_uptrend: "Price isn't in a confirmed Stage-2 uptrend yet. Breakouts attempted against a flat or falling trend fail far more often.",
             thin_liq: "Average daily traded value is low, so fills can slip and a few large orders can whip the price — harder to enter and exit cleanly.",
             earnings_soon: "An earnings report lands inside the trade window — a binary event that can gap the stock either way, regardless of what the chart says.",
+            delivery_weak: "Delivery % = the share of the day's traded volume actually taken to demat (held), not squared off intraday. A low delivery % on a breakout means the move was mostly intraday churn rather than conviction buying — a weaker, less trustworthy breakout.",
         };
 
         function renderRationale(s) {

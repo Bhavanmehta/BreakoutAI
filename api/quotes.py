@@ -100,7 +100,8 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "symbols query param is required"})
             return
         suffix = ".NS" if market != "US" else ""
-        yahoo_symbols = [f"{s}{suffix}" for s in symbols]
+        # Index symbols (^NSEI, ^GSPC, ...) already carry Yahoo's own notation -- no exchange suffix.
+        yahoo_symbols = [s if s.startswith("^") else f"{s}{suffix}" for s in symbols]
         try:
             self._send_json(200, {"quotes": fetch_quotes(yahoo_symbols)})
         except Exception as exc:
