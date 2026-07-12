@@ -759,6 +759,131 @@ def add_sequential_confirmation_signals(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# --------------------------------------------------------------------------- #
+# I — Volume Profile value-area breakout (2026-07 US research round 2): trailing
+# price-by-volume histogram (each day's volume placed at its typical price), POC =
+# highest-volume bin, Value Area = highest-volume bins covering VP_VALUE_AREA of
+# total volume. Fire when close crosses UP through the Value Area High on a volume
+# surge in an uptrend — "price accepted above value" in profile terms, a genuinely
+# different signal basis (volume-at-price) from anything in A-H (all time-series).
+# Profile is computed over bars [t-W, t) — today excluded, no lookahead.
+# --------------------------------------------------------------------------- #
+def add_method_i_volume_profile(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    n = len(df)
+    tp = ((df["high"] + df["low"] + df["close"]) / 3).values
+    vol = df["volume"].values.astype(float)
+    W, nbins = settings.VP_WINDOW, settings.VP_BINS
+    vah = np.full(n, np.nan)
+    for t in range(W, n):
+        p, v = tp[t - W:t], vol[t - W:t]
+        hist, edges = np.histogram(p, bins=nbins, weights=v)
+        total = hist.sum()
+        if total <= 0:
+            continue
+        # ponytail: value area = top-volume bins until 70% covered (the classic
+        # POC-outward-expansion algorithm differs only at the margins)
+        order = np.argsort(hist)[::-1]
+        cum = np.cumsum(hist[order])
+        take = order[:int(np.searchsorted(cum, settings.VP_VALUE_AREA * total)) + 1]
+        vah[t] = edges[int(take.max()) + 1]
+    s_vah = pd.Series(vah, index=df.index)
+    vol_ok = df["volume"] > df["avg_vol"] * settings.VP_VOL_CONFIRM_MULT
+    cross = (df["close"] > s_vah) & (df["close"].shift(1) <= s_vah.shift(1))
+    df["vp_vah"] = vah
+    df["is_breakout_i"] = (cross & vol_ok & df["uptrend"]).fillna(False)
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# J — true TTM Squeeze: Bollinger(20,2) fully inside Keltner(20, KC_MULT*ATR20) =
+# squeeze on; fire when the squeeze RELEASES (was on within KC_CONFIRM_DAYS, off now)
+# with price above the 20-day mean, short-term momentum up, volume confirm, uptrend.
+# Method C only asked "is band width near its own low"; this is the canonical
+# BB-inside-KC definition plus an explicit release trigger.
+# --------------------------------------------------------------------------- #
+def add_method_j_ttm_squeeze(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    close = df["close"]
+    mid = close.rolling(20).mean()
+    std = close.rolling(20).std()
+    tr = pd.concat([df["high"] - df["low"],
+                    (df["high"] - close.shift(1)).abs(),
+                    (df["low"] - close.shift(1)).abs()], axis=1).max(axis=1)
+    atr20 = tr.rolling(20).mean()
+    squeeze_on = (2 * std) < (settings.KC_MULT * atr20)   # BB inside KC (both bands, symmetric)
+    released = squeeze_on.shift(1).rolling(settings.KC_CONFIRM_DAYS).max().astype(bool) & ~squeeze_on
+    vol_ok = df["volume"] > df["avg_vol"] * settings.KC_VOL_CONFIRM_MULT
+    momentum_up = (close > mid) & (close > close.shift(5))
+    df["is_breakout_j"] = (released & momentum_up & vol_ok & df["uptrend"]).fillna(False)
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# K — Anchored VWAP breakout: anchor the VWAP at the highest-volume day of the
+# trailing year (the last institutional repositioning event, no event calendar
+# needed) and fire when close crosses UP through it — the average holder since that
+# event just went from red to green, a supply/psychology level A-H never look at.
+# Anchor chosen over bars [t-L, t) (today excluded); AVWAP must be at least
+# AVWAP_MIN_AGE_BARS old so a fresh anchor (≈ current price) can't spray crosses.
+# --------------------------------------------------------------------------- #
+def add_method_k_anchored_vwap(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    n = len(df)
+    tp = ((df["high"] + df["low"] + df["close"]) / 3).values
+    vol = df["volume"].values.astype(float)
+    cs_pv = np.cumsum(tp * vol)
+    cs_v = np.cumsum(vol)
+    L, min_age = settings.AVWAP_ANCHOR_LOOKBACK, settings.AVWAP_MIN_AGE_BARS
+    av = np.full(n, np.nan)
+    for t in range(min_age, n):
+        lo = max(0, t - L)
+        a = lo + int(np.argmax(vol[lo:t]))          # anchor day (excludes today)
+        if t - a < min_age:
+            continue
+        pv = cs_pv[t] - (cs_pv[a - 1] if a > 0 else 0.0)
+        vv = cs_v[t] - (cs_v[a - 1] if a > 0 else 0.0)
+        av[t] = pv / vv if vv > 0 else np.nan
+    s_av = pd.Series(av, index=df.index)
+    vol_ok = df["volume"] > df["avg_vol"] * settings.AVWAP_VOL_CONFIRM_MULT
+    cross = (df["close"] > s_av) & (df["close"].shift(1) <= s_av.shift(1))
+    df["avwap"] = av
+    df["is_breakout_k"] = (cross & vol_ok & df["uptrend"]).fillna(False)
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# L — deep-base gate on the already-shipped US tiers: pure intersection of the two
+# strongest measured US results — the SB/HC tiers (45.3%/51.1%) and base depth (the
+# most monotonic feature in the whole project: deepest tercile 39.1% vs 14.7%).
+# No new indicator; just "same tier, but only when the base is >= 20% deep".
+# Must run AFTER add_existing_high_conviction_tiers.
+# --------------------------------------------------------------------------- #
+def add_method_l_deep_base_tiers(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    W = settings.LOOKBACK_HIGH
+    depth_pct = (df["low"].rolling(W).min() / df["high"].rolling(W).max() - 1) * 100
+    deep = depth_pct <= -settings.DEEP_BASE_MIN_DEPTH_PCT
+    df["is_sb_deep_base"] = (df["is_strong_breakout"] & deep).fillna(False)
+    df["is_hc_deep_base"] = (df["is_high_conviction"] & deep).fillna(False)
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# M — shakeout re-break: today closes back above `resistance` (prior 50-day high)
+# for the SECOND-or-later time within REBREAK_LOOKBACK bars — a prior break failed
+# and price is reclaiming the level after the flush. Trader lore says the second
+# attempt, with weak hands shaken out, outperforms the first; this tests it.
+# --------------------------------------------------------------------------- #
+def add_method_m_shakeout_rebreak(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    cross_up = (df["close"] > df["resistance"]) & (df["close"].shift(1) <= df["resistance"].shift(1))
+    prior_crosses = cross_up.shift(1).rolling(settings.REBREAK_LOOKBACK, min_periods=1).sum()
+    vol_ok = df["volume"] > df["avg_vol"] * settings.VOL_SURGE_MULT
+    df["is_breakout_m"] = (cross_up & (prior_crosses >= 1) & vol_ok & df["uptrend"]).fillna(False)
+    return df
+
+
 def add_all_methods(df: pd.DataFrame, benchmark: pd.DataFrame | None = None) -> pd.DataFrame:
     """Run methods B-H (plus G2, the replicated existing HC tiers, and the sequential
     confirmation signals) and attach all their trigger columns. `df` must already have
@@ -773,6 +898,11 @@ def add_all_methods(df: pd.DataFrame, benchmark: pd.DataFrame | None = None) -> 
     df = add_method_g_pre_breakout(df, benchmark)
     df = add_method_g2_pre_breakout_retuned(df, benchmark)
     df = add_method_h_pressure_cooker(df)
+    df = add_method_i_volume_profile(df)
+    df = add_method_j_ttm_squeeze(df)
+    df = add_method_k_anchored_vwap(df)
+    df = add_method_m_shakeout_rebreak(df)
     df = add_existing_high_conviction_tiers(df)
+    df = add_method_l_deep_base_tiers(df)   # needs the HC/SB tier columns above
     df = add_sequential_confirmation_signals(df)
     return df

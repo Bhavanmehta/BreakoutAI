@@ -42,10 +42,10 @@ _W = {
     "vcp_tight": 85, "vcp_ok": 60,
     "volume": 80, "ema_stack": 75, "coiling": 70,
     "trend_adx": 65, "squeeze": 55, "followthrough": 78, "signal_hc": 90,
-    "signal_strong": 82, "signal_rs": 70,
+    "signal_strong": 82, "signal_rs": 70, "delivery_confirm": 72,
     # risk
     "extended": 55, "unreliable": 65, "no_uptrend": 70,
-    "thin_liq": 60, "earnings_soon": 75, "deep_base": 45,
+    "thin_liq": 60, "earnings_soon": 75, "deep_base": 45, "delivery_weak": 50,
 }
 
 
@@ -191,6 +191,18 @@ def _confirming(rec) -> list[dict]:
     elif sig == "relative_strength":
         add("signal_rs", "Relative-strength high vs the index", _W["signal_rs"])
 
+    # High delivery-% vs the stock's own average (IN only) — buyers took delivery
+    # (held), not intraday churn: a "realness" confirm on the breakout bar. Needs both
+    # an absolute floor and a rise over its own baseline so a chronically high-delivery
+    # (illiquid) name doesn't fire on nothing.
+    deliv = rec.get("delivery") or {}
+    latest, avg = _num(deliv.get("latest")), _num(deliv.get("avg"))
+    if latest is not None and avg is not None and avg > 0 \
+            and latest >= settings.DELIVERY_STRONG_PCT \
+            and latest >= settings.DELIVERY_STRONG_RATIO * avg:
+        add("delivery_confirm", f"High delivery — {latest:.0f}% held (avg {avg:.0f}%)",
+            _W["delivery_confirm"])
+
     return out
 
 
@@ -227,6 +239,16 @@ def _risk(rec, days_to_earnings, turnover) -> list[dict]:
         d = days_to_earnings
         when = "today" if d == 0 else ("tomorrow" if d == 1 else f"in {d} days")
         add("earnings_soon", f"Earnings {when}", _W["earnings_soon"])
+
+    # Notably low delivery-% vs the stock's own average (IN only) — the move was mostly
+    # intraday churn, not conviction buying: a weaker, less trustworthy breakout.
+    deliv = rec.get("delivery") or {}
+    latest, avg = _num(deliv.get("latest")), _num(deliv.get("avg"))
+    if latest is not None and avg is not None and avg > 0 \
+            and latest <= settings.DELIVERY_WEAK_RATIO * avg \
+            and latest < settings.DELIVERY_STRONG_PCT:
+        add("delivery_weak", f"Low delivery — {latest:.0f}% held (avg {avg:.0f}%), intraday churn",
+            _W["delivery_weak"])
 
     return out
 

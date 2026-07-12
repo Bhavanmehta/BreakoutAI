@@ -102,6 +102,7 @@ A Python pipeline produces all computed data. See `backend/README.md` for detail
   screener.in) + `holdings.py` (NSE-XBRL fallback) + `fetch_holdings.py`, `sectors.py` +
   `fetch_sectors.py` (sector/industry), `fundamentals.py` + `fetch_fundamentals.py` (market
   cap/P-E/growth/ROE/D-E), `earnings.py` + `fetch_earnings.py` (EPS estimate-vs-actual),
+  `fetch_delivery.py` (NSE full-bhavcopy delivery-% accumulation confirm, IN-only),
   `fetch_news.py` + `news_providers.py` + `event_classifier.py` + `sentiment.py` (news +
   sentiment), `fetch_social.py` + `social_providers.py` (Reddit/Trends buzz), `market_mood.py`
   (fear/greed gauge), `export_ohlc.py` (per-stock chart JSON), `ask_ai.py` + `chat_server.py` (Ask

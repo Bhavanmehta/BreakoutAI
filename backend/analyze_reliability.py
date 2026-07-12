@@ -72,6 +72,12 @@ BASE_METHODS = {
     "H_pressure_cooker": "is_breakout_h",
     "HC_tier1_high_conviction": "is_high_conviction",
     "SB_tier2_strong_breakout": "is_strong_breakout",
+    "I_volume_profile": "is_breakout_i",
+    "J_ttm_squeeze": "is_breakout_j",
+    "K_anchored_vwap": "is_breakout_k",
+    "L_sb_deep_base": "is_sb_deep_base",
+    "L2_hc_deep_base": "is_hc_deep_base",
+    "M_shakeout_rebreak": "is_breakout_m",
     "SB_after_G2_alert": "is_sb_after_g2",
     "SB_after_H_alert": "is_sb_after_h",
     "HC_after_G2_alert": "is_hc_after_g2",
@@ -94,6 +100,18 @@ COMBOS = {
     "SB_and_H": ("SB_tier2_strong_breakout", "H_pressure_cooker"),
     "HC_and_G2": ("HC_tier1_high_conviction", "G2_pre_breakout_retuned"),
     "HC_and_H": ("HC_tier1_high_conviction", "H_pressure_cooker"),
+    # Round-2 (2026-07, US): does the price-level break agreeing with the volume-at-
+    # price read (I) or the squeeze release (J) beat either alone?
+    "AI_combo": ("A_donchian_minervini", "I_volume_profile"),
+    "AJ_combo": ("A_donchian_minervini", "J_ttm_squeeze"),
+    # Round-2b (2026-07, US): I/J/K are all independent reads on the same underlying
+    # price/volume action (volume-at-price, squeeze release, anchored VWAP) -- do any
+    # PAIRS of them agreeing same-day beat the individual signals, without requiring
+    # the price-level break (A) too? Also test the triple-agreement case.
+    "IJ_combo": ("I_volume_profile", "J_ttm_squeeze"),
+    "IK_combo": ("I_volume_profile", "K_anchored_vwap"),
+    "JK_combo": ("J_ttm_squeeze", "K_anchored_vwap"),
+    "IJK_combo": ("I_volume_profile", "J_ttm_squeeze", "K_anchored_vwap"),
 }
 
 
@@ -349,15 +367,22 @@ def _attach_trailing_reliability(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def test_score(df_all: pd.DataFrame):
+def test_score(df_all: pd.DataFrame, method: str = "A_donchian_minervini", section: str = "2b"):
+    """Replay the score.breakout_quality() candidates on `method`'s own event
+    population, no lookahead (trailing reliability computed from ONLY that
+    method's own prior fires, per stock -- what the score would have known live
+    if I/K shipped as their own tracked signal). Defaults to Method-A (the
+    original validation population); pass method="I_volume_profile" etc. to check
+    whether the SAME shipped weights generalize to a different signal's events,
+    or whether that signal would need its own weight mix."""
     print("\n" + "=" * 72)
-    print("2b. COMPOSITE SCORE - does blending validated features into ONE number")
-    print("    stratify follow-through? (replayed on Method-A events, no lookahead)")
+    print(f"{section}. COMPOSITE SCORE on {method} - does blending validated features into")
+    print("    ONE number stratify follow-through? (no lookahead)")
     print("=" * 72)
 
-    df = df_all[df_all["method"] == "A_donchian_minervini"].copy()
+    df = df_all[df_all["method"] == method].copy()
     if len(df) < 100:
-        print("  too few Method-A events to test a composite score.")
+        print(f"  too few {method} events to test a composite score.")
         return
     df = _attach_trailing_reliability(df)
 
@@ -566,6 +591,8 @@ def main():
     test_persistence(method_a)
     test_features(method_a)
     test_score(df)
+    test_score(df, method="I_volume_profile", section="2c")
+    test_score(df, method="K_anchored_vwap", section="2d")
     test_analog_predictiveness(df)
     test_methods(df)
     report_overlap(fire_counts, overlap_counts)
@@ -579,7 +606,10 @@ def main():
               "E2_relative_strength_uptrend", "G_pre_breakout_composite", "G2_pre_breakout_retuned",
               "H_pressure_cooker", "AE_combo", "AD_combo", "ED_combo", "AED_combo",
               "SB_and_G2", "SB_and_H", "HC_and_G2", "HC_and_H",
-              "SB_after_G2_alert", "SB_after_H_alert", "HC_after_G2_alert", "HC_after_H_alert"]:
+              "SB_after_G2_alert", "SB_after_H_alert", "HC_after_G2_alert", "HC_after_H_alert",
+              "I_volume_profile", "J_ttm_squeeze", "K_anchored_vwap",
+              "L_sb_deep_base", "L2_hc_deep_base", "M_shakeout_rebreak",
+              "AI_combo", "AJ_combo"]:
         print_examples(df, m)
 
     print("\n" + "=" * 72)

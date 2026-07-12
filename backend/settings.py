@@ -357,6 +357,40 @@ G_W_TREND, G_W_BASE, G_W_VOLATILITY, G_W_VOLUME, G_W_PRICE, G_W_RS, G_W_READINES
 H_WINDOW = 20            # trailing bars most sub-signals look over (~1 trading month)
 H_FIRE_THRESHOLD = 75.0
 
+# I — Volume Profile value-area breakout: build a trailing price-by-volume histogram
+# (volume placed at each day's typical price), find the Point of Control and the 70%
+# Value Area; trigger when close crosses UP through the Value Area High on a volume
+# surge while in an uptrend. Computed purely from cached OHLCV — no new data source.
+VP_WINDOW = 120               # trailing bars per profile (~6 months)
+VP_BINS = 25                  # histogram price bins per profile
+VP_VALUE_AREA = 0.70          # classic 70% value area
+VP_VOL_CONFIRM_MULT = 1.3
+# J — true TTM Squeeze (Keltner): Bollinger(20,2) fully inside Keltner(20, KC_MULT x
+# ATR20) = "squeeze on"; fire when the squeeze releases with upward momentum + volume.
+# NOTE the 2026-07-06 US finding that volatility CONTRACTION graded negative pooled —
+# this tests whether the *release* (contraction ending, expansion starting) is
+# different from "still contracted", which is the part Method C only loosely captured.
+KC_MULT = 1.5
+KC_CONFIRM_DAYS = 3           # squeeze must have been on within this many days of the release
+KC_VOL_CONFIRM_MULT = 1.3
+# K — Anchored VWAP breakout: anchor at the highest-volume day of the trailing year
+# (proxy for the last institutional repositioning event); trigger when close crosses
+# UP through that AVWAP, in an uptrend, on volume. AVWAP needs a minimum age so a
+# yesterday-anchored line (≈ yesterday's price) can't generate noise crosses.
+AVWAP_ANCHOR_LOOKBACK = 252
+AVWAP_MIN_AGE_BARS = 20
+AVWAP_VOL_CONFIRM_MULT = 1.3
+# L — deep-base gate on the ALREADY-SHIPPED US tiers: base depth is the strongest,
+# most monotonic US feature measured (deepest tercile 39.1% vs shallowest 14.7%,
+# 2026-07-05 whole-market replay), so test SB/HC ∩ (LOOKBACK_HIGH-window base depth
+# >= this %). Pure intersection of two validated ideas — no new indicator at all.
+DEEP_BASE_MIN_DEPTH_PCT = 20.0
+# M — shakeout re-break: today closes back above `resistance` for the SECOND (or
+# later) time within this window — i.e. a prior break failed/faded and price is
+# reclaiming the level. Tests the trader lore that second attempts through a level
+# (after the weak hands are flushed) outperform first attempts.
+REBREAK_LOOKBACK = 15
+
 # --- News / sentiment (fetch_news.py -- NOT part of the daily price scan itself; news
 # is separately budgeted since all three free providers cap daily requests) ----------
 NEWS_JSON = DATA_DIR / "news.json"
@@ -423,6 +457,23 @@ MOOD_TREND_CLAMP_PCT = 10.0      # +/- this % distance from the SMA maps to the 
 # (India VIX and CBOE VIX aren't on the same historical scale) -- not redefined here.
 MOOD_FII_ROLLING_DAYS = 21       # window today's net FII flow is z-scored against
 MOOD_FII_CLAMP_Z = 2.0           # a z-score of +/- this many std-devs maps to the full 0-100 range
+
+# --- NSE delivery-% accumulation signal (fetch_delivery.py -> delivery.json) --------
+# "Delivery %" = the share of a day's traded quantity that was actually taken to demat
+# (held overnight) rather than squared off intraday. A HIGH delivery-% on a breakout bar
+# means buyers are holding -- real accumulation, not day-trade churn -- so it's a cheap
+# "realness" confirm on the breakout. It's a transparency token only (signals.py), NEVER
+# a ranker input (score.py), matching the roadmap's decorative-first discipline.
+# IN-ONLY: NSE publishes DELIV_PER in its *full* bhavcopy; there's no free US equivalent
+# (the consolidated tape doesn't expose held-vs-churned), so US runs simply carry
+# delivery: null and the token never fires.
+HAS_DELIVERY = MARKET != "US"
+DELIVERY_JSON = DATA_DIR / "delivery.json"
+DELIVERY_LOOKBACK_DAYS = 30      # trading days of full-bhavcopy to average each symbol over
+DELIVERY_MIN_DAYS = 5            # need at least this many observations before the avg is trusted
+DELIVERY_STRONG_PCT = 55.0       # latest delivery-% must clear this absolute floor to confirm...
+DELIVERY_STRONG_RATIO = 1.15     # ...AND be >= this multiple of the stock's own trailing average
+DELIVERY_WEAK_RATIO = 0.70       # latest <= this x its own average (and below the floor) = churn risk
 
 # --- Options-flow research prototype (options_flow_scan.py -- NOT part of the daily
 # scan/run_scan.py, and NOT wired into the served site. US-only (yfinance/jugaad-data

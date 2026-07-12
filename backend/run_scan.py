@@ -119,6 +119,25 @@ def run():
         for s in summaries:
             s["holdings"] = None
 
+    # --- Merge cached NSE delivery-% (from fetch_delivery.py) if present ---
+    # delivery.json is the trailing latest/avg delivery-% per symbol (accumulation vs
+    # intraday churn). IN-only and optional, exactly like holdings above: stocks without
+    # an entry — and every stock on a US run — just carry delivery: null, and signals.py's
+    # delivery token simply never fires for them.
+    delivery_path = settings.DELIVERY_JSON
+    if settings.HAS_DELIVERY and delivery_path.exists():
+        with open(delivery_path, encoding="utf-8") as f:
+            delivery = json.load(f)
+        matched = 0
+        for s in summaries:
+            d = delivery.get(s["symbol"])
+            s["delivery"] = d
+            matched += 1 if d else 0
+        print(f"  merged delivery-% for {matched}/{len(summaries)} stocks")
+    else:
+        for s in summaries:
+            s["delivery"] = None
+
     # --- Merge cached sector/industry (from fetch_sectors.py) if present ---
     # Curated labels (FALLBACK_WATCHLIST) win; otherwise fill from sectors.json.
     # Also optional — stocks without an entry keep their (possibly blank) sector.
