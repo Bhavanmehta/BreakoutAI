@@ -25,6 +25,10 @@ venv/
 *.duckdb
 *.duckdb.wal
 
+# Options backtest SQLite cache (local-only, re-downloadable via
+# /api/options_backtest?action=download — see api/options_backtest.py)
+backend/backtest_cache.db
+
 # Serving data (breakouts/ohlc/performance/etc.) now lives on the orphan `data`
 # branch, force-pushed daily by .github/workflows/*.yml — NOT committed to main,
 # which was growing ~6k files/day. Regenerate locally with `cd backend; python
@@ -44,7 +48,17 @@ backend/OPTIONS_FLOW_TRADIER_NOTES.md
 # as ongoing cross-checks. Regenerable; nothing here is source of record.
 /scratchpad/
 _verify_*
-_httpserver.log
+_httpserver*.log
+
+# Fable design-review scratch — throwaway HTML mockups + Playwright screenshots from a
+# redesign-concept comparison pass. Regenerate by re-running the review pass; nothing
+# here is source of record.
+concept_*.html
+concept_*_verify.png
+concepts.html
+_concept_review.py
+_review_*.png
+_payload.json
 
 # Local scratch copies of serving data pulled while wiring the live-record join
 # (breakouts/live dumps are multi-MB and belong on the orphan `data` branch, NOT
