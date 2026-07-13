@@ -136,38 +136,79 @@ def _sig_t(iv: float, t_years: float):
     return sigma, sqrt_t, sigma * sqrt_t
 
 
-def _d1d2(spot: float, strike: float, iv: float, t_years: float, r: float):
+def _forward_of(spot: float | None, r: float, t_years: float, forward: float | None = None) -> float:
+    if forward is not None:
+        return forward
+    return (spot or 0.0) * math.exp(r * max(t_years, 0.0))
+
+
+# B1: forward via ATM put-call parity: F = K_atm + (C_atm - P_atm)*e^{rT}. NIFTY
+# weeklies have no tradeable matching-expiry futures, so the forward is imputed
+# from the chain's own ATM CE/PE ltp instead. Falls back to the pure carry
+# forward (spot * e^{rT}) when the ATM ltps aren't available (mock provider,
+# stale leg, manual entry, or -- as in the replay engine -- no ATM straddle
+# fetched at all). Mirrors scripts/options_math.js impliedForward() exactly.
+def implied_forward(atm_strike: float | None, atm_call_ltp: float | None, atm_put_ltp: float | None,
+                     t_years: float, r: float = 0.065, spot: float | None = None) -> dict:
+    growth = math.exp(r * max(t_years, 0.0))
+    spot_fallback = (spot or 0.0) * growth
+    if (atm_strike is None or atm_call_ltp is None or atm_put_ltp is None
+            or not (atm_call_ltp > 0) or not (atm_put_ltp > 0)):
+        return {"forward": spot_fallback, "source": "spot-fallback"}
+    return {"forward": atm_strike + (atm_call_ltp - atm_put_ltp) * growth, "source": "parity"}
+
+
+# Black-76 d1/d2 on the FORWARD (not spot): d1 = [ln(F/K) + sigma^2 T/2] / (sigma sqrt T).
+# No separate "+r*T" drift term -- the forward already prices in the carry,
+# unlike plain Black-Scholes where d1 carries that term against spot.
+def _d1d2_forward(forward: float, strike: float, iv: float, t_years: float):
     sigma, sqrt_t, denom = _sig_t(iv, t_years)
-    if denom <= 1e-12 or spot <= 0 or strike <= 0:
-        m = math.log((spot or 1e-9) / (strike or 1e-9))
+    if denom <= 1e-12 or forward <= 0 or strike <= 0:
+        m = math.log((forward or 1e-9) / (strike or 1e-9))
         big = 40.0 if m >= 0 else -40.0
         return big, big, sigma, sqrt_t
-    d1 = (math.log(spot / strike) + (r + 0.5 * sigma * sigma) * t_years) / denom
+    d1 = (math.log(forward / strike) + 0.5 * sigma * sigma * t_years) / denom
     return d1, d1 - denom, sigma, sqrt_t
 
 
-def bs_price(spot: float, strike: float, iv: float, t_years: float, opt_type: str = "CE", r: float = 0.065) -> float:
-    d1, d2, _sigma, _sqrt_t = _d1d2(spot, strike, iv, t_years, r)
+# Black-76 fair value (per unit of underlying). Pass `forward` directly when you
+# have a parity-implied one (see implied_forward); otherwise pass `spot` (+
+# optional `r`) and the pure carry forward spot*e^{rT} is used, which makes this
+# numerically IDENTICAL to the old plain Black-Scholes price (the standard BS
+# <-> Black-76 equivalence) -- existing spot-only callers are unaffected.
+def bs_price(spot: float | None, strike: float, iv: float, t_years: float, opt_type: str = "CE",
+             r: float = 0.065, forward: float | None = None) -> float:
+    f = _forward_of(spot, r, t_years, forward)
+    d1, d2, _sigma, _sqrt_t = _d1d2_forward(f, strike, iv, t_years)
     disc = math.exp(-r * max(t_years, 0.0))
     if opt_type.upper() == "PE":
-        return max(strike * disc * _norm_cdf(-d2) - spot * _norm_cdf(-d1), 0.0)
-    return max(spot * _norm_cdf(d1) - strike * disc * _norm_cdf(d2), 0.0)
+        return max(disc * (strike * _norm_cdf(-d2) - f * _norm_cdf(-d1)), 0.0)
+    return max(disc * (f * _norm_cdf(d1) - strike * _norm_cdf(d2)), 0.0)
 
 
-def bs_greeks(spot: float, strike: float, iv: float, t_years: float, opt_type: str = "CE", r: float = 0.065) -> dict:
-    d1, d2, sigma, sqrt_t = _d1d2(spot, strike, iv, t_years, r)
+# Greeks, Black-76 form. delta now carries the discount factor e^{-rT} (a
+# deliberate change from the old plain-BS delta, which had none -- this IS the
+# correct forward-measure delta). gamma/vega are on the forward; theta =
+# -disc*F*phi(d1)*sigma/(2 sqrt T) + r*price, derived from d(price)/dT holding F
+# fixed (the standard practitioner "sticky forward" theta) -- differs slightly
+# from the old spot-based theta by design.
+def bs_greeks(spot: float | None, strike: float, iv: float, t_years: float, opt_type: str = "CE",
+              r: float = 0.065, forward: float | None = None) -> dict:
+    f = _forward_of(spot, r, t_years, forward)
+    d1, d2, sigma, sqrt_t = _d1d2_forward(f, strike, iv, t_years)
     disc = math.exp(-r * max(t_years, 0.0))
     pdf = _norm_pdf(d1)
     sqrt_t = sqrt_t or 1e-9
-    gamma = pdf / ((spot * sigma * sqrt_t) or 1e-9)
-    vega_annual = spot * pdf * sqrt_t
-    term1 = -(spot * pdf * sigma) / (2 * sqrt_t)
+    gamma = (disc * pdf) / ((f * sigma * sqrt_t) or 1e-9)
+    vega_annual = disc * f * pdf * sqrt_t
+    theta_term = -(disc * f * pdf * sigma) / (2 * sqrt_t)
     if opt_type.upper() == "PE":
-        delta = _norm_cdf(d1) - 1.0
-        theta_annual = term1 + r * strike * disc * _norm_cdf(-d2)
+        delta = -disc * _norm_cdf(-d1)
+        price = max(disc * (strike * _norm_cdf(-d2) - f * _norm_cdf(-d1)), 0.0)
     else:
-        delta = _norm_cdf(d1)
-        theta_annual = term1 - r * strike * disc * _norm_cdf(d2)
+        delta = disc * _norm_cdf(d1)
+        price = max(disc * (f * _norm_cdf(d1) - strike * _norm_cdf(d2)), 0.0)
+    theta_annual = theta_term + r * price
     return {"delta": delta, "gamma": gamma, "theta": theta_annual / 365.0, "vega": vega_annual / 100.0}
 
 
@@ -197,12 +238,19 @@ def breakeven(strike: float, premium: float, opt_type: str = "CE") -> float:
 
 
 def assess(trade: dict) -> dict:
-    """Python port of options_math.js assess(). Same dirOk check, same
-    tLeft = tYears*0.5 target/stop mark projection, same reward/risk/rr,
-    thetaPctOfPrem, probTouch PoP and EXACT verdict thresholds:
-      rr>=2 & pop>=0.40 & thetaPctOfPrem<0.08 -> Favorable
-      rr>=1 & pop>=0.30                       -> Marginal
+    """Python port of options_math.js assess() (post B1-B3 overhaul). Same
+    dirOk check, same reward/risk/rr, PoP, and EXACT verdict thresholds:
+      rr>=2 & pop>=0.40 & thetaCostPctOfReward<=0.25 -> Favorable
+      rr>=1 & pop>=0.30                              -> Marginal
       else Unfavorable; !dirOk -> "Check inputs".
+    B1: entry greeks/forward use a parity-implied forward (trade["atmStrike"]/
+    ["atmCallLtp"]/["atmPutLtp"]), falling back to spot*e^{rT} when absent.
+    B2: trade["marketIv"] / trade["marketGreeks"] (straight from the live
+    chain leg) replace the BS-derived iv/greeks field-by-field when usable.
+    B3: trade["horizonDays"] (actual intraday hold, defaults to full `days`
+    when omitted) replaces the old "half the time to expiry" mark projection
+    and the old absolute thetaPctOfPrem<0.08 gate (unreachable for weekly ATM
+    options) with a hold-scoped thetaCostPctOfReward<=0.25 gate.
     Prose `reasons` strings are omitted (UI copy, irrelevant to bucketing);
     verdict/tone/warnings/metrics match the JS shape."""
     opt_type = (trade.get("type") or "CE").upper()
@@ -217,29 +265,70 @@ def assess(trade: dict) -> dict:
 
     dir_ok = (tgt_u > spot and sl_u < spot) if opt_type == "CE" else (tgt_u < spot and sl_u > spot)
 
-    t_left = max(t_years * 0.5, 0.0)
-    mark_at_target = bs_price(tgt_u, strike, iv, t_left, opt_type, r)
-    mark_at_stop = bs_price(sl_u, strike, iv, t_left, opt_type, r)
+    # B2: market IV (from the live chain leg) replaces the manual/BS-implied IV
+    # whenever it's usable.
+    market_iv = trade.get("marketIv")
+    eff_iv = market_iv if (market_iv is not None and market_iv > 0) else iv
+
+    # B3: intraday holding horizon. The assessor page defaults this to "time
+    # left in today's session"; when the caller omits it we assume a full hold
+    # to expiry (days) -- the old, conservative behaviour.
+    horizon_days_in = days if trade.get("horizonDays") is None else trade["horizonDays"]
+    horizon_days = min(max(horizon_days_in, 0.0), days)
+    horizon_t_years = horizon_days / 365.0
+    t_left = max(t_years - horizon_t_years, 0.0)  # time-to-expiry REMAINING once the hold elapses
+
+    # B1: forward via ATM put-call parity for the ENTRY greeks (falls back to
+    # spot*e^{rT} when no live ATM CE/PE ltp is supplied).
+    atm_strike = trade["atmStrike"] if trade.get("atmStrike") is not None else strike
+    fwd = implied_forward(atm_strike, trade.get("atmCallLtp"), trade.get("atmPutLtp"),
+                           t_years, r, spot)
+
+    # Project option mark at target and at stop, decayed by the ACTUAL holding
+    # window (tLeft), not "half the time to expiry" (the old, arbitrary
+    # assumption that ignored the intraday-exit reality).
+    mark_at_target = bs_price(tgt_u, strike, eff_iv, t_left, opt_type, r)
+    mark_at_stop = bs_price(sl_u, strike, eff_iv, t_left, opt_type, r)
 
     units = lot_size * lots
     reward = (mark_at_target - premium) * units
     risk = (premium - mark_at_stop) * units
     rr = (reward / risk) if risk > 0 else (math.inf if reward > 0 else 0.0)
 
-    g = bs_greeks(spot, strike, iv, t_years, opt_type, r)
-    theta_per_day = g["theta"] * units
-    theta_pct_of_prem = abs(g["theta"]) / premium if premium > 0 else 0.0
+    # B2: market greeks (straight from the chain leg) replace the BS-computed
+    # ones field-by-field whenever finite; BS fallback (using the parity
+    # forward) otherwise (mock provider / stale leg).
+    bs_g = bs_greeks(None, strike, eff_iv, t_years, opt_type, r, forward=fwd["forward"])
+    mg = trade.get("marketGreeks") or {}
 
-    pop = prob_touch(spot, tgt_u, iv, t_years, r)
+    def _pick(key):
+        v = mg.get(key)
+        return v if (v is not None and math.isfinite(v)) else bs_g[key]
+
+    g = {"delta": _pick("delta"), "gamma": _pick("gamma"), "theta": _pick("theta"), "vega": _pick("vega")}
+    theta_per_day = g["theta"] * units              # currency/day (negative)
+    theta_pct_of_prem = abs(g["theta"]) / premium if premium > 0 else 0.0   # legacy display metric
+
+    # B3: theta gate over the ACTUAL hold, as a fraction of the projected
+    # reward -- replaces the old absolute "<8%/day" gate, which no weekly ATM
+    # option could ever pass (theta routinely 15-25%/day of premium; the trade
+    # never holds for a full day anyway).
+    theta_cost_horizon = abs(theta_per_day) * horizon_days
+    theta_cost_pct_of_reward = (theta_cost_horizon / reward) if reward > 0 else (
+        math.inf if theta_cost_horizon > 0 else 0.0)
+
+    # B3: PoP is the probability of touching the target WITHIN the horizon
+    # (not the full days-to-expiry -- the trade is flattened EOD).
+    pop = prob_touch(spot, tgt_u, eff_iv, horizon_t_years, r)
     be = breakeven(strike, premium, opt_type)
-    em = expected_move(spot, iv, t_years)
+    em = expected_move(spot, eff_iv, t_years)
     move_needed = abs(be - spot)
 
     warnings = []
     if not dir_ok:
         warnings.append(f"Target/stop are on the wrong side of spot for a {opt_type} -- check direction.")
-    if theta_pct_of_prem >= 0.08:
-        warnings.append("Heavy theta (>= 8%/day) -- needs the move fast.")
+    if theta_cost_pct_of_reward > 0.25:
+        warnings.append("Theta over the hold eats > 25% of projected reward -- needs the move fast.")
     if move_needed > em:
         warnings.append("Breakeven is beyond the +/-1 sigma expected move -- statistically a stretch.")
     if abs(g["delta"]) < 0.2:
@@ -247,7 +336,7 @@ def assess(trade: dict) -> dict:
 
     if not dir_ok:
         verdict, tone = "Check inputs", "warn"
-    elif math.isfinite(rr) and rr >= 2 and pop >= 0.40 and theta_pct_of_prem < 0.08:
+    elif math.isfinite(rr) and rr >= 2 and pop >= 0.40 and theta_cost_pct_of_reward <= 0.25:
         verdict, tone = "Favorable", "good"
     elif rr >= 1 and pop >= 0.30:
         verdict, tone = "Marginal", "warn"
@@ -259,9 +348,11 @@ def assess(trade: dict) -> dict:
         "metrics": {
             "pop": pop, "rr": rr, "reward": reward, "risk": risk,
             "thetaPerDay": theta_per_day, "thetaPctOfPrem": theta_pct_of_prem,
+            "thetaCostPctOfReward": theta_cost_pct_of_reward,
             "delta": g["delta"], "gamma": g["gamma"], "vega": g["vega"], "theta": g["theta"],
             "breakeven": be, "expectedMove": em, "moveNeeded": move_needed,
             "markAtTarget": mark_at_target, "markAtStop": mark_at_stop,
+            "forward": fwd["forward"], "forwardSource": fwd["source"], "horizonDays": horizon_days,
         },
     }
 
@@ -759,6 +850,10 @@ def action_replay(q) -> dict:
     p = _engine_params(q)
     expiry_weekday = int(q("expiry_weekday", "3"))
     units = p["lot_size"] * p["lots"]
+    # B3: horizonDays = the ACTUAL intraday hold (entry_time -> eod_time), as a
+    # fraction of a calendar day -- trades are flattened EOD, they do not carry
+    # to expiry, so PoP/theta-gate must be scoped to this window (not `days`).
+    horizon_days = max(_hm(p["eod_time"]) - _hm(p["entry_time"]), 0) / 1440.0
     con = _db()
     try:
         trades = _run_long(con, p["symbol"], p["expiry_flag"], p["expiry_code"], p["interval"],
@@ -787,15 +882,21 @@ def action_replay(q) -> dict:
         sign = 1.0 if p["side"] == "CE" else -1.0
         sl_u = spot - sign * prem_sl / abs(delta)
         tgt_u = spot + sign * prem_tgt / abs(delta)
+        # horizonDays can't exceed days-to-expiry on expiry day itself (days=0).
+        this_horizon = min(horizon_days, days) if days > 0 else 0.0
         a = assess({"spot": spot, "strike": strike, "type": p["side"], "iv": iv, "days": days,
                     "premium": t["entry"], "slUnderlying": sl_u, "targetUnderlying": tgt_u,
-                    "lotSize": p["lot_size"], "lots": p["lots"]})
+                    "lotSize": p["lot_size"], "lots": p["lots"], "horizonDays": this_horizon})
         rr = a["metrics"]["rr"]
         replayed.append({
             "date": t["date"], "verdict": a["verdict"],
             "rr": round(rr, 3) if math.isfinite(rr) else None,
             "pop": round(a["metrics"]["pop"], 4),
             "theta_pct_of_prem": round(a["metrics"]["thetaPctOfPrem"], 4),
+            "theta_cost_pct_of_reward": round(a["metrics"]["thetaCostPctOfReward"], 4)
+                if math.isfinite(a["metrics"]["thetaCostPctOfReward"]) else None,
+            "horizon_days": round(a["metrics"]["horizonDays"], 4),
+            "forward": round(a["metrics"]["forward"], 2), "forward_source": a["metrics"]["forwardSource"],
             "days_to_expiry": days, "entry": t["entry"], "exit": t["exit"],
             "exit_reason": t["exit_reason"], "net_pnl": t["net_pnl"],
         })
@@ -906,16 +1007,47 @@ if __name__ == "__main__":
     bad = assess({"spot": 25000, "strike": 25100, "type": "CE", "iv": 13, "days": 3, "premium": 90,
                   "slUnderlying": 25200, "targetUnderlying": 24800, "lotSize": 75, "lots": 1})
     assert bad["verdict"] == "Check inputs" and bad["warnings"], bad
-    # Put-call parity on the ported bs_price.
+    # Put-call parity on the ported bs_price (spot-fallback forward == old plain BS
+    # numerically, by the standard BS <-> Black-76 equivalence).
     S, K, iv, T = 25000, 25000, 13, 7 / 365
     parity = S - K * math.exp(-0.065 * T)
     assert abs((bs_price(S, K, iv, T, "CE") - bs_price(S, K, iv, T, "PE")) - parity) < 1e-3
     # probTouch bounds + touch >= ITM-style sanity.
     pt = prob_touch(S, 25200, iv, T)
     assert 0.0 <= pt <= 1.0
-    # Greeks parity with the JS conventions.
+    # Greeks parity with the JS conventions (Black-76 delta now carries e^-rT).
     g = bs_greeks(S, K, iv, T, "CE")
     assert 0 < g["delta"] < 1 and g["theta"] < 0 and g["gamma"] > 0 and g["vega"] > 0
+
+    # --- B1: impliedForward -----------------------------------------------------
+    fwd_cp = implied_forward(25000, 130, 100, 7 / 365, 0.065, 25000)
+    expect_fwd = 25000 + (130 - 100) * math.exp(0.065 * 7 / 365)
+    assert abs(fwd_cp["forward"] - expect_fwd) < 1e-6 and fwd_cp["source"] == "parity", fwd_cp
+    fwd_fb = implied_forward(25000, None, None, 7 / 365, 0.065, 24950)
+    assert abs(fwd_fb["forward"] - 24950 * math.exp(0.065 * 7 / 365)) < 1e-6 and fwd_fb["source"] == "spot-fallback"
+    # Round-trip: price off a forward, feed those ltps back, recover F.
+    Frt, Krt, iv_rt, Trt = 25137.42, 25100, 14, 5 / 365
+    Crt = bs_price(None, Krt, iv_rt, Trt, "CE", forward=Frt)
+    Prt = bs_price(None, Krt, iv_rt, Trt, "PE", forward=Frt)
+    Frec = implied_forward(Krt, Crt, Prt, Trt, 0.065, Frt)["forward"]
+    assert abs(Frec - Frt) < 1e-6, (Frec, Frt)
+    # Black-76 delta = e^-rT * N(d1) (discounted, unlike old raw N(d1)).
+    gF = bs_greeks(None, K, iv, T, "CE", forward=S * math.exp(0.065 * T))
+    assert 0 < gF["delta"] < math.exp(-0.065 * T), gF
+
+    # --- B2/B3: horizonDays shortens PoP; hold-scoped theta gate is reachable ---
+    a_full = assess({"spot": 25000, "strike": 25100, "type": "CE", "iv": 15, "days": 5, "premium": 90,
+                      "slUnderlying": 24850, "targetUnderlying": 25350, "lotSize": 75, "lots": 1, "horizonDays": 5})
+    a_short = assess({"spot": 25000, "strike": 25100, "type": "CE", "iv": 15, "days": 5, "premium": 90,
+                       "slUnderlying": 24850, "targetUnderlying": 25350, "lotSize": 75, "lots": 1, "horizonDays": 0.25})
+    assert a_short["metrics"]["pop"] < a_full["metrics"]["pop"], (a_short["metrics"]["pop"], a_full["metrics"]["pop"])
+    weekly_atm = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 12, "days": 1, "premium": 45,
+                          "slUnderlying": 24940, "targetUnderlying": 25120, "lotSize": 75, "lots": 1, "horizonDays": 0.4})
+    assert weekly_atm["metrics"]["thetaPctOfPrem"] >= 0.08, weekly_atm  # proves the OLD gate was unreachable
+    assert weekly_atm["metrics"]["thetaCostPctOfReward"] <= 0.25, weekly_atm  # NEW gate is reachable
+    weekly_atm_closer = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 10, "days": 1, "premium": 40,
+                                 "slUnderlying": 24975, "targetUnderlying": 25045, "lotSize": 75, "lots": 1, "horizonDays": 0.3})
+    assert weekly_atm_closer["verdict"] == "Favorable", weekly_atm_closer  # Favorable is actually populated
     # Strike-spec parser.
     assert _parse_strikes("ATM-2..ATM+2") == [-2, -1, 0, 1, 2]
     assert _parse_strikes("ATM") == [0] and _parse_strikes("ATM+3") == [3]

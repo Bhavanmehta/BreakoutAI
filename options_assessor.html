@@ -81,6 +81,12 @@
                                class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
                     </label>
                     <label class="flex flex-col gap-1">
+                        <span class="text-[10px] uppercase tracking-wide text-slate-400">Holding window (hrs)</span>
+                        <input id="fHold" type="number" step="0.25" min="0"
+                               title="How long you actually plan to hold, in hours. Defaults to time left until 15:15 IST today (6.25h when the market is closed)."
+                               class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                    </label>
+                    <label class="flex flex-col gap-1">
                         <span class="text-[10px] uppercase tracking-wide text-slate-400">Strike interval</span>
                         <input id="fInterval" type="number" step="5" value="50"
                                class="num bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
@@ -258,6 +264,7 @@
                 spot: numOrNull($("fSpot").value),
                 iv: numOrNull($("fIv").value),
                 days: numOrNull($("fDays").value),
+                holdHours: numOrNull($("fHold").value),
                 interval: numOrNull($("fInterval").value) || 50,
                 type: TYPE,
                 strike: numOrNull($("fStrike").value),
@@ -326,6 +333,14 @@
             const d = Math.max(Math.abs(delta != null ? delta : 0.5), 0.05);
             const move = premium * pct / d;
             return (TYPE === "CE" ? spot - move : spot + move).toFixed(1);
+        }
+
+        // Mirror of slForPremiumLoss but for the FAVORABLE direction (option gains value).
+        // Plan default: SL = 20% premium loss, target = 40% premium gain (~2:1 in premium terms).
+        function targetForPremiumGain(spot, premium, delta, pct) {
+            const d = Math.max(Math.abs(delta != null ? delta : 0.5), 0.05);
+            const move = premium * pct / d;
+            return (TYPE === "CE" ? spot + move : spot - move).toFixed(1);
         }
 
         function renderChain() {
@@ -477,8 +492,10 @@
                 delta = M.bsGreeks({ spot: t.spot, strike: Number(strike), iv: t.iv,
                                      tYears: t.days / 365, type: leg }).delta;
             }
-            if (t.spot != null && prem != null)
+            if (t.spot != null && prem != null) {
                 $("fSl").value = slForPremiumLoss(t.spot, Number(prem), delta, 0.2);
+                $("fTarget").value = targetForPremiumGain(t.spot, Number(prem), delta, 0.4);
+            }
             [...document.querySelectorAll(".chain-row")].forEach((r) =>
                 r.classList.toggle("sel", Number(r.dataset.strike) === Number(strike)));
             recompute();
@@ -490,6 +507,27 @@
             warn: "border-amber-500/40 bg-amber-900/40 text-amber-300",
             bad:  "border-rose-500/40 bg-rose-900/40 text-rose-300"
         };
+
+        // B1/B2: pull the parity-forward inputs (ATM CE/PE ltps) plus the picked
+        // leg's market IV & greeks straight from the live chain — but only when
+        // the chain actually matches the current symbol/spot, else assess()
+        // falls back to manual IV + BS internally.
+        function chainMarketArgs(t) {
+            if (!chainMatchesLive(t)) return {};
+            const atm = LIVE_CHAIN.strikes.reduce((best, s) =>
+                Math.abs(s.strike - t.spot) < Math.abs(best.strike - t.spot) ? s : best, LIVE_CHAIN.strikes[0]);
+            const row = t.strike != null
+                ? LIVE_CHAIN.strikes.find((s) => Number(s.strike) === Number(t.strike)) : null;
+            const leg = row ? (t.type === "PE" ? row.pe : row.ce) : null;
+            const out = {
+                atmStrike: atm.strike,
+                atmCallLtp: atm.ce ? atm.ce.ltp : null,
+                atmPutLtp: atm.pe ? atm.pe.ltp : null
+            };
+            if (leg && leg.iv != null && leg.iv > 0) out.marketIv = leg.iv;
+            if (leg) out.marketGreeks = { delta: leg.delta, gamma: leg.gamma, theta: leg.theta, vega: leg.vega };
+            return out;
+        }
 
         function renderVerdict(t) {
             const badge = $("verdictBadge");
@@ -505,10 +543,16 @@
                 grid.innerHTML = "";
                 return null;
             }
+            const mkt = chainMarketArgs(t);
             const a = M.assess({
                 spot: t.spot, strike: t.strike, type: t.type, iv: t.iv, days: t.days,
                 premium: t.premium, slUnderlying: t.slUnderlying,
-                targetUnderlying: t.targetUnderlying, lotSize: t.lotSize, lots: t.lots
+                targetUnderlying: t.targetUnderlying, lotSize: t.lotSize, lots: t.lots,
+                // B3: holding window in DAYS; null → assess() holds to expiry.
+                horizonDays: t.holdHours != null ? t.holdHours / 24 : null,
+                // B1/B2: live-chain market data (all undefined when no chain matches).
+                atmStrike: mkt.atmStrike, atmCallLtp: mkt.atmCallLtp, atmPutLtp: mkt.atmPutLtp,
+                marketIv: mkt.marketIv, marketGreeks: mkt.marketGreeks
             });
             badge.textContent = a.verdict;
             badge.className = "px-3 py-1 text-sm font-bold rounded-md border " + (toneBadge[a.tone] || toneBadge.warn);
@@ -531,7 +575,11 @@
                 cell("Δ delta", fmt(m.delta, 2)) +
                 cell("Θ/day", "₹" + fmt0(m.thetaPerDay), "text-rose-300") +
                 cell("Breakeven", fmt(m.breakeven, 0)) +
-                cell("±1σ move", fmt(m.expectedMove, 0) + " pt");
+                cell("±1σ move", fmt(m.expectedMove, 0) + " pt") +
+                cell("Forward", fmt(m.forward, 0) + " · " + (m.forwardSource === "parity" ? "parity" : "spot·eʳᵀ"),
+                    m.forwardSource === "parity" ? "text-emerald-300" : "text-slate-100") +
+                cell("IV / greeks", mkt.marketIv != null ? "chain" : "manual · BS",
+                    mkt.marketIv != null ? "text-emerald-300" : "text-slate-100");
             return a;
         }
 
@@ -681,9 +729,21 @@
             }
         }
 
+        // B3: default holding window = time left until the 15:15 IST square-off
+        // today; 6.25h (a full 09:15→15:15 session) when the market is closed
+        // or it's a weekend. User-editable after.
+        function defaultHoldHours() {
+            const now = new Date();
+            const ist = new Date(now.getTime() + (330 + now.getTimezoneOffset()) * 60000);
+            const open = 9 * 60 + 15, close = 15 * 60 + 15;
+            const mins = ist.getHours() * 60 + ist.getMinutes();
+            if (ist.getDay() === 0 || ist.getDay() === 6 || mins <= open || mins >= close) return 6.25;
+            return Math.max(Math.round((close - mins) / 60 * 4) / 4, 0.25); // quarter-hour steps
+        }
+
         function wire() {
             setType("CE");
-            ["fSymbol","fSpot","fIv","fDays","fInterval","fStrike","fPremium","fSl","fTarget","fLotSize","fLots"]
+            ["fSymbol","fSpot","fIv","fDays","fInterval","fStrike","fPremium","fSl","fTarget","fLotSize","fLots","fHold"]
                 .forEach((id) => $(id).addEventListener("input", () => {
                     if (["fSpot","fIv","fDays","fInterval"].includes(id)) renderChain();
                     recompute();
@@ -741,6 +801,7 @@
         document.addEventListener("DOMContentLoaded", function () {
             if (!M) { document.body.innerHTML = '<p class="p-8 text-rose-400">OptionsMath failed to load (scripts/options_math.js).</p>'; return; }
             wire();
+            $("fHold").value = defaultHoldHours();  // B3: pre-fill the holding window
             loadSymbols();      // fills the symbol datalist (fire-and-forget)
             renderChain();
             autofillPremium();
