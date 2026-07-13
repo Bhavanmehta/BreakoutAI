@@ -187,6 +187,7 @@ def collect_events(watchlist: dict):
                 analog_worked = analog_sim = np.nan
                 rs_cofire = bool(ev.get("is_breakout_e2", False))
                 d_cofire = bool(ev.get("is_breakout_d", False))
+                l_cofire = bool(ev.get("is_sb_deep_base", False))
                 if is_method_a:
                     a = detect_analog(feat.iloc[: idx + 1])
                     if a is not None:
@@ -217,6 +218,7 @@ def collect_events(watchlist: dict):
                     "pattern": pattern["name"],
                     "rs_cofire": rs_cofire,
                     "d_cofire": d_cofire,
+                    "l_cofire": l_cofire,
                     "analog_worked": analog_worked,
                     "analog_sim": analog_sim,
                     "score_g": float(ev["pre_breakout_score_g"]) if "pre_breakout_score_g" in ev.index and pd.notna(ev["pre_breakout_score_g"]) else np.nan,
@@ -395,6 +397,10 @@ def test_score(df_all: pd.DataFrame, method: str = "A_donchian_minervini", secti
         "rel(0.6)+depth(0.25)+method(0.15) [shipped default]": df.apply(
             lambda r: breakout_quality(r["rel_est"], r["base_depth_pct"],
                                        bool(r["rs_cofire"]), bool(r["d_cofire"])), axis=1),
+        "rel(0.6)+depth(0.25)+method(0.15)+l_cofire [with Method L]": df.apply(
+            lambda r: breakout_quality(r["rel_est"], r["base_depth_pct"],
+                                       bool(r["rs_cofire"]), bool(r["d_cofire"]),
+                                       bool(r["l_cofire"])), axis=1),
     }
     for name, col in candidates.items():
         tmp = df.assign(_score=col)

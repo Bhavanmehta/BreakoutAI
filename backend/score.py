@@ -11,9 +11,15 @@ block; India numbers in CLAUDE.md's reliability section, US replay 2026-07-05 on
     smaller US weight.
   * base depth — robust in both markets (India p<0.001, 41% vs 35%; US the strongest
     feature, 14.6% shallow vs 39.1% deep, p<0.001), hence the larger US weight.
-  * method confirmation — India only (E2/D both beat its baseline). In the US this
+  * method confirmation — India only (E2/D/L all beat baseline). In the US this
     term is weighted 0: D co-fire measured -12.2pt HARMFUL (p=0.002, n=130) and E2
     co-fire's +9.5pt lift is already captured by depth+reliability in the blend.
+    L (Method L / is_sb_deep_base, a deep-base squeeze-breakout tier) was checked
+    the same way 2026-07-12 on 9,581 whole-market-cached Method-A events: +6.5pt
+    lift, 44.4% vs 37.9%, p<0.001, n_on=1637 -- the only one of I/J/K/L that
+    cleared significance (I +1.6pt p=0.15 n=2705; J -0.5pt p=0.68 n=2386; K +2.8pt
+    p=0.15 n=667 -- none distinguishable from noise at this sample size), so only
+    L was wired in; see backend/_scratch_ijkl_cofire.py for the replay.
 
 Deliberately NOT used: ADX, volume-surge magnitude, named chart patterns (all shown
 non-predictive in both markets), vol_contraction (direction flips between markets;
@@ -67,7 +73,7 @@ def _depth_component(base_depth_pct: float | None) -> float:
 
 
 def breakout_quality(rel_est: float, base_depth_pct: float | None,
-                     rs_on: bool = False, d_on: bool = False,
+                     rs_on: bool = False, d_on: bool = False, l_on: bool = False,
                      w_rel: float = settings.SCORE_W_REL,
                      w_depth: float = settings.SCORE_W_DEPTH,
                      w_method: float = settings.SCORE_W_METHOD) -> float:
@@ -75,9 +81,14 @@ def breakout_quality(rel_est: float, base_depth_pct: float | None,
     probability — a monotone quality rank (higher = historically more likely to follow
     through). Weights default to the active market's backtest-chosen values (settings'
     score-calibration block); the same function is replayed in analyze_reliability.py
-    to confirm they stratify follow-through."""
+    to confirm they stratify follow-through.
+
+    method sub-weights (0.5 / 0.5 / 0.25, capped at 1.0) are NOT independently
+    settings-tunable — they were fixed by the one-off replays in
+    backend/_scratch_ijkl_cofire.py (l_on 2026-07-12) and CLAUDE.md's reliability
+    section (rs_on/d_on 2026-07-04), same as the top-level w_method being 0 for US."""
     depth = _depth_component(base_depth_pct)
-    method = (0.5 if rs_on else 0.0) + (0.5 if d_on else 0.0)
+    method = min(1.0, (0.5 if rs_on else 0.0) + (0.5 if d_on else 0.0) + (0.25 if l_on else 0.0))
     return w_rel * rel_est + w_depth * depth + w_method * method
 
 
@@ -92,13 +103,13 @@ _IMMINENCE = {"breaking": 1.0, "high": 0.8, "medium_watch": 0.55, "medium": 0.4,
 
 
 def conviction(rel_est: float, base_depth_pct: float | None, imminence_key: str,
-               rs_on: bool = False, d_on: bool = False) -> int:
+               rs_on: bool = False, d_on: bool = False, l_on: bool = False) -> int:
     """A single 0..100 the UI ranks on: blends how imminent the setup is (readiness
     tier) with how reliable it is if it triggers (validated quality). Reliability-
     weighted enough that a primed-but-flaky stock ranks below a primed-and-proven one,
     but imminence still matters so a coiling name doesn't outrank a breaking one on
     reliability alone."""
-    q = breakout_quality(rel_est, base_depth_pct, rs_on, d_on)
+    q = breakout_quality(rel_est, base_depth_pct, rs_on, d_on, l_on)
     q_norm = min(max((q - _Q_LO) / (_Q_HI - _Q_LO), 0.0), 1.0)
     imm = _IMMINENCE.get(imminence_key, 0.15)
     return round(100 * (0.55 * imm + 0.45 * q_norm))

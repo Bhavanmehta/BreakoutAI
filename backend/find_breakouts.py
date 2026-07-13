@@ -324,6 +324,11 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     coiling = (vc is not None and vc < 1)
     near = (dist_pct is not None and 0 <= dist_pct <= 3)   # within 3% below resistance
     rs_breakout_today = bool(latest.get("is_breakout_e2", False))
+    # Method L (deep-base squeeze-breakout tier) co-firing today. Validated
+    # standalone 2026-07-12 (see score.py's docstring / _scratch_ijkl_cofire.py):
+    # +6.5pt follow-through lift, p<0.001 -- feeds breakout_quality()'s method
+    # term below, same as rs_breakout_today, but doesn't get its own readiness tier.
+    l_breakout_today = bool(latest.get("is_sb_deep_base", False))
     if broke_out_today:
         readiness = {"label": "Breaking out now", "watch": True, "score": "high"}
     elif not in_uptrend:
@@ -410,7 +415,7 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
                      if readiness["signal"] == "relative_strength"
                      else reliability_estimate(worked_a, total_a))
     readiness["conviction"] = conviction(rel_for_score, base_depth, imminence,
-                                         rs_on=rs_breakout_today)
+                                         rs_on=rs_breakout_today, l_on=l_breakout_today)
 
     # Rank floors, not probabilities: held-out hit rates are 52% (tier 1) and 46%
     # (tier 2) vs 43% for the score's own top decile — a badge stock must outrank

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What Changed: The Method-L Update, Explained</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2c; --panel2:#0f172a; --border:#1e293b;
+    --text:#e2e8f0; --sub:#94a3b8; --muted:#64748b;
+    --amber:#f59e0b; --amber-soft:#fbbf2433;
+    --green:#34d399; --green-soft:#34d39922;
+    --red:#f87171; --red-soft:#f8717122;
+    --blue:#60a5fa; --blue-soft:#60a5fa22;
+    --purple:#c084fc;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:radial-gradient(1200px 600px at 20% -10%, #14203a 0%, var(--bg) 55%) fixed;
+    color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:32px 20px 100px;}
+  header.hero{
+    text-align:center; padding:56px 20px 40px; border-bottom:1px solid var(--border);
+    margin-bottom:40px;
+  }
+  header.hero .eyebrow{
+    display:inline-block; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--amber); background:var(--amber-soft); border:1px solid #f59e0b55;
+    padding:5px 12px; border-radius:999px; margin-bottom:18px; font-weight:600;
+  }
+  header.hero h1{
+    font-size:clamp(28px,4.4vw,42px); margin:0 0 14px; font-weight:800; letter-spacing:-0.02em;
+    background:linear-gradient(135deg,#fff,#94a3b8); -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  header.hero p.sub{color:var(--sub); font-size:16px; max-width:640px; margin:0 auto;}
+  .tldr{
+    background:linear-gradient(135deg,#152036,#0f1729); border:1px solid var(--border);
+    border-left:4px solid var(--amber); border-radius:14px; padding:22px 24px; margin-top:28px;
+    text-align:left; font-size:15px; color:#cbd5e1;
+  }
+  .tldr b{color:#fff;}
+  section{margin:56px 0;}
+  .section-head{display:flex; align-items:baseline; gap:12px; margin-bottom:8px;}
+  .section-num{
+    font-size:13px; font-weight:800; color:var(--amber); background:var(--amber-soft);
+    border:1px solid #f59e0b40; border-radius:8px; padding:2px 9px; flex:none;
+  }
+  h2{font-size:24px; margin:0; font-weight:800; letter-spacing:-0.01em;}
+  .section-intro{color:var(--sub); margin:10px 0 22px; font-size:15px; max-width:760px;}
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:22px;
+  }
+  .grid{display:grid; gap:16px;}
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-3{grid-template-columns:repeat(3,1fr);}
+  .grid-4{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:760px){ .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;} }
+
+  .term{
+    background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:16px 18px;
+  }
+  .term .icon{font-size:20px; margin-bottom:6px; display:block;}
+  .term h4{margin:0 0 6px; font-size:14px; color:#fff;}
+  .term p{margin:0; font-size:13px; color:var(--sub);}
+
+  .ingredient{
+    background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:18px;
+    position:relative; overflow:hidden;
+  }
+  .ingredient .weight-tag{
+    position:absolute; top:14px; right:14px; font-size:11px; font-weight:800; color:var(--bg);
+    background:var(--amber); padding:3px 9px; border-radius:999px;
+  }
+  .ingredient h4{margin:0 0 8px; font-size:15px; color:#fff; padding-right:70px;}
+  .ingredient p{margin:0; font-size:13px; color:var(--sub);}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th,td{padding:11px 12px; text-align:left; border-bottom:1px solid var(--border);}
+  th{color:var(--sub); font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;}
+  tr:last-child td{border-bottom:none;}
+  .pill{
+    display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+    padding:3px 10px; border-radius:999px;
+  }
+  .pill.win{color:var(--green); background:var(--green-soft); border:1px solid #34d39955;}
+  .pill.lose{color:var(--muted); background:#33415522; border:1px solid var(--border);}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+
+  .barrow{display:flex; align-items:center; gap:10px; margin:10px 0;}
+  .barrow .label{width:190px; flex:none; font-size:12.5px; color:var(--sub);}
+  .barrow .track{flex:1; height:10px; background:#1e293b; border-radius:999px; overflow:hidden;}
+  .barrow .fill{height:100%; border-radius:999px;}
+  .barrow .val{width:44px; flex:none; text-align:right; font-size:12.5px; font-weight:700; color:#fff;}
+
+  .formula-box{
+    background:#0a0f1c; border:1px solid var(--border); border-radius:12px; padding:18px 20px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13.5px; color:#e2e8f0;
+    overflow-x:auto; white-space:pre;
+  }
+  .formula-box .old{color:#f87171;}
+  .formula-box .new{color:#34d399;}
+  .formula-box .comment{color:#64748b;}
+
+  .vs-wrap{display:grid; grid-template-columns:1fr auto 1fr; gap:18px; align-items:stretch;}
+  @media (max-width:700px){ .vs-wrap{grid-template-columns:1fr;} .vs-wrap .arrow{display:none;} }
+  .vs-wrap .arrow{align-self:center; font-size:22px; color:var(--amber);}
+  .before-card, .after-card{
+    border-radius:14px; padding:20px; border:1px solid var(--border);
+  }
+  .before-card{background:#141b2b;}
+  .after-card{background:linear-gradient(135deg,#16241c,#0f1729); border-color:#34d39944;}
+  .tag{display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:3px 9px; border-radius:6px; margin-bottom:12px;}
+  .tag.before{color:#94a3b8; background:#1e293b;}
+  .tag.after{color:#34d399; background:#34d39922;}
+
+  /* mock stock card */
+  .stock-card{
+    background:#0f1729; border:1px solid var(--border); border-radius:12px; padding:16px 18px;
+  }
+  .stock-card .row1{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .stock-card .sym{font-weight:800; font-size:15px; color:#fff;}
+  .stock-card .setup{font-size:11.5px; color:var(--sub);}
+  .conv-badge{
+    font-size:20px; font-weight:800; padding:4px 12px; border-radius:10px;
+  }
+  .conv-badge.before{color:#cbd5e1; background:#1e293b;}
+  .conv-badge.after{color:#052e1f; background:var(--green);}
+  .chip-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .chip{font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid var(--border); color:var(--sub);}
+  .chip.on{color:var(--green); border-color:#34d39955; background:var(--green-soft);}
+  .chip.new-on{color:var(--amber); border-color:#f59e0b55; background:var(--amber-soft); font-weight:700;}
+
+  .callout{
+    border-radius:12px; padding:14px 16px; font-size:13.5px; border:1px solid; margin-top:14px;
+  }
+  .callout.info{border-color:#60a5fa44; background:#60a5fa14; color:#bfdbfe;}
+  .callout.warn{border-color:#f59e0b44; background:#f59e0b14; color:#fde68a;}
+  .callout.ok{border-color:#34d39944; background:#34d39914; color:#bbf7d0;}
+
+  ul.clean{margin:0; padding-left:20px; color:var(--sub); font-size:13.5px;}
+  ul.clean li{margin-bottom:6px;}
+
+  .foot{
+    margin-top:70px; padding-top:24px; border-top:1px solid var(--border);
+    color:var(--muted); font-size:12.5px; text-align:center;
+  }
+  code.inline{background:#1e293b; padding:1px 6px; border-radius:5px; font-size:12px; color:#e2e8f0;}
+  .badge-not{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--sub);
+    background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:8px 12px;
+  }
+  .badge-not .x{color:var(--red); font-weight:800;}
+  .toc{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:22px;}
+  .toc a{
+    font-size:12.5px; color:var(--sub); text-decoration:none; border:1px solid var(--border);
+    padding:6px 12px; border-radius:999px; background:var(--panel2);
+  }
+  .toc a:hover{color:#fff; border-color:#475569;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="eyebrow">Backend change · 2026‑07‑12</span>
+    <h1>What we changed, and why it matters</h1>
+    <p class="sub">A plain-English walkthrough of the "Method L" update to the breakout scanner's <b>conviction score</b> — written for someone who doesn't (yet) know a base depth from a breakout.</p>
+    <div class="tldr">
+      <b>TL;DR —</b> The scanner already ranks stocks with a single 0–100 <b>conviction score</b> built from three ingredients: (1) how reliably a stock's past breakouts followed through, (2) how deep its price base was, and (3) whether other independent breakout signals fired on the same day ("confirmation"). We tested <b>four new candidate confirmation signals</b> (nicknamed I, J, K, L) to see if any of them predicted better follow-through. <b>Three didn't hold up statistically</b> and were discarded. <b>One — "Method L", a deep-base + volatility-squeeze pattern — did</b> (a real, statistically significant lift), so it's now wired into the conviction score as a third confirmation input. Nothing about the screen's <i>layout</i> changed — no new badge or column — only the ranking math for a subset of stocks got slightly smarter, and <b>only in the India market</b> (the US side ignores confirmation signals entirely, for reasons explained below).
+    </div>
+    <div class="toc">
+      <a href="#beginner">1 · Beginner primer</a>
+      <a href="#before">2 · How it worked before</a>
+      <a href="#experiment">3 · The experiment (I/J/K/L)</a>
+      <a href="#after">4 · What we added</a>
+      <a href="#ui">5 · Before vs after, on screen</a>
+      <a href="#rejected">6 · What we deliberately didn't add</a>
+      <a href="#glossary">7 · Glossary</a>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <section id="beginner">
+    <div class="section-head"><span class="section-num">1</span><h2>Stock-market beginner primer</h2></div>
+    <p class="section-intro">Before the "before vs after," here's what the scanner is even looking at. Six ideas cover almost everything below.</p>
+    <div class="grid grid-3">
+      <div class="term"><span class="icon">📈</span><h4>Breakout</h4><p>A stock pushes above a price ceiling ("resistance") it had struggled to clear before — often on above-average volume. The bet: if it clears the ceiling convincingly, it tends to keep climbing.</p></div>
+      <div class="term"><span class="icon">🧱</span><h4>Base</h4><p>The sideways, range-bound period <i>before</i> a breakout — price "resting" under resistance while buyers and sellers fight it out. A <b>deep base</b> (a bigger up‑and‑down range beforehand) has historically led to stronger breakouts than a shallow, tight one.</p></div>
+      <div class="term"><span class="icon">🚧</span><h4>Resistance</h4><p>A price level a stock has bounced off before — think of it as a ceiling. Breaking through it is the whole premise of a "breakout" trade.</p></div>
+      <div class="term"><span class="icon">✅</span><h4>Follow-through</h4><p>Did the breakout actually keep working afterward, or did it fizzle/reverse? This is the thing we're ultimately trying to predict — measured here as "did it move +1R (a defined risk unit) before hitting its stop, within a set window."</p></div>
+      <div class="term"><span class="icon">🎯</span><h4>Conviction score (0–100)</h4><p>One number the app ranks every stock by. Higher = "this setup is both close to firing <i>and</i> has a track record / features that historically follow through." It is <b>not</b> a probability — it's a ranking.</p></div>
+      <div class="term"><span class="icon">🤝</span><h4>Confirmation / "co-fire"</h4><p>The scanner runs several independent breakout-detection methods (nicknamed A, D, E2, L…) side by side. When the main method (A) breaks out <i>and</i> a second, independent method agrees on the very same day, that agreement is called a "co-fire" — like getting a second doctor's opinion that matches the first.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="before">
+    <div class="section-head"><span class="section-num">2</span><h2>How the conviction score worked before this change</h2></div>
+    <p class="section-intro">Nothing about breakout <i>detection</i> itself changed — a stock still needs to actually break out (Method A) to show up as a candidate. What changed is the <b>quality/ranking math</b> layered on top, called <code class="inline">breakout_quality()</code>. It already blended three validated ingredients:</p>
+    <div class="grid grid-3">
+      <div class="ingredient"><span class="weight-tag">60%</span>
+        <h4>① Track-record reliability</h4>
+        <p>Out of this stock's own past breakouts, how many actually followed through? A stock with zero history isn't punished (it starts at the market's overall average, ~39% in India), and one single failed breakout barely moves the needle — you need several data points before the score gets genuinely cautious.</p>
+      </div>
+      <div class="ingredient"><span class="weight-tag">25%</span>
+        <h4>② Base depth</h4>
+        <p>How deep was the price base beforehand? Backtesting found <b>deeper bases break out more reliably</b> than shallow, tight ones — the opposite of what many beginners assume. An 8%-deep base scores 0; a 50%+-deep base scores close to 1.</p>
+      </div>
+      <div class="ingredient"><span class="weight-tag">15%</span>
+        <h4>③ Method confirmation</h4>
+        <p>Did another independent breakout method <i>also</i> fire today? Before this change, only two were counted: <b>"E2"</b> (a relative-strength breakout vs. the market) worth half credit, and <b>"D"</b> worth the other half. Full credit only if both fired.</p>
+      </div>
+    </div>
+    <div class="callout info" style="margin-top:18px;">
+      <b>Why these three, and not more?</b> Every ingredient here had to survive a statistical test across thousands of historical breakouts before being allowed into the formula — see section 6 for the long list of things that were tried and <i>rejected</i> (chart patterns, volume spikes, ADX, etc.).
+    </div>
+    <div class="formula-box" style="margin-top:18px;">quality = <span class="old">0.60 × reliability</span> + <span class="old">0.25 × base_depth</span> + <span class="old">0.15 × method_confirmation</span>
+<span class="comment">where, before this change:</span>
+method_confirmation = <span class="old">(0.5 if E2 fired today else 0) + (0.5 if D fired today else 0)</span></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="experiment">
+    <div class="section-head"><span class="section-num">3</span><h2>The experiment: could we find a better third opinion?</h2></div>
+    <p class="section-intro">The scanner already runs several other pattern-detection methods behind the scenes that <i>weren't</i> being used for confirmation yet. Four candidates were tested — did stocks that had one of these fire on the same day as the main breakout follow through more often than stocks that didn't? Tested across <b>9,581</b> historical whole-market breakout events.</p>
+    <div class="card">
+      <table>
+        <thead><tr><th>Nickname</th><th>What it detects (plain English)</th><th>Sample size</th><th>Follow-through lift</th><th>Statistically real?</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono">I</td>
+            <td>Price sitting on a high-volume "shelf" from recent trading (volume-profile support)</td>
+            <td>2,705 events</td>
+            <td>+1.6 pts</td>
+            <td><span class="pill lose">✕ No (p = 0.15)</span></td>
+          </tr>
+          <tr>
+            <td class="mono">J</td>
+            <td>A volatility "squeeze" per the TTM-Squeeze indicator (price coiling tightly)</td>
+            <td>2,386 events</td>
+            <td>−0.5 pts</td>
+            <td><span class="pill lose">✕ No (p = 0.68)</span></td>
+          </tr>
+          <tr>
+            <td class="mono">K</td>
+            <td>Price anchored above a volume-weighted average price (VWAP) drawn from a recent swing low</td>
+            <td>667 events</td>
+            <td>+2.8 pts</td>
+            <td><span class="pill lose">✕ No (p = 0.15)</span></td>
+          </tr>
+          <tr style="background:#34d39910;">
+            <td class="mono" style="color:#34d399;">L ★</td>
+            <td><b>Deep price base + volatility squeeze releasing into a breakout</b>, in one combined pattern</td>
+            <td>1,637 events</td>
+            <td style="color:#34d399; font-weight:800;">+6.5 pts (44.4% vs 37.9%)</td>
+            <td><span class="pill win">✓ Yes (p &lt; 0.001)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout warn" style="margin-top:16px;">
+      <b>What does "p-value" mean here, in beginner terms?</b> It's the odds this "lift" was just random noise rather than a real pattern. A common bar in research is <code class="inline">p &lt; 0.05</code> ("less than 5% chance it's a fluke"). I, J, and K all landed around <code class="inline">p ≈ 0.15–0.68</code> — i.e., a coin flip could plausibly explain their results, so they were <b>not</b> reliable enough to trust with real rankings. L landed at <code class="inline">p &lt; 0.001</code> — under a 1-in-1000 chance of being a fluke.
+    </div>
+    <div class="callout info" style="margin-top:12px;">
+      Discarding I, J, and K wasn't a failure — it's exactly the point of testing first. Shipping a signal that <i>looks</i> plausible but doesn't actually predict anything would make the scanner <b>less</b> trustworthy, not more (it'd just be adding noise dressed up as insight).
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="after">
+    <div class="section-head"><span class="section-num">4</span><h2>What we added: Method L joins the formula</h2></div>
+    <p class="section-intro">Method L now counts as a third, partial-credit confirmation signal — worth less than E2/D individually (since it's newer and slightly less powerful), but real.</p>
+    <div class="formula-box">method_confirmation = (0.5 if E2 fired) + (0.5 if D fired) <span class="new">+ (0.25 if L fired)</span><span class="comment">   — capped at 1.0 total</span>
+
+<span class="comment">quality formula itself is unchanged — L just feeds into ingredient ③:</span>
+quality = 0.60 × reliability + 0.25 × base_depth + 0.15 × method_confirmation</div>
+    <div class="callout ok" style="margin-top:14px;">
+      <b>Net effect, measured on the full 9,581-event replay:</b> the gap in follow-through rate between the scanner's <i>best-ranked third</i> of setups and its <i>worst-ranked third</i> widened from <b>+6.1 points to +7.1 points</b> — i.e., the ranking got measurably better at separating good setups from bad ones, without breaking anything that already worked.
+    </div>
+
+    <h3 style="margin:30px 0 12px; font-size:16px;">A worked example (illustrative numbers)</h3>
+    <p class="section-intro" style="margin-top:0;">Take a hypothetical India stock that's breaking out today, with a decent-but-not-amazing 42% personal track record and a fairly deep base — but on this particular day it <i>also</i> happens to trigger Method L. Before this change, that extra agreement was invisible to the score. Now it nudges the score up:</p>
+    <div class="vs-wrap">
+      <div class="before-card">
+        <span class="tag before">Before</span>
+        <div class="barrow"><span class="label">① Reliability (60%)</span><div class="track"><div class="fill" style="width:42%; background:#60a5fa;"></div></div><span class="val">0.42</span></div>
+        <div class="barrow"><span class="label">② Base depth (25%)</span><div class="track"><div class="fill" style="width:52%; background:#c084fc;"></div></div><span class="val">0.52</span></div>
+        <div class="barrow"><span class="label">③ Method confirm. (15%)</span><div class="track"><div class="fill" style="width:0%; background:#64748b;"></div></div><span class="val">0.00</span></div>
+        <p style="margin:14px 0 0; font-size:13px; color:var(--sub);">L fired today, but wasn't counted → no credit for the extra agreement.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="after-card">
+        <span class="tag after">After</span>
+        <div class="barrow"><span class="label">① Reliability (60%)</span><div class="track"><div class="fill" style="width:42%; background:#60a5fa;"></div></div><span class="val">0.42</span></div>
+        <div class="barrow"><span class="label">② Base depth (25%)</span><div class="track"><div class="fill" style="width:52%; background:#c084fc;"></div></div><span class="val">0.52</span></div>
+        <div class="barrow"><span class="label">③ Method confirm. (15%)</span><div class="track"><div class="fill" style="width:25%; background:#34d399;"></div></div><span class="val">0.25</span></div>
+        <p style="margin:14px 0 0; font-size:13px; color:#86efac;">L's agreement now counts → small but real credit.</p>
+      </div>
+    </div>
+    <div class="callout info" style="margin-top:16px;">
+      Running both through the full scoring pipeline (quality → normalize → blend with how imminent the setup is): the stock's <b>conviction score moves from ≈70 to ≈73</b> in this example. Small, deliberate, and only for the subset of stocks where Method L actually fires that day — not a blanket boost.
+    </div>
+    <div class="callout warn" style="margin-top:12px;">
+      <b>India only.</b> In the US market, "method confirmation" is weighted <b>0%</b> in the formula (a separate backtest found the old D-signal was actually <i>harmful</i> there, −12.2 pts). So Method L firing has <b>zero effect</b> on US conviction scores today — it's wired in, but structurally inert until/unless a future US-specific study justifies turning it on.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="ui">
+    <div class="section-head"><span class="section-num">5</span><h2>What actually changes on screen</h2></div>
+    <p class="section-intro">This was a <b>ranking-math-only</b> change — no new UI element, badge, filter, or column was added. The only visible difference is that some stocks' <b>conviction numbers shift by a few points</b>, which can occasionally re-order the list. Here's the same mock stock card, before and after:</p>
+    <div class="vs-wrap">
+      <div class="stock-card" style="border-color:#1e293b;">
+        <div class="row1">
+          <div><div class="sym">RELIANCE</div><div class="setup">Breaking out now</div></div>
+          <div class="conv-badge before">70</div>
+        </div>
+        <div class="chip-row">
+          <span class="chip on">Uptrend</span>
+          <span class="chip on">Deep base</span>
+          <span class="chip">E2 relative-strength: off</span>
+          <span class="chip">D co-fire: off</span>
+          <span class="chip" style="color:#475569;">L co-fire: (not counted yet)</span>
+        </div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="stock-card" style="border-color:#34d39944;">
+        <div class="row1">
+          <div><div class="sym">RELIANCE</div><div class="setup">Breaking out now</div></div>
+          <div class="conv-badge after">73</div>
+        </div>
+        <div class="chip-row">
+          <span class="chip on">Uptrend</span>
+          <span class="chip on">Deep base</span>
+          <span class="chip">E2 relative-strength: off</span>
+          <span class="chip">D co-fire: off</span>
+          <span class="chip new-on">★ L co-fire: on (+credit)</span>
+        </div>
+      </div>
+    </div>
+    <div class="callout info" style="margin-top:18px;">
+      Everything else on the actual scanner page — the setup-type filters, the fundamentals panel, the "why" explanation text, the reliability caution notes, the historical-analog chart, the live hindsight tracking — is <b>untouched</b>. This was purely a backend scoring refinement, not a redesign.
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="rejected">
+    <div class="section-head"><span class="section-num">6</span><h2>What we deliberately did <i>not</i> add (and why)</h2></div>
+    <p class="section-intro">For context, here's the fuller list of things that have been tested against real historical data over time and <b>rejected</b> from the score because they didn't hold up, or actively hurt. This is why the conviction score can be trusted to mean something — everything in it survived a test, and everything here didn't:</p>
+    <div class="grid grid-2">
+      <div class="badge-not"><span class="x">✕</span> <b>ADX</b> (a trend-strength indicator) — not predictive in either market.</div>
+      <div class="badge-not"><span class="x">✕</span> <b>Volume-surge magnitude</b> — how big the volume spike was didn't matter, just whether it happened at all.</div>
+      <div class="badge-not"><span class="x">✕</span> <b>Named chart patterns</b> (cup-and-handle, flags, etc.) — visually appealing, not statistically predictive.</div>
+      <div class="badge-not"><span class="x">✕</span> <b>Volatility contraction</b> — flipped direction between markets; an artifact, not a real signal.</div>
+      <div class="badge-not"><span class="x">✕</span> <b>Broad market regime</b> (index above/below its 200-day average) — tested, no measurable edge.</div>
+      <div class="badge-not"><span class="x">✕</span> <b>"Closest historical analog day"</b> — still shown to users as a soft illustration, but too weak/noisy to feed the ranking math.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="glossary">
+    <div class="section-head"><span class="section-num">7</span><h2>Glossary — every term used above, in one place</h2></div>
+    <div class="card">
+      <table>
+        <tbody>
+          <tr><td style="width:190px;"><b>Method A</b></td><td>The scanner's primary/baseline breakout definition — price clears resistance in an uptrend. This is what actually puts a stock "on the list" in the first place.</td></tr>
+          <tr><td><b>Method D, E2, L…</b></td><td>Alternate, independently-defined breakout/pattern detectors running in parallel to Method A. They don't add new stocks to the list on their own here — they're used as "does this agree with Method A today?" confirmation checks.</td></tr>
+          <tr><td><b>Co-fire / confirmation</b></td><td>Two different detection methods both flagging the same stock on the same day. Historically, agreement between independent methods has predicted stronger follow-through than Method A firing alone.</td></tr>
+          <tr><td><b>Reliability estimate</b></td><td>A stock's own personal breakout track record, statistically smoothed ("Bayesian shrinkage") so that one unlucky failed breakout doesn't unfairly tank its score — it needs a real pattern of failures (3+) before the score gets meaningfully cautious.</td></tr>
+          <tr><td><b>Base depth</b></td><td>How big the price swing was during the sideways "resting" period before the breakout. Counterintuitively, deeper (bigger-range) bases have back-tested as more reliable than shallow ones.</td></tr>
+          <tr><td><b>Imminence</b></td><td>How close/urgent the setup is right now (e.g. "breaking out today" vs. "just starting to coil"). The conviction score blends this with quality — a great-quality setup that's not near triggering yet still ranks below one that's actually breaking today.</td></tr>
+          <tr><td><b>p-value</b></td><td>A statistics term for "how likely is it this result happened by pure chance?" Smaller is stronger evidence of a real effect. p &lt; 0.05 is a common minimum bar; this study used p &lt; 0.001 for Method L.</td></tr>
+          <tr><td><b>Backtest</b></td><td>Running a rule against years of historical price data to see how it would have performed, before trusting it with real decisions today.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    Generated as a plain-English summary of the <span class="mono">l_cofire</span> change to
+    <span class="mono">backend/score.py</span>, <span class="mono">backend/find_breakouts.py</span>, and
+    <span class="mono">backend/analyze_reliability.py</span> in the BreakoutAI repo. Not investment advice —
+    this describes internal ranking methodology only.
+  </div>
+
+</div>
+</body>
+</html>

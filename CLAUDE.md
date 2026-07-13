@@ -175,6 +175,19 @@ A Python pipeline produces all computed data. See `backend/README.md` for detail
   visually de-emphasized (muted gray, not red/green) — it IS weakly predictive (36.7% vs 33.0%,
   p=0.011) but far weaker than the aggregate track record, so it no longer competes visually with
   the validated signal. See `analyze_reliability.py::test_score`/`test_analog_predictiveness`.
+  **method_confirmation itself** blends up to three same-day cross-method co-fires, capped at
+  1.0: `0.5*rs_cofire(E2) + 0.5*d_cofire(D) + 0.25*l_cofire(L, deep-base squeeze-breakout)`.
+  These sub-weights are fixed constants inside `breakout_quality()`, not independently
+  settings-tunable (only the top-level `w_method` varies by market, and is 0 for US so this
+  whole term is inert there). L was added 2026-07-12 after `_scratch_ijkl_cofire.py` tested
+  whether Methods I (volume-profile), J (TTM-squeeze), K (anchored-VWAP), or L co-firing with
+  a Method-A breakout adds predictive lift the same way E2/D already do: only L was significant
+  (+6.5pt hit-rate lift, p<0.001, whole IN market, no lookahead) — I/J/K showed no significant
+  difference (p>0.05), so they were dropped rather than shipped as noise. Replaying the full
+  composite (`analyze_reliability.py::test_score`, Method-A population) with L added widens the
+  top-vs-bottom-tertile spread from +6.1pts to +7.1pts (both p=0.000); K/I did not generalize
+  when tested as method-confirmation inputs on their own event populations either, confirming
+  they don't belong in the blend.
 - **US-only high-conviction tiers** (`readiness.signal` = `"high_conviction"` / `"strong_breakout"`,
   gated by `settings.HC_ENABLED = MARKET == "US"`): a disciplined precision search (point-in-time
   trader features — closing range, cross-sectional RS percentile, breadth, base tightness/age, $
