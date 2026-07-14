@@ -33,6 +33,7 @@ from __future__ import annotations
 import datetime as dt
 import importlib.util
 import json
+import math
 import statistics
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -252,6 +253,10 @@ def _classify_regime(feat: dict, move_pct: float | None, dte: int) -> dict:
     else:
         oi_state = "SHORT_BUILD_UP" if d_oi > 0 else "LONG_UNWINDING"
 
+    if dte <= 0:
+        reasons.append("expiry day (0DTE): theta decay is extreme and pin risk is high -- "
+                       "premium selling favored; long premium is a scalp, not a hold")
+
     return {"label": label, "oi_state": oi_state, "confidence": conf, "reasons": reasons}
 
 
@@ -314,10 +319,18 @@ def _buy_view(strikes: list[dict], feat: dict, regime: dict) -> dict:
 
 
 # --- sell view ----------------------------------------------------------------------
-def _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source) -> dict:
+# Condor ladder shown side-by-side: (label, target short delta). Wing is the
+# config default for all three; the frontend slider overrides both live.
+CONDOR_PRESETS = (("Wide", 0.10), ("Balanced", 0.20), ("Tight", 0.30))
+
+
+def _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source, feat) -> dict:
     cfg, b76, strat = _ic_modules()
+    atm_iv = feat.get("atm_iv")
+    interval = feat.get("interval")
     notes = ["F approximated by cash spot (condor book prices off NIFTY FUT)",
              f"wing width {cfg.WING_WIDTH} pts (NIFTY-tuned)",
+             f"POP is Black-76 model estimate at ATM IV {atm_iv}% -- not a guarantee",
              "margin is the flat paper estimate, NOT broker-confirmed"]
 
     gate_reasons, gate_ok = [], True
@@ -341,8 +354,8 @@ def _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source
     if symbol not in SYMBOL_MAP:
         return {"gate": {"ok": False, "reasons": ["sell engine is index-tuned in v1; "
                                                   "stock condors not supported"]},
-                "condor": {"ok": False, "reason": "index-only in v1"},
-                "butterfly": {"ok": False, "reason": "index-only in v1"}, "notes": notes}
+                "presets": [], "butterfly": {"ok": False, "reason": "index-only in v1"},
+                "slim_chain": [], "chain_meta": None, "notes": notes}
 
     calls, puts = {}, {}
     for s in strikes:
@@ -358,30 +371,66 @@ def _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source
     if not lot_size:
         notes.append(f"live lot size unavailable -- using config LOT_SIZE={cfg.LOT_SIZE} (VERIFY)")
 
-    def pack(spec, why):
+    def pop(be_lo, be_hi):
+        """Black-76 lognormal P(be_lo < F_T < be_hi) at a single ATM-IV vol.
+        P(F_T < K) = N(-d2(K)); POP is the difference across the two breakevens."""
+        sig = (atm_iv or 0.0) / 100.0
+        if not (spot and be_lo and be_hi) or sig <= 0 or T <= 0:
+            return None
+        root = sig * math.sqrt(T)
+        def p_below(K):
+            return b76.N(-((math.log(spot / K) - 0.5 * sig * sig * T) / root))
+        return _rnd(max(0.0, min(1.0, p_below(be_hi) - p_below(be_lo))), 3)
+
+    def pack(spec, why, name, target_delta, wing):
+        base = {"name": name, "short_delta_target": target_delta, "wing": wing}
         if spec is None:
-            return {"ok": False, "reason": why}
+            return {**base, "ok": False, "reason": why}
         credit = spec.net_credit
-        max_loss_pts = cfg.WING_WIDTH - credit
-        return {"ok": True,
+        max_loss_pts = wing - credit
+        be_lo, be_hi = spec.short_put_k - credit, spec.short_call_k + credit
+        return {**base, "ok": True,
                 "short_call_k": spec.short_call_k, "long_call_k": spec.long_call_k,
                 "short_put_k": spec.short_put_k, "long_put_k": spec.long_put_k,
                 "net_credit_pts": _rnd(credit), "credit_rupees": _rnd(credit * lot, 0),
-                "max_loss_rupees": _rnd(max_loss_pts * lot, 0),
-                "breakeven_low": _rnd(spec.short_put_k - credit),
-                "breakeven_high": _rnd(spec.short_call_k + credit),
+                "max_loss_pts": _rnd(max_loss_pts), "max_loss_rupees": _rnd(max_loss_pts * lot, 0),
+                "breakeven_low": _rnd(be_lo), "breakeven_high": _rnd(be_hi),
+                "pop": pop(be_lo, be_hi),
                 "short_call_delta": _rnd(spec.short_call_delta, 3),
                 "short_put_delta": _rnd(spec.short_put_delta, 3),
                 "lots": 1, "margin_rupees": cfg.MARGIN_PER_LOT_PAPER,
                 "margin_source": "estimated",
                 "reward_risk": _rnd(credit / max_loss_pts, 2) if max_loss_pts > 0 else None}
 
-    # Delta-anchored (spot passed for both OR bounds -- see select_condor docstring).
-    condor_spec, condor_why = strat.select_condor(chain, spot, spot, spot, T, cfg.RISK_FREE_RATE)
+    # Ladder of delta-anchored condors (spot for both OR bounds -> centered on
+    # spot); min_credit=0 so a thin preset still renders for comparison -- the
+    # gate above, not the credit floor, governs whether to act.
+    presets = []
+    for name, td in CONDOR_PRESETS:
+        spec, why = strat.select_condor_at(chain, spot, spot, spot, T,
+                                           cfg.RISK_FREE_RATE, td, cfg.WING_WIDTH, min_credit=0)
+        presets.append(pack(spec, why, name, td, cfg.WING_WIDTH))
     fly_spec, fly_why = strat.select_butterfly(chain, spot, spot, spot, T, cfg.RISK_FREE_RATE)
+
+    # Slim chain (strikes within ~8% of spot with quotes) for the client-side
+    # delta/wing slider -- it recomputes strikes/credit/POP without a round-trip.
+    slim = []
+    for s in strikes:
+        if abs(s["strike"] - spot) > 0.08 * spot:
+            continue
+        ce_ltp, ce_d = _f(s["ce"].get("ltp")), _f(s["ce"].get("delta"))
+        pe_ltp, pe_d = _f(s["pe"].get("ltp")), _f(s["pe"].get("delta"))
+        if ce_ltp is None and pe_ltp is None:
+            continue
+        slim.append({"k": s["strike"], "ce_ltp": _rnd(ce_ltp), "ce_delta": _rnd(ce_d, 3),
+                     "pe_ltp": _rnd(pe_ltp), "pe_delta": _rnd(pe_d, 3)})
+
+    meta = {"spot": spot, "T": T, "atm_iv": atm_iv, "interval": interval,
+            "wing_default": cfg.WING_WIDTH, "lot": lot, "min_credit": cfg.MIN_CREDIT_PTS}
     return {"gate": {"ok": gate_ok, "reasons": gate_reasons},
-            "condor": pack(condor_spec, condor_why),
-            "butterfly": pack(fly_spec, fly_why), "notes": notes}
+            "presets": presets,
+            "butterfly": pack(fly_spec, fly_why, "Butterfly", None, cfg.WING_WIDTH),
+            "slim_chain": slim, "chain_meta": meta, "notes": notes}
 
 
 # --- orchestration --------------------------------------------------------------------
@@ -409,11 +458,12 @@ def build_platform_view(symbol: str, expiry: str | None = None) -> dict:
     feat = _compute_features(strikes, spot, expiry)
     regime = _classify_regime(feat, move_pct, dte)
     buy = _buy_view(strikes, feat, regime)
-    sell = _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source)
+    sell = _sell_view(strikes, spot, expiry, symbol, lot_size, regime, move_pct, source, feat)
 
     out = {"source": source, "symbol": symbol, "expiry": expiry, "expiries": expiries,
            "spot": spot, "lot_size": lot_size, "prev_close": _rnd(prev_close),
-           "move_pct": move_pct, "generated_at": now.isoformat(timespec="seconds"),
+           "move_pct": move_pct, "dte": dte, "expiry_day": dte <= 0,
+           "generated_at": now.isoformat(timespec="seconds"),
            "mode": "paper",
            "features": {k: v for k, v in feat.items() if not k.startswith("_")},
            "regime": regime, "buy": buy, "sell": sell}

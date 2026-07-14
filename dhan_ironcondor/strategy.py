@@ -79,32 +79,33 @@ def late_entry_ok(
     return True, f"late entry ok: move {move_pct:.2f}% within {max_move_pct:g}%"
 
 
-def select_condor(
-    chain: OptionChain, or_high: float, or_low: float, F: float, T: float, r: float
+def select_condor_at(
+    chain: OptionChain, or_high: float, or_low: float, F: float, T: float, r: float,
+    target_short_delta: float, wing_width: float, min_credit: float = MIN_CREDIT_PTS,
 ) -> tuple[Optional[CondorSpec], str]:
-    """Scan for the first call >= or_high and put <= or_low whose |delta| is at
-    or below TARGET_SHORT_DELTA. Pass the OR high/low for OR-breakout entry, or
-    spot for both bounds to get a pure delta-anchored condor centered on spot."""
+    """select_condor with the short-delta target, wing width and min-credit floor
+    passed in, so one chain can be swept into a ladder of (delta, wing) presets.
+    select_condor is this called with the config defaults."""
     short_call_k = short_call_delta = None
     for k in sorted(k for k in chain.calls if k >= or_high):
         d = delta(F, k, chain.calls[k].iv, T, r, "CALL")
-        if d <= TARGET_SHORT_DELTA:
+        if d <= target_short_delta:
             short_call_k, short_call_delta = k, d
             break
     if short_call_k is None:
-        return None, f"no call strike >= {or_high:g} with delta <= TARGET_SHORT_DELTA"
+        return None, f"no call strike >= {or_high:g} with delta <= {target_short_delta:g}"
 
     short_put_k = short_put_delta = None
     for k in sorted((k for k in chain.puts if k <= or_low), reverse=True):
         d = delta(F, k, chain.puts[k].iv, T, r, "PUT")
-        if abs(d) <= TARGET_SHORT_DELTA:
+        if abs(d) <= target_short_delta:
             short_put_k, short_put_delta = k, d
             break
     if short_put_k is None:
-        return None, f"no put strike <= {or_low:g} with |delta| <= TARGET_SHORT_DELTA"
+        return None, f"no put strike <= {or_low:g} with |delta| <= {target_short_delta:g}"
 
-    long_call_k = short_call_k + WING_WIDTH
-    long_put_k = short_put_k - WING_WIDTH
+    long_call_k = short_call_k + wing_width
+    long_put_k = short_put_k - wing_width
     if long_call_k not in chain.calls or long_put_k not in chain.puts:
         return None, "wing strikes not present in chain"
 
@@ -112,14 +113,23 @@ def select_condor(
         chain.calls[short_call_k].ltp - chain.calls[long_call_k].ltp
         + chain.puts[short_put_k].ltp - chain.puts[long_put_k].ltp
     )
-    if net_credit < MIN_CREDIT_PTS:
-        return None, f"net credit {net_credit:.2f} < MIN_CREDIT_PTS {MIN_CREDIT_PTS}"
+    if net_credit < min_credit:
+        return None, f"net credit {net_credit:.2f} < min_credit {min_credit:g}"
 
     spec = CondorSpec(
         short_call_k, long_call_k, short_put_k, long_put_k,
         net_credit, short_call_delta, short_put_delta,
     )
     return spec, "ok"
+
+
+def select_condor(
+    chain: OptionChain, or_high: float, or_low: float, F: float, T: float, r: float
+) -> tuple[Optional[CondorSpec], str]:
+    """Scan for the first call >= or_high and put <= or_low whose |delta| is at
+    or below TARGET_SHORT_DELTA. Pass the OR high/low for OR-breakout entry, or
+    spot for both bounds to get a pure delta-anchored condor centered on spot."""
+    return select_condor_at(chain, or_high, or_low, F, T, r, TARGET_SHORT_DELTA, WING_WIDTH)
 
 
 def select_butterfly(
@@ -218,3 +228,33 @@ def select_roll(
 
 def breakevens(short_call_k: float, short_put_k: float, net_credit: float) -> tuple[float, float]:
     return short_put_k - net_credit, short_call_k + net_credit
+
+
+if __name__ == "__main__":
+    # Self-check: a synthetic symmetric chain around F=20000. Run from this dir
+    # (bare imports of black76/config), same as black76.py's __main__.
+    F, T, r, iv = 20000.0, 5 / 365.0, 0.069, 0.14
+    ivp = {}
+    calls, puts = {}, {}
+    for k in range(19000, 21050, 50):
+        calls[k] = ChainLeg(k, max(0.5, __import__("black76").call_price(F, k, iv, T, r)), iv)
+        puts[k] = ChainLeg(k, max(0.5, __import__("black76").put_price(F, k, iv, T, r)), iv)
+    ch = OptionChain(calls=calls, puts=puts)
+
+    # (1) select_condor == select_condor_at with the config defaults
+    a, _ = select_condor(ch, F, F, F, T, r)
+    b, _ = select_condor_at(ch, F, F, F, T, r, TARGET_SHORT_DELTA, WING_WIDTH)
+    assert a == b, "select_condor must delegate to select_condor_at with defaults"
+
+    # (2) higher target delta -> shorts sit closer to spot (narrower body)
+    lo, _ = select_condor_at(ch, F, F, F, T, r, 0.10, WING_WIDTH, min_credit=0)
+    hi, _ = select_condor_at(ch, F, F, F, T, r, 0.30, WING_WIDTH, min_credit=0)
+    assert lo and hi, "both presets should resolve on a full chain"
+    assert hi.short_call_k <= lo.short_call_k and hi.short_put_k >= lo.short_put_k, \
+        "0.30-delta condor must be tighter than the 0.10-delta one"
+    assert hi.net_credit > lo.net_credit, "tighter condor must collect more credit"
+
+    # (3) wing width flows through to the long strikes
+    w, _ = select_condor_at(ch, F, F, F, T, r, 0.20, 300, min_credit=0)
+    assert w.long_call_k - w.short_call_k == 300, "wing_width must set the long strike"
+    print("PASS: select_condor_at ladder (delegation, delta tightness, wing width)")
