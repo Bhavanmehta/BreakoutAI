@@ -273,12 +273,37 @@
         // Project option mark at target and at stop, decayed by the ACTUAL
         // holding window (tLeft), not "half the time to expiry" (the old,
         // arbitrary assumption that ignored the intraday-exit reality).
-        var markAtTarget = bsPrice({ spot: trade.targetUnderlying, strike: trade.strike, iv: effIv, tYears: tLeft, type: type, r: r });
-        var markAtStop = bsPrice({ spot: trade.slUnderlying, strike: trade.strike, iv: effIv, tYears: tLeft, type: type, r: r });
+        var markAtTargetTheo = bsPrice({ spot: trade.targetUnderlying, strike: trade.strike, iv: effIv, tYears: tLeft, type: type, r: r });
+        var markAtStopTheo = bsPrice({ spot: trade.slUnderlying, strike: trade.strike, iv: effIv, tYears: tLeft, type: type, r: r });
 
+        // B5: calibrate the theoretical reprice to the real observed entry
+        // premium (ratio k, computed once per trade). Uncalibrated BS reprices
+        // vs real market premium disperse 0-3.36x per trade -- left unscaled,
+        // that dispersion produces spurious risk<=0 (rr=Infinity) that reflects
+        // model/market mismatch, not real trade risk. Clamp k to a sane band;
+        // fall back to k=1 (old uncalibrated behaviour) if theoAtEntry is
+        // degenerate (0 IV/time, bad inputs).
+        var theoAtEntry = bsPrice({ spot: trade.spot, strike: trade.strike, iv: effIv, tYears: tYears, type: type, r: r });
+        var calibrated = premium > 0 && isFinite(theoAtEntry) && theoAtEntry > 1e-6;
+        var k = calibrated ? Math.min(Math.max(premium / theoAtEntry, 0.2), 5) : 1;
+        var markAtTarget = k * markAtTargetTheo;
+        var markAtStop = k * markAtStopTheo;
+
+        // Raw (uncalibrated) reward/risk/rr, kept around for debugging -- this
+        // is what would have hit the old isFinite(rr) exclusion.
+        var rewardRaw = (markAtTargetTheo - premium) * lotSize * lots;
+        var riskRaw = (premium - markAtStopTheo) * lotSize * lots;
+        var rrRaw = riskRaw > 0 ? rewardRaw / riskRaw : (rewardRaw > 0 ? Infinity : 0);
+
+        // Calibrated reward/risk/rr -- risk is floored at a small positive
+        // fraction of premium (not zero/negative) so "the model says even the
+        // worst case still profits" becomes a large-but-finite rr (real signal
+        // once calibrated) instead of a literal Infinity that has to be
+        // special-cased out of the isFinite(rr) gate below.
         var reward = (markAtTarget - premium) * lotSize * lots;
-        var risk = (premium - markAtStop) * lotSize * lots;
-        var rr = risk > 0 ? reward / risk : (reward > 0 ? Infinity : 0);
+        var riskFloor = Math.max(0.02 * premium * lotSize * lots, 1e-6);
+        var risk = Math.max((premium - markAtStop) * lotSize * lots, riskFloor);
+        var rr = reward / risk;
 
         // B2: market greeks (straight from the chain leg) replace the
         // BS-computed ones field-by-field whenever finite; BS fallback
@@ -312,7 +337,7 @@
         reasons.push("Forward ≈ " + _r2(fwd.forward) + " (" + fwd.source +
             (fwd.source === "parity" ? " — ATM put-call parity" : " — spot·e^{rT}") + ").");
         reasons.push("Prob. of touching target within the " + _r2(horizonDays) + "-day hold ≈ " + _pct(pop) + "%.");
-        reasons.push("Reward:risk on the option ≈ " + (isFinite(rr) ? "1:" + _r2(rr) : "uncapped") +
+        reasons.push("Reward:risk on the option ≈ 1:" + _r2(rr) +
             " (₹" + Math.round(reward) + " vs ₹" + Math.round(risk) + ").");
         reasons.push("Theta cost over the hold ≈ " + _pct(thetaCostPctOfReward) + "% of projected reward (₹" +
             Math.round(thetaCostHorizon) + "; " + _pct(thetaPctOfPrem) + "%/day of premium).");
@@ -332,7 +357,7 @@
         var verdict, tone;
         if (!dirOk) {
             verdict = "Check inputs"; tone = "warn";
-        } else if (isFinite(rr) && rr >= 2 && pop >= 0.40 && thetaCostPctOfReward <= 0.25) {
+        } else if (rr >= 2 && pop >= 0.40 && thetaCostPctOfReward <= 0.25) {
             verdict = "Favorable"; tone = "good";
         } else if (rr >= 1 && pop >= 0.30) {
             verdict = "Marginal"; tone = "warn";
@@ -348,6 +373,7 @@
             warnings: warnings,
             metrics: {
                 pop: pop, rr: rr, reward: reward, risk: risk,
+                rrRaw: rrRaw, riskRaw: riskRaw, calibrated: calibrated,
                 thetaPerDay: thetaPerDay, thetaPctOfPrem: thetaPctOfPrem, thetaCostPctOfReward: thetaCostPctOfReward,
                 delta: g.delta, gamma: g.gamma, vega: g.vega, theta: g.theta,
                 breakeven: be, expectedMove: em, moveNeeded: moveNeeded,
@@ -493,7 +519,12 @@ if (typeof require !== "undefined" && require.main === module) {
     // thetaCostPctOfReward <= 0.25 (theta cost over the ACTUAL hold as % of projected
     // reward). Confirm: legacy metric is deep in "impossible" territory (>25%/day)
     // while the new hold-scoped gate is comfortably passable.
-    var weeklyAtm = M.assess({ spot: 25000, strike: 25000, type: "CE", iv: 12, days: 1, premium: 45, slUnderlying: 24940, targetUnderlying: 25120, lotSize: 75, lots: 1, horizonDays: 0.4 });
+    // Fixture premiums are set to the trade's OWN theoretical entry price (k=1,
+    // neutral under B5 calibration) so these B3 tests keep exercising the
+    // horizon/theta-gate mechanics on their own, not calibration.
+    var weeklyAtmIn = { spot: 25000, strike: 25000, type: "CE", iv: 15, days: 3, slUnderlying: 24980, targetUnderlying: 25100, lotSize: 75, lots: 1, horizonDays: 0.3 };
+    weeklyAtmIn.premium = M.bsPrice({ spot: weeklyAtmIn.spot, strike: weeklyAtmIn.strike, iv: weeklyAtmIn.iv, tYears: weeklyAtmIn.days / 365, type: weeklyAtmIn.type, r: 0.065 });
+    var weeklyAtm = M.assess(weeklyAtmIn);
     ok("legacy thetaPctOfPrem/day would have failed the OLD <0.08 gate (proves bug existed)",
         weeklyAtm.metrics.thetaPctOfPrem >= 0.08, weeklyAtm.metrics.thetaPctOfPrem.toFixed(3));
     ok("new hold-scoped theta gate (thetaCostPctOfReward <= 0.25) passes for this case",
@@ -502,10 +533,50 @@ if (typeof require !== "undefined" && require.main === module) {
     // With a higher-pop, closer target (tight enough to keep theta cost under
     // 25% of reward) the same weekly-ATM case should actually reach Favorable,
     // proving Favorable is populated at all (not just theoretically reachable).
-    var weeklyAtmCloser = M.assess({ spot: 25000, strike: 25000, type: "CE", iv: 10, days: 1, premium: 40, slUnderlying: 24975, targetUnderlying: 25045, lotSize: 75, lots: 1, horizonDays: 0.3 });
+    var weeklyAtmCloserIn = { spot: 25000, strike: 25000, type: "CE", iv: 22, days: 4, slUnderlying: 24980, targetUnderlying: 25090, lotSize: 75, lots: 1, horizonDays: 0.3 };
+    weeklyAtmCloserIn.premium = M.bsPrice({ spot: weeklyAtmCloserIn.spot, strike: weeklyAtmCloserIn.strike, iv: weeklyAtmCloserIn.iv, tYears: weeklyAtmCloserIn.days / 365, type: weeklyAtmCloserIn.type, r: 0.065 });
+    var weeklyAtmCloser = M.assess(weeklyAtmCloserIn);
     ok("weekly-ATM-like case with a reachable target hits Favorable",
         weeklyAtmCloser.verdict === "Favorable",
         weeklyAtmCloser.verdict + " pop=" + weeklyAtmCloser.metrics.pop.toFixed(3) + " rr=" + weeklyAtmCloser.metrics.rr.toFixed(2) + " thetaCostPctOfReward=" + weeklyAtmCloser.metrics.thetaCostPctOfReward.toFixed(3));
+
+    // --- B5: premium-calibrated reward/risk ---
+    // NOTE: horizonDays is deliberately SHORT relative to days (a partial,
+    // intraday-style hold) and slUnderlying is close to spot -- this is the
+    // combination that leaves real BS time-value on the stop-loss leg. With
+    // a full hold to expiry (the old default) the stop reprice collapses to
+    // pure intrinsic (0 for an OTM stop), so riskRaw = premium - 0 is always
+    // positive and the "cheap premium" bug case below can never be observed.
+    var calBase = { spot: 25000, strike: 25100, type: "CE", iv: 13, days: 3, slUnderlying: 24900, targetUnderlying: 25350, lotSize: 75, lots: 1, horizonDays: 0.5 };
+    var theoAtEntry = M.bsPrice({ spot: calBase.spot, strike: calBase.strike, iv: calBase.iv, tYears: calBase.days / 365, type: calBase.type, r: 0.065 });
+
+    // Real premium well BELOW the theoretical entry price -- this is exactly
+    // the shape that used to produce risk<=0 -> rr=Infinity on the raw numbers
+    // (the old isFinite(rr) exclusion). Calibration should scale the reprice
+    // down to match reality and turn rr into a large-but-finite number.
+    var cheap = Object.assign({}, calBase, { premium: theoAtEntry * 0.4 });
+    var aCheap = M.assess(cheap);
+    ok("cheap-vs-theoretical premium is calibrated", aCheap.metrics.calibrated === true, JSON.stringify(aCheap.metrics.calibrated));
+    ok("cheap premium: old raw rr would have been Infinity (proves the bug case)",
+        !isFinite(aCheap.metrics.rrRaw) && aCheap.metrics.riskRaw <= 0,
+        "rrRaw=" + aCheap.metrics.rrRaw + " riskRaw=" + aCheap.metrics.riskRaw);
+    ok("cheap premium: calibrated rr is finite (no Infinity reaches the gate)",
+        isFinite(aCheap.metrics.rr) && aCheap.metrics.rr > 0, aCheap.metrics.rr);
+    ok("cheap premium: calibrated risk is floored positive, not <= 0",
+        aCheap.metrics.risk > 0, aCheap.metrics.risk);
+
+    // Real premium well ABOVE the theoretical entry price -- k should clamp
+    // at the top of the [0.2, 5] band rather than blow up.
+    var rich = Object.assign({}, calBase, { premium: theoAtEntry * 8 });
+    var aRich = M.assess(rich);
+    ok("expensive-vs-theoretical premium clamps k at 5", aRich.metrics.calibrated === true && near(aRich.metrics.markAtTarget / M.bsPrice({ spot: calBase.targetUnderlying, strike: calBase.strike, iv: calBase.iv, tYears: (calBase.days - (aRich.metrics.horizonDays || 0)) / 365, type: calBase.type, r: 0.065 }), 5, 1e-6),
+        "markAtTarget/theo ratio should be 5");
+
+    // Zero/absent premium -- degenerate theoAtEntry guard falls back to k=1
+    // (old uncalibrated behaviour), not calibrated.
+    var noPrem = Object.assign({}, calBase, { premium: 0 });
+    var aNoPrem = M.assess(noPrem);
+    ok("zero premium falls back to k=1 (not calibrated)", aNoPrem.metrics.calibrated === false, aNoPrem.metrics.calibrated);
 
     console.log("\n" + passes + " passed, " + fails + " failed.");
     process.exit(fails === 0 ? 0 : 1);

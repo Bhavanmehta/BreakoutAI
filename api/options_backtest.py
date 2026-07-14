@@ -287,13 +287,39 @@ def assess(trade: dict) -> dict:
     # Project option mark at target and at stop, decayed by the ACTUAL holding
     # window (tLeft), not "half the time to expiry" (the old, arbitrary
     # assumption that ignored the intraday-exit reality).
-    mark_at_target = bs_price(tgt_u, strike, eff_iv, t_left, opt_type, r)
-    mark_at_stop = bs_price(sl_u, strike, eff_iv, t_left, opt_type, r)
+    mark_at_target_theo = bs_price(tgt_u, strike, eff_iv, t_left, opt_type, r)
+    mark_at_stop_theo = bs_price(sl_u, strike, eff_iv, t_left, opt_type, r)
+
+    # B5: calibrate the theoretical reprice to the real observed entry premium
+    # (ratio k, computed once per trade). Uncalibrated BS reprices vs real
+    # market premium disperse 0-3.36x per trade -- left unscaled, that
+    # dispersion produces spurious risk<=0 (rr=Infinity) that reflects
+    # model/market mismatch, not real trade risk. Clamp k to a sane band;
+    # fall back to k=1 (old uncalibrated behaviour) if theo_at_entry is
+    # degenerate (0 IV/time, bad inputs).
+    theo_at_entry = bs_price(spot, strike, eff_iv, t_years, opt_type, r)
+    calibrated = premium > 0 and math.isfinite(theo_at_entry) and theo_at_entry > 1e-6
+    k = min(max(premium / theo_at_entry, 0.2), 5.0) if calibrated else 1.0
+    mark_at_target = k * mark_at_target_theo
+    mark_at_stop = k * mark_at_stop_theo
 
     units = lot_size * lots
+
+    # Raw (uncalibrated) reward/risk/rr, kept around for debugging -- this is
+    # what would have hit the old isFinite(rr) exclusion.
+    reward_raw = (mark_at_target_theo - premium) * units
+    risk_raw = (premium - mark_at_stop_theo) * units
+    rr_raw = (reward_raw / risk_raw) if risk_raw > 0 else (math.inf if reward_raw > 0 else 0.0)
+
+    # Calibrated reward/risk/rr -- risk is floored at a small positive
+    # fraction of premium (not zero/negative) so "the model says even the
+    # worst case still profits" becomes a large-but-finite rr (real signal
+    # once calibrated) instead of a literal Infinity that has to be
+    # special-cased out of the isfinite(rr) gate below.
     reward = (mark_at_target - premium) * units
-    risk = (premium - mark_at_stop) * units
-    rr = (reward / risk) if risk > 0 else (math.inf if reward > 0 else 0.0)
+    risk_floor = max(0.02 * premium * units, 1e-6)
+    risk = max((premium - mark_at_stop) * units, risk_floor)
+    rr = reward / risk
 
     # B2: market greeks (straight from the chain leg) replace the BS-computed
     # ones field-by-field whenever finite; BS fallback (using the parity
@@ -347,6 +373,7 @@ def assess(trade: dict) -> dict:
         "verdict": verdict, "tone": tone, "warnings": warnings,
         "metrics": {
             "pop": pop, "rr": rr, "reward": reward, "risk": risk,
+            "rrRaw": rr_raw, "riskRaw": risk_raw, "calibrated": calibrated,
             "thetaPerDay": theta_per_day, "thetaPctOfPrem": theta_pct_of_prem,
             "thetaCostPctOfReward": theta_cost_pct_of_reward,
             "delta": g["delta"], "gamma": g["gamma"], "vega": g["vega"], "theta": g["theta"],
@@ -1041,13 +1068,57 @@ if __name__ == "__main__":
     a_short = assess({"spot": 25000, "strike": 25100, "type": "CE", "iv": 15, "days": 5, "premium": 90,
                        "slUnderlying": 24850, "targetUnderlying": 25350, "lotSize": 75, "lots": 1, "horizonDays": 0.25})
     assert a_short["metrics"]["pop"] < a_full["metrics"]["pop"], (a_short["metrics"]["pop"], a_full["metrics"]["pop"])
-    weekly_atm = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 12, "days": 1, "premium": 45,
-                          "slUnderlying": 24940, "targetUnderlying": 25120, "lotSize": 75, "lots": 1, "horizonDays": 0.4})
+    # Fixture premiums are set to the trade's OWN theoretical entry price
+    # (k=1, neutral under B5 calibration) so these B3 tests keep exercising
+    # the horizon/theta-gate mechanics on their own, not calibration --
+    # mirrors the equivalent fixtures in scripts/options_math.js.
+    weekly_atm_premium = bs_price(25000, 25000, 15, 3 / 365.0, "CE")
+    weekly_atm = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 15, "days": 3, "premium": weekly_atm_premium,
+                          "slUnderlying": 24980, "targetUnderlying": 25100, "lotSize": 75, "lots": 1, "horizonDays": 0.3})
     assert weekly_atm["metrics"]["thetaPctOfPrem"] >= 0.08, weekly_atm  # proves the OLD gate was unreachable
     assert weekly_atm["metrics"]["thetaCostPctOfReward"] <= 0.25, weekly_atm  # NEW gate is reachable
-    weekly_atm_closer = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 10, "days": 1, "premium": 40,
-                                 "slUnderlying": 24975, "targetUnderlying": 25045, "lotSize": 75, "lots": 1, "horizonDays": 0.3})
+    weekly_atm_closer_premium = bs_price(25000, 25000, 22, 4 / 365.0, "CE")
+    weekly_atm_closer = assess({"spot": 25000, "strike": 25000, "type": "CE", "iv": 22, "days": 4, "premium": weekly_atm_closer_premium,
+                                 "slUnderlying": 24980, "targetUnderlying": 25090, "lotSize": 75, "lots": 1, "horizonDays": 0.3})
     assert weekly_atm_closer["verdict"] == "Favorable", weekly_atm_closer  # Favorable is actually populated
+
+    # --- B5: premium-calibrated reward/risk (parity with options_math.js) ------
+    # NOTE: horizonDays is deliberately SHORT relative to days (a partial,
+    # intraday-style hold) and slUnderlying is close to spot -- this is the
+    # combination that leaves real BS time-value on the stop-loss leg. With a
+    # full hold to expiry (the old default) the stop reprice collapses to pure
+    # intrinsic (0 for an OTM stop), so riskRaw = premium - 0 is always
+    # positive and the "cheap premium" bug case below can never be observed.
+    cal_base = {"spot": 25000, "strike": 25100, "type": "CE", "iv": 13, "days": 3,
+                "slUnderlying": 24900, "targetUnderlying": 25350, "lotSize": 75, "lots": 1, "horizonDays": 0.5}
+    theo_at_entry = bs_price(cal_base["spot"], cal_base["strike"], cal_base["iv"], cal_base["days"] / 365.0, cal_base["type"])
+
+    # Real premium well BELOW the theoretical entry price -- this is exactly
+    # the shape that used to produce risk<=0 -> rr=Infinity on the raw numbers
+    # (the old isfinite(rr) exclusion). Calibration should scale the reprice
+    # down to match reality and turn rr into a large-but-finite number.
+    cheap = dict(cal_base, premium=theo_at_entry * 0.4)
+    a_cheap = assess(cheap)
+    assert a_cheap["metrics"]["calibrated"] is True, a_cheap
+    assert not math.isfinite(a_cheap["metrics"]["rrRaw"]) and a_cheap["metrics"]["riskRaw"] <= 0, a_cheap
+    assert math.isfinite(a_cheap["metrics"]["rr"]) and a_cheap["metrics"]["rr"] > 0, a_cheap
+    assert a_cheap["metrics"]["risk"] > 0, a_cheap
+
+    # Real premium well ABOVE the theoretical entry price -- k should clamp at
+    # the top of the [0.2, 5] band rather than blow up.
+    rich = dict(cal_base, premium=theo_at_entry * 8)
+    a_rich = assess(rich)
+    theo_at_target = bs_price(cal_base["targetUnderlying"], cal_base["strike"], cal_base["iv"],
+                               (cal_base["days"] - a_rich["metrics"]["horizonDays"]) / 365.0, cal_base["type"])
+    assert a_rich["metrics"]["calibrated"] is True, a_rich
+    assert abs(a_rich["metrics"]["markAtTarget"] / theo_at_target - 5) < 1e-6, a_rich
+
+    # Zero/absent premium -- degenerate theo_at_entry guard falls back to k=1
+    # (old uncalibrated behaviour), not calibrated.
+    no_prem = dict(cal_base, premium=0)
+    a_no_prem = assess(no_prem)
+    assert a_no_prem["metrics"]["calibrated"] is False, a_no_prem
+
     # Strike-spec parser.
     assert _parse_strikes("ATM-2..ATM+2") == [-2, -1, 0, 1, 2]
     assert _parse_strikes("ATM") == [0] and _parse_strikes("ATM+3") == [3]
