@@ -104,7 +104,8 @@
                 </h2>
                 <span id="buyBiasBadge" class="px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap">—</span>
             </div>
-            <p id="buyVerdict" class="text-[13px] text-slate-300 mb-3 leading-snug">—</p>
+            <p id="buyVerdict" class="text-[13px] text-slate-300 mb-2 leading-snug">—</p>
+            <p id="buyExpiryNote" class="hidden text-[11px] text-amber-300/90 mb-3 leading-snug border-l-2 border-amber-500/50 pl-2"></p>
             <div id="buyCandidates" class="space-y-2"></div>
             <div id="buySuppressed" class="hidden absolute inset-0 rounded-lg suppressed-overlay flex items-center justify-center p-6">
                 <p class="text-sm font-semibold text-amber-300 text-center">⚠ Long premium suppressed in this regime</p>
@@ -126,7 +127,28 @@
 
             <div class="space-y-3">
                 <div class="border border-borderCl/70 rounded-md p-3">
-                    <h3 class="text-xs font-bold text-slate-300 mb-2">Iron Condor</h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-bold text-slate-300">Iron Condor</h3>
+                        <span class="text-[9px] uppercase tracking-wide text-slate-500">compare presets</span>
+                    </div>
+                    <!-- preset compare cards; click to load into the tuner below -->
+                    <div id="condorPresets" class="grid grid-cols-3 gap-1.5 mb-3"></div>
+                    <!-- delta/wing tuner: recomputes strikes/credit/POP client-side
+                         from the slim chain via computeCondor(), no round-trip -->
+                    <div id="condorTuner" class="border-t border-borderCl/50 pt-2.5 mb-1 hidden">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <label class="text-[10px] text-slate-400 w-16 shrink-0">Short Δ</label>
+                            <input id="condorDelta" type="range" min="5" max="40" step="1" value="16"
+                                class="flex-1 accent-purple-500 cursor-pointer">
+                            <span id="condorDeltaVal" class="num text-[10px] text-slate-200 w-9 text-right">0.16</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] text-slate-400 w-16 shrink-0">Wing</label>
+                            <input id="condorWing" type="range" min="50" max="600" step="50" value="200"
+                                class="flex-1 accent-purple-500 cursor-pointer">
+                            <span id="condorWingVal" class="num text-[10px] text-slate-200 w-9 text-right">200</span>
+                        </div>
+                    </div>
                     <div id="condorBody"></div>
                 </div>
                 <div class="border border-borderCl/70 rounded-md p-3">
@@ -166,6 +188,7 @@
         lastFetch: 0,
         pollTimer: null,
         countdownTimer: null,
+        condor: { sel: "Balanced", delta: 0.15, wing: 200 }, // delta/wing slider persistence
     };
 
     // ---- formatting -----------------------------------------------------
@@ -176,6 +199,64 @@
     const fmtPct = (x, d = 2) => isNum(x) ? (x >= 0 ? "+" : "") + x.toFixed(d) + "%" : "—";
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+    // Standard-normal CDF (Zelen & Severo 26.2.17, |err| < 7.5e-8). Mirrors the
+    // engine's Black-76 N() so the client-side condor slider POP matches server.
+    function normCdf(x) {
+        if (!isNum(x)) return null;
+        const t = 1 / (1 + 0.2316419 * Math.abs(x));
+        const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+        const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        return x >= 0 ? 1 - p : p;
+    }
+
+    // JS mirror of strategy.py::select_condor_at() — sweep one chain into a
+    // (delta, wing) condor. `chain` is the slim rows [{k,ce_ltp,ce_delta,pe_ltp,
+    // pe_delta}], `meta` carries {spot, lot, min_credit}. Kept deliberately in
+    // lock-step with the Python selector so slider previews == server presets.
+    function computeCondor(chain, meta, targetShortDelta, wing) {
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const spot = meta.spot, lot = meta.lot || 75, minCredit = meta.min_credit ?? 0;
+        const base = { name: null, short_delta_target: targetShortDelta, wing };
+        // short call: first strike >= spot whose call delta <= target
+        let sc = null;
+        for (const r of chain.filter(r => r.k >= spot && isNum(r.ce_delta)).sort((a, b) => a.k - b.k)) {
+            if (r.ce_delta <= targetShortDelta) { sc = r; break; }
+        }
+        if (!sc) return { ...base, ok: false, reason: `no call strike >= ${spot} with delta <= ${targetShortDelta}` };
+        // short put: first strike <= spot (descending) whose |put delta| <= target
+        let sp = null;
+        for (const r of chain.filter(r => r.k <= spot && isNum(r.pe_delta)).sort((a, b) => b.k - a.k)) {
+            if (Math.abs(r.pe_delta) <= targetShortDelta) { sp = r; break; }
+        }
+        if (!sp) return { ...base, ok: false, reason: `no put strike <= ${spot} with |delta| <= ${targetShortDelta}` };
+        const lc = rows[sc.k + wing], lp = rows[sp.k - wing];
+        if (!lc || !lp) return { ...base, ok: false, reason: "wing strikes not present in chain" };
+        const netCredit = sc.ce_ltp - lc.ce_ltp + sp.pe_ltp - lp.pe_ltp;
+        if (netCredit < minCredit) return { ...base, ok: false, reason: `net credit ${netCredit.toFixed(2)} < min_credit ${minCredit}` };
+        const maxLossPts = wing - netCredit;
+        const beLo = sp.k - netCredit, beHi = sc.k + netCredit;
+        return {
+            ...base, ok: true, short_call_k: sc.k, long_call_k: lc.k, short_put_k: sp.k, long_put_k: lp.k,
+            net_credit_pts: +netCredit.toFixed(2), credit_rupees: Math.round(netCredit * lot),
+            max_loss_pts: +maxLossPts.toFixed(2), max_loss_rupees: Math.round(maxLossPts * lot),
+            breakeven_low: +beLo.toFixed(1), breakeven_high: +beHi.toFixed(1),
+            pop: condorPop(spot, beLo, beHi, meta.atm_iv, meta.T),
+            short_call_delta: +sc.ce_delta.toFixed(3), short_put_delta: +sp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: meta.margin_rupees ?? 45000, margin_source: "estimated",
+            reward_risk: maxLossPts > 0 ? +(netCredit / maxLossPts).toFixed(2) : null,
+        };
+    }
+
+    // Black-76 lognormal P(be_lo < F_T < be_hi) at a single ATM-IV vol — mirrors
+    // options_platform.py::pop() so the slider's POP matches the server presets.
+    function condorPop(spot, beLo, beHi, atmIvPct, T) {
+        const sig = (atmIvPct || 0) / 100;
+        if (!(spot && beLo && beHi) || sig <= 0 || !(T > 0)) return null;
+        const root = sig * Math.sqrt(T);
+        const pBelow = (K) => normCdf(-((Math.log(spot / K) - 0.5 * sig * sig * T) / root));
+        return +Math.max(0, Math.min(1, pBelow(beHi) - pBelow(beLo))).toFixed(3);
+    }
+
     function isDemoParam() {
         return new URLSearchParams(location.search).get("demo") === "1";
     }
@@ -185,11 +266,52 @@
         return custom || $("fSymbol").value;
     }
 
+    // ---- demo condor ladder — generated from a toy Black-76 chain and fed
+    // through the SAME computeCondor() the live slider uses, so demo presets
+    // and the demo slider stay internally consistent (single source of math).
+    const _demoCondor = (() => {
+        const spot = 24200.5, T = 5 / 365, sig = 0.132, lot = 75, wing = 200;
+        const d1 = (K) => (Math.log(spot / K) + 0.5 * sig * sig * T) / (sig * Math.sqrt(T));
+        const callPx = (K) => Math.max(spot * normCdf(d1(K)) - K * normCdf(d1(K) - sig * Math.sqrt(T)), 0.05);
+        const chain = [];
+        // Range must cover the widest preset's wings: the 0.10-delta short strikes
+        // sit near 24700 / 23700, so +/-wing needs the chain out to ~24900 / 23500.
+        for (let K = 23400; K <= 25000; K += 50) {
+            const cd = normCdf(d1(K)), c = callPx(K);
+            chain.push({ k: K, ce_ltp: +c.toFixed(1), ce_delta: +cd.toFixed(3),
+                pe_ltp: +Math.max(c - spot + K, 0.05).toFixed(1), pe_delta: +(cd - 1).toFixed(3) });
+        }
+        const meta = { spot, T, atm_iv: 13.2, interval: 50, wing_default: wing, lot,
+            min_credit: 0, margin_rupees: 45000 };
+        // Delta targets MUST match api/options_platform.py::CONDOR_PRESETS so the
+        // demo ladder tells the same story a live user sees.
+        const presets = [["Wide", 0.10], ["Balanced", 0.20], ["Tight", 0.30]].map(([name, td]) => {
+            const c = computeCondor(chain, meta, td, wing);
+            c.name = name; return c;
+        });
+        // Short iron butterfly: both shorts at ATM, longs at +/- wing (mirrors
+        // strategy.py::select_butterfly). Reuse the same toy chain rows.
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const atm = 24200, bc = rows[atm], bp = rows[atm], blc = rows[atm + wing], blp = rows[atm - wing];
+        const bCredit = bc.ce_ltp - blc.ce_ltp + bp.pe_ltp - blp.pe_ltp, bMaxPts = wing - bCredit;
+        const bLo = atm - bCredit, bHi = atm + bCredit;
+        const butterfly = { name: "Butterfly", short_delta_target: null, wing, ok: true,
+            short_call_k: atm, long_call_k: atm + wing, short_put_k: atm, long_put_k: atm - wing,
+            net_credit_pts: +bCredit.toFixed(2), credit_rupees: Math.round(bCredit * lot),
+            max_loss_pts: +bMaxPts.toFixed(2), max_loss_rupees: Math.round(bMaxPts * lot),
+            breakeven_low: +bLo.toFixed(1), breakeven_high: +bHi.toFixed(1),
+            pop: condorPop(spot, bLo, bHi, meta.atm_iv, T),
+            short_call_delta: +bc.ce_delta.toFixed(3), short_put_delta: +bp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: 22000, margin_source: "estimated",
+            reward_risk: bMaxPts > 0 ? +(bCredit / bMaxPts).toFixed(2) : null };
+        return { chain, meta, presets, butterfly };
+    })();
+
     // ---- demo payload (only used if ?demo=1 AND a real fetch fails) -----
     const DEMO_PAYLOAD = {
         source: "mock", demo_reason: "embedded sample — live fetch failed and ?demo=1 was set",
         symbol: "NIFTY", expiry: "2026-07-28", expiries: ["2026-07-28", "2026-08-04", "2026-08-25"],
-        spot: 24200.5, lot_size: 75, prev_close: 24150.0, move_pct: 0.21,
+        spot: 24200.5, lot_size: 75, prev_close: 24150.0, move_pct: 0.21, dte: 5, expiry_day: false,
         generated_at: new Date().toISOString(), mode: "paper",
         features: { pcr_near: 1.12, pcr_far: 0.94, oi_concentration: 0.31, max_pain: 24150, call_wall: 24500,
             put_wall: 24000, atm_strike: 24200, atm_iv: 13.2, iv_skew: 1.4, expected_move_pts: 180.5,
@@ -202,14 +324,9 @@
                 { type: "CE", strike: 24300, ltp: 68.2, delta: 0.35, iv: 13.8, oi: 900000, volume: 140000, spread_pct: 1.1, score: 58, why: "Cheaper convexity, wider spread." }
             ] },
         sell: { gate: { ok: true, reasons: ["IV percentile in range", "No event risk within expiry"] },
-            condor: { ok: true, short_call_k: 24500, long_call_k: 24700, short_put_k: 23900, long_put_k: 23700,
-                net_credit_pts: 42.5, credit_rupees: 3188, max_loss_rupees: 11813, breakeven_low: 23857.5,
-                breakeven_high: 24542.5, short_call_delta: 0.18, short_put_delta: -0.19, lots: 1,
-                margin_rupees: 45000, margin_source: "estimated", reward_risk: 0.27 },
-            butterfly: { ok: true, short_call_k: 24200, long_call_k: 24400, short_put_k: 24200, long_put_k: 24000,
-                net_credit_pts: 0, credit_rupees: 0, max_loss_rupees: 9000, breakeven_low: 24080,
-                breakeven_high: 24320, short_call_delta: 0.5, short_put_delta: -0.5, lots: 1,
-                margin_rupees: 22000, margin_source: "estimated", reward_risk: 1.1 },
+            presets: _demoCondor.presets,
+            butterfly: _demoCondor.butterfly,
+            slim_chain: _demoCondor.chain, chain_meta: _demoCondor.meta,
             notes: ["Sized for 1 lot — scale margin linearly.", "Exit both legs if spot closes beyond either breakeven."] }
     };
 
@@ -223,6 +340,19 @@
             console.assert(fmtPct(-0.5) === "-0.50%", "fmtPct negative");
             const p = ladderPositions({ long_put_k: 23700, short_put_k: 23900, short_call_k: 24500, long_call_k: 24700 }, 24200, 23857.5, 24542.5);
             console.assert(p && p.pts.length === 4 && p.lo < p.hi, "ladderPositions basic shape");
+            // computeCondor: tuner math must agree with the demo presets it feeds.
+            const bal = _demoCondor.presets.find((x) => /balanc/i.test(x.name));
+            const c = computeCondor(_demoCondor.chain, _demoCondor.meta, bal.short_delta_target, bal.wing);
+            console.assert(c.ok && c.short_call_k === bal.short_call_k && c.net_credit_pts === bal.net_credit_pts,
+                "computeCondor reproduces preset");
+            console.assert(c.short_call_k > _demoCondor.meta.spot && c.short_put_k < _demoCondor.meta.spot,
+                "condor shorts straddle spot");
+            console.assert(c.long_call_k - c.short_call_k === bal.wing && c.short_put_k - c.long_put_k === bal.wing,
+                "condor wings symmetric");
+            console.assert(c.pop == null || (c.pop >= 0 && c.pop <= 1), "condorPop in [0,1]");
+            // widening the short delta should pull shorts nearer spot (tighter body).
+            const tight = computeCondor(_demoCondor.chain, _demoCondor.meta, 0.30, bal.wing);
+            console.assert(!tight.ok || tight.short_call_k <= c.short_call_k, "higher delta => nearer short call");
         } catch (e) { console.warn("options_platform self-check failed:", e); }
     }
 
@@ -252,10 +382,27 @@
     };
 
     // ---- rendering ----------------------------------------------------
-    function kpiCard(label, val, cls) {
+    function kpiCard(label, val, cls, sub) {
         return '<div class="bg-cardBg border border-borderCl rounded-lg p-2.5 text-center">' +
             '<div class="text-[9px] uppercase tracking-wide text-slate-500">' + label + '</div>' +
-            '<div class="num text-sm font-bold ' + (cls || "text-slate-100") + '">' + val + '</div></div>';
+            '<div class="num text-sm font-bold ' + (cls || "text-slate-100") + '">' + val + '</div>' +
+            (sub ? '<div class="text-[9px] text-slate-500 leading-tight mt-0.5">' + esc(sub) + '</div>' : "") +
+            '</div>';
+    }
+
+    // Plain-English one-liners under each tile — dynamic where the reading flips
+    // meaning (PCR / skew), static context otherwise. Empty string => no subtitle.
+    function pcrHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 1.15) return "puts > calls · bullish tilt";
+        if (v <= 0.85) return "calls > puts · bearish tilt";
+        return "balanced flow";
+    }
+    function skewHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 0.5) return "puts pricier · downside bid";
+        if (v <= -0.5) return "calls pricier · upside bid";
+        return "flat skew";
     }
 
     function renderHeader(d) {
@@ -306,16 +453,17 @@
 
     function renderKpis(d) {
         const f = d.features || {};
+        const emSub = isNum(f.expected_move_pct) ? "1σ ±" + fmt(f.expected_move_pct, 2) + "% by expiry" : "1σ range by expiry";
         $("kpiGrid").innerHTML =
-            kpiCard("PCR Near", fmt(f.pcr_near, 2)) +
-            kpiCard("PCR Far", fmt(f.pcr_far, 2)) +
-            kpiCard("Max Pain", fmt0(f.max_pain)) +
-            kpiCard("Call Wall", fmt0(f.call_wall), "text-emerald-300") +
-            kpiCard("Put Wall", fmt0(f.put_wall), "text-rose-300") +
-            kpiCard("ATM IV", isNum(f.atm_iv) ? fmt(f.atm_iv, 1) + "%" : "—") +
-            kpiCard("IV Skew", fmt(f.iv_skew, 2)) +
+            kpiCard("PCR Near", fmt(f.pcr_near, 2), null, pcrHint(f.pcr_near)) +
+            kpiCard("PCR Far", fmt(f.pcr_far, 2), null, pcrHint(f.pcr_far)) +
+            kpiCard("Max Pain", fmt0(f.max_pain), null, "pin strike at expiry") +
+            kpiCard("Call Wall", fmt0(f.call_wall), "text-emerald-300", "resistance ceiling") +
+            kpiCard("Put Wall", fmt0(f.put_wall), "text-rose-300", "support floor") +
+            kpiCard("ATM IV", isNum(f.atm_iv) ? fmt(f.atm_iv, 1) + "%" : "—", null, "annualized vol") +
+            kpiCard("IV Skew", fmt(f.iv_skew, 2), null, skewHint(f.iv_skew)) +
             kpiCard("Exp. Move", isNum(f.expected_move_pts) ? fmt0(f.expected_move_pts) + " pt" : "—",
-                null) + '' /* pts primary; pct as footnote below via title */;
+                null, emSub);
         // Fold expected-move % into the same last card's title for a hover detail.
         const cards = $("kpiGrid").children;
         if (cards.length) cards[cards.length - 1].title = "±" + fmt(f.expected_move_pct, 2) + "% of spot";
@@ -355,6 +503,19 @@
         badge.textContent = b.bias || "—";
         badge.className = "px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap " + biasTone;
         $("buyVerdict").textContent = b.verdict || "—";
+
+        // Expiry-day reframe: a long option today is a scalp, not a hold — all
+        // extrinsic value burns to zero by the 15:30 close, so it must be worked
+        // intraday and closed before EOD. Prefer a server-supplied note if given.
+        const note = $("buyExpiryNote");
+        if (d.expiry_day) {
+            note.textContent = b.expiry_note ||
+                "Expiry day — treat any long premium as an intraday SCALP, not a hold: extrinsic value decays to zero by the 15:30 close. Work it intraday and exit before EOD or it settles worthless.";
+            note.classList.remove("hidden");
+        } else {
+            note.textContent = "";
+            note.classList.add("hidden");
+        }
 
         const cands = Array.isArray(b.candidates) ? b.candidates : [];
         $("buyCandidates").innerHTML = cands.length
@@ -432,6 +593,70 @@
         return html;
     }
 
+    // ---- condor compare-cards + delta/wing tuner state -------------------
+    // Held at module scope so the slider handlers can re-run computeCondor()
+    // against the same slim chain the presets were built from (no round-trip).
+    let _sellChain = null, _sellMeta = null, _sellPresets = [], _condorWired = false;
+
+    const _clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+    function presetCardHtml(p, idx, activeIdx) {
+        const active = idx === activeIdx;
+        const base = 'data-preset="' + idx + '" class="preset-card text-left rounded border p-1.5 transition-colors ';
+        if (!p || p.ok === false) {
+            return '<button ' + base + 'border-borderCl/50 bg-slate-800/20 opacity-50 cursor-not-allowed" disabled>' +
+                '<div class="text-[10px] font-bold text-slate-400">' + esc((p && p.name) || "—") + '</div>' +
+                '<div class="text-[9px] text-slate-600 mt-2">n/a</div></button>';
+        }
+        const pop = isNum(p.pop) ? Math.round(p.pop * 100) + "%" : "—";
+        return '<button ' + base +
+            (active ? 'border-purple-500/70 bg-purple-900/30' : 'border-borderCl/60 bg-slate-800/40 hover:border-slate-500') + '">' +
+            '<div class="text-[10px] font-bold text-slate-200">' + esc(p.name || "—") + '</div>' +
+            '<div class="text-[9px] text-slate-500">Δ' + fmt(p.short_delta_target, 2) + ' · w' + fmt0(p.wing) + '</div>' +
+            '<div class="num text-xs font-bold text-emerald-300 mt-0.5">' + fmtInr(p.credit_rupees) + '</div>' +
+            '<div class="text-[9px] text-slate-400">POP ' + pop + ' · R:R ' + fmt(p.reward_risk, 2) + '</div>' +
+            '</button>';
+    }
+
+    function renderCondorPresets(presets, activeIdx) {
+        $("condorPresets").innerHTML = presets.map((p, i) => presetCardHtml(p, i, activeIdx)).join("");
+    }
+
+    function setTuner(td, wing) {
+        if (isNum(td)) $("condorDelta").value = Math.round(_clamp(td * 100, 5, 40));
+        if (isNum(wing)) $("condorWing").value = Math.round(_clamp(wing, 50, 600) / 50) * 50;
+    }
+
+    // Recompute the live condor from the current slider position and re-highlight
+    // whichever preset (if any) exactly matches the tuned (delta, wing) pair.
+    function applyTuner() {
+        if (!_sellChain || !_sellMeta) return;
+        const td = (+$("condorDelta").value) / 100;
+        const wing = +$("condorWing").value;
+        $("condorDeltaVal").textContent = td.toFixed(2);
+        $("condorWingVal").textContent = fmt0(wing);
+        const c = computeCondor(_sellChain, _sellMeta, td, wing);
+        $("condorBody").innerHTML = spreadCardHtml(c, _sellMeta.spot);
+        const matchIdx = _sellPresets.findIndex((p) => p && p.ok !== false &&
+            Math.round((p.short_delta_target || 0) * 100) === Math.round(td * 100) && +p.wing === wing);
+        renderCondorPresets(_sellPresets, matchIdx);
+    }
+
+    function wireCondorControls() {
+        if (_condorWired) return;
+        _condorWired = true;
+        $("condorDelta").addEventListener("input", applyTuner);
+        $("condorWing").addEventListener("input", applyTuner);
+        $("condorPresets").addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-preset]");
+            if (!btn || btn.disabled) return;
+            const p = _sellPresets[+btn.dataset.preset];
+            if (!p || p.ok === false) return;
+            setTuner(p.short_delta_target, p.wing);
+            applyTuner();
+        });
+    }
+
     function renderSell(d) {
         const s = d.sell || {};
         const gate = s.gate || {};
@@ -442,7 +667,42 @@
         const reasons = Array.isArray(gate.reasons) ? gate.reasons : [];
         $("sellGateReasons").innerHTML = reasons.map((r) => '<li>· ' + esc(r) + '</li>').join("");
 
-        $("condorBody").innerHTML = spreadCardHtml(s.condor, d.spot);
+        // Condor presets + tuner. Prefer the new presets[]/slim_chain payload;
+        // fall back to the legacy single s.condor when a chain isn't available.
+        _sellPresets = Array.isArray(s.presets) ? s.presets : [];
+        _sellChain = Array.isArray(s.slim_chain) ? s.slim_chain : null;
+        _sellMeta = s.chain_meta || null;
+        // Rebuild each preset card from the SAME computeCondor()/slim-chain the
+        // tuner uses, so a card's headline (strikes/credit/POP) always equals
+        // what the slider shows when you load that preset. The server presets
+        // pick short strikes off Black-Scholes-from-IV delta, but the slider
+        // picks off the broker's per-strike delta in slim_chain; right at the
+        // delta cutoff those two sources disagree by a strike (e.g. broker
+        // Δ0.301 vs BS Δ0.268 at the same strike), which made the card and the
+        // calculations below it diverge. Keep the server preset only when the
+        // slim chain can't form the condor (e.g. wings outside the ~8% window).
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            _sellPresets = _sellPresets.map((p) => {
+                if (!p || !isNum(p.short_delta_target)) return p;
+                const c = computeCondor(_sellChain, _sellMeta, p.short_delta_target, p.wing);
+                return c.ok === false ? p : { ...c, name: p.name };
+            });
+        }
+        wireCondorControls();
+
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            let activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false && /balanc/i.test(p.name || ""));
+            if (activeIdx < 0) activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false);
+            if (activeIdx < 0) activeIdx = 0;
+            const ap = _sellPresets[activeIdx];
+            if (ap && ap.ok !== false) setTuner(ap.short_delta_target, ap.wing);
+            $("condorTuner").classList.remove("hidden");
+            applyTuner();
+        } else {
+            $("condorPresets").innerHTML = "";
+            $("condorTuner").classList.add("hidden");
+            $("condorBody").innerHTML = spreadCardHtml(_sellPresets[0] || s.condor, d.spot);
+        }
         $("butterflyBody").innerHTML = spreadCardHtml(s.butterfly, d.spot);
 
         const notes = Array.isArray(s.notes) ? s.notes : [];

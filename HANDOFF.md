@@ -1,8 +1,145 @@
 # BreakoutAI — Session Handoff
 
-_Last updated: 2026-07-06 (session 11, kill-list execution). Read this +
-`CLAUDE.md` (durable project record) to resume._
+_Last updated: 2026-07-28b (options-platform session — condor card↔panel
+consistency fix + gate/ladder explainer). Read this + `CLAUDE.md` (durable
+project record) to resume._
 _When you start a fresh chat, point it here first._
+
+---
+
+## 🧭 OPTIONS PLATFORM SESSION (2026-07-28b) — condor card↔panel consistency
+
+**Continues the session below.** Single-file fix in `options_platform.html`; no
+Python or `dhan_ironcondor/` changes this pass.
+
+### Problem found (confirmed with live numbers)
+The condor **preset card** (headline ₹) and the **tuner/slider panel** (the
+"calculations below") disagreed — e.g. Tight showed **₹1,931 on the card vs
+₹1,795 in the panel** at the same target delta.
+
+- **Not a pricing bug.** Both sides price a condor as a pure **LTP-sum**
+  (`sc.ce_ltp − lc.ce_ltp + sp.pe_ltp − lp.pe_ltp`); verified identical to the
+  paisa at equal strikes.
+- **Root cause = two delta sources feeding strike selection:**
+  - Cards (live path) rendered from server `s.presets`, built by
+    `strategy.py::select_condor_at` → `black76.delta` = **Black-Scholes delta
+    from IV**.
+  - Panel/slider uses `computeCondor()` in the HTML, selecting off **Dhan's
+    broker per-strike `ce_delta/pe_delta`** in `slim_chain`.
+  - Right at the 0.30 cutoff they disagree by one strike: broker `ce_delta` at
+    77600 = **0.301** (slider skips to 77700) but BS delta there = **0.268**
+    (backend keeps 77600). One strike apart ⇒ different credit.
+
+### Fix shipped
+- **`options_platform.html` → `renderSell()`** (right after `_sellPresets/
+  _sellChain/_sellMeta` are set, ~L672): the **live path now rebuilds each preset
+  card via `computeCondor()` over the same `slim_chain`/`chain_meta` the tuner
+  uses**, keeping the server preset only when the slim chain can't form the
+  condor (`c.ok === false`, e.g. wings outside the ~8% slim window). Mirrors what
+  the demo path already did (L288). Card headline == slider output, guaranteed.
+- Verified over a live payload: all 3 presets (Wide/Balanced/Tight) recompute
+  cleanly from `slim_chain`; card now equals panel for each.
+- **Deliberately did NOT touch `strategy.py`** — that's the live bot's execution
+  selection math (keeps BS-from-IV delta). This was a UI-consistency fix only.
+
+### Two UI behaviours explained (no code change — working as designed)
+- **"✕ BLOCKED" badge** = sell-side regime gate in `api/options_platform.py::
+  _sell_view()` (L336–352). Flips to BLOCKED when regime ∈ {HIGH_VOLATILITY,
+  TRENDING_BULL, TRENDING_BEAR} at confidence ≥0.6 (also demo data / late-entry
+  fail). Advisory "don't sell premium now," **not** a data error, separate from
+  `min_credit`. `late entry ok …` is a *different* gate that passed.
+- **Spot/strike ladder shows for Sensex but not Nifty:** `spreadCardHtml()`
+  (L574) draws the ladder only when `computeCondor` is `ok:true`; it returns
+  `ok:false` when `netCredit < min_credit` (`MIN_CREDIT_PTS = 30`, from
+  `config.py`, shipped in `chain_meta`). Nifty was 0DTE/low-vol → 5.35 pt < 30 →
+  ladder suppressed with the amber reason. Sensex Δ0.30 → 97.2 pt ≥ 30 → ladder
+  shown. Not symbol-specific logic — raise Nifty's Short Δ until credit clears 30
+  and its ladder appears too.
+
+### Open items / decisions for next session
+1. **Delta-source authority (needs a call).** The fix makes the *UI* internally
+   consistent by displaying broker-delta selections, but the *bot* still enters
+   on BS-from-IV delta — so at a boundary strike the screen can show a condor one
+   strike off from what the bot would actually trade. Options: (a) leave as-is
+   (UI consistent, execution separate); (b) ship the backend BS delta into
+   `slim_chain` and have `computeCondor` select on that, so the UI mirrors
+   execution. Pick one.
+2. **Re-check Nifty post-fix.** Earlier Nifty screenshot showed all three presets
+   identical (**₹1,063 / POP 98% / R:R 0.09**) while the tuner said 5.35 pt —
+   same class of inconsistency, likely a pre-fix render or near-expiry degenerate
+   chain. Reload Nifty and confirm the three presets now differentiate and match
+   the tuner.
+3. **Design/UI work not started.** User asked about connecting **Claude Design**
+   to improve the landing page / web interface. No design project is linked
+   (`DesignSync` project list is empty). Routes offered, awaiting choice:
+   (A) redesign the existing pages in-repo directly; (B) create a design on
+   claude.ai and import its share URL; (C) spin up a synced design project.
+   Candidate surfaces: landing page, `options_platform.html`,
+   `combined_breakout_scanner_platform.html`, or unify the whole visual system.
+   Note the existing explorations: `concept_glass.html`, `concept_press.html`,
+   `concept_terminal.html`, `concept_cockpit.html` — pick a vibe to standardise on.
+
+### Reference points (verified this session)
+- `options_platform.html`: `computeCondor()` L216, `spreadCardHtml()` L574,
+  `presetCardHtml()` L603, `renderCondorPresets()` L621, `applyTuner()` L632,
+  `renderSell()` L660 (fix ~L672).
+- `api/options_platform.py`: preset loop `pack()` L385–412, `_sell_view()` gate
+  L327–352, `chain_meta.min_credit = cfg.MIN_CREDIT_PTS` L429, slim_chain build
+  L414–424.
+- `dhan_ironcondor/strategy.py`: `select_condor_at()` L82 (uses `black76.delta`);
+  `ChainLeg` L13. `dhan_ironcondor/config.py`: `WING_WIDTH=200` L22,
+  `MIN_CREDIT_PTS=30` L24.
+- Scratch: `_s.json` (a fetched-payload dump used for the diagnosis) sits in the
+  repo root — safe to delete.
+
+---
+
+## 🧭 OPTIONS PLATFORM SESSION (2026-07-28) — condor presets + expiry-day reframe
+
+**Separate product track from the breakout scanner below.** Touches
+`api/options_platform.py`, `options_platform.html`, and the vendored
+`dhan_ironcondor/` engine (`strategy.py`, `black76.py`, `config.py`). This session
+extended the combined buy-side/sell-side options cockpit.
+
+### What shipped
+- **`dhan_ironcondor/strategy.py` — `select_condor_at(chain, or_high, or_low, F, T,
+  r, target_short_delta, wing_width, min_credit=MIN_CREDIT_PTS)`** (new). Factored the
+  short-delta target, wing width, and min-credit floor out of `select_condor()` so one
+  chain can be swept into a ladder of `(delta, wing)` presets. `select_condor()` now
+  just calls it with the `config.py` defaults (`TARGET_SHORT_DELTA`, `WING_WIDTH`) —
+  behaviour byte-identical, verified.
+- **`api/options_platform.py`** — `_sell_view()` now emits a **3-preset condor ladder**
+  (Wide 0.10 / Balanced 0.20 / Tight 0.30 short-delta), each with a **Black-76 POP
+  estimate** (`pop(be_lo, be_hi)` = `N(-d2)` difference across the two breakevens — model
+  estimate, not a guarantee; noted in `notes`), plus a **slim_chain** payload for the
+  compare UI. Regime gating unchanged: premium-selling still blocked in
+  HIGH_VOLATILITY / TRENDING_BULL / TRENDING_BEAR at confidence ≥0.6. `_buy_view()`
+  reframes the **expiry-day verdict** (hold vs scalp).
+- **`options_platform.html`** — condor **compare cards + delta/wing slider** (recomputes
+  presets client-side via `computeCondor`/`condorPop`, JS mirror of the Python), inline
+  **plain-English subtitles under the metric tiles**, and the **expiry-day buy-verdict
+  reframe** (hold vs scalp).
+
+### Verified end-to-end (this session)
+- All **3 demo presets resolve** on the widened demo chain (Wide/Balanced/Tight → ok,
+  distinct short strikes, credit rising & POP falling as delta tightens).
+- All **5 self-check assertions pass**: reproduces preset, shorts straddle spot, wings
+  symmetric, POP∈[0,1], higher delta ⇒ nearer short-call.
+- Syntax clean: **all 3 HTML `<script>` blocks parse**; `api/options_platform.py` +
+  `dhan_ironcondor/strategy.py` both `ast.parse` OK.
+
+### Current honest state
+- **Uncommitted.** Modified: `api/options_platform.py`, `dhan_ironcondor/strategy.py`,
+  `options_platform.html`. Latest commit is `8b779dcd2`.
+- **Dhan access token** was regenerated into `dhan_ironcondor/config.py` (the live
+  provider path; not a repo `.env`). Live expirylist + chain pulls verified with the new
+  token. Token is short-lived — will need regenerating again next session; the demo
+  chain path (`state.usingDemoFallback`) covers UI work without a live token.
+
+### Next steps (not requested, noted)
+- POP/regime thresholds in `options_platform.py` are first-pass rule-based (`v1`) — tune
+  in the thresholds block, not inline.
+- Butterfly is index-only in v1 (`stock condors not supported`).
 
 ---
 
