@@ -1,0 +1,4 @@
+dhanhq>=2.0
+websockets
+streamlit
+pandas
