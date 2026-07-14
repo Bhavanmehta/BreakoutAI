@@ -216,6 +216,8 @@ class LiveDhanProvider(DataProvider):
                 "oi": raw.get("oi"),
                 "volume": raw.get("volume"),
                 "iv": raw.get("implied_volatility"),
+                "prev_oi": raw.get("previous_oi"),
+                "prev_volume": raw.get("previous_volume"),
                 "delta": greeks.get("delta"),
                 "theta": greeks.get("theta"),
                 "gamma": greeks.get("gamma"),
