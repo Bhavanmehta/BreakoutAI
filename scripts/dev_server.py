@@ -15,6 +15,7 @@ from api.quotes import MAX_SYMBOLS, fetch_quotes  # noqa: E402
 from api.index_ohlc import fetch_index_ohlc  # noqa: E402
 from api.options_chain import ConfigError, ProviderError, SymbolNotFoundError, _load_env_file, fetch_expiry_list, fetch_option_chain, fetch_symbols  # noqa: E402
 from api.options_backtest import LocalOnlyError, dispatch as backtest_dispatch  # noqa: E402
+from api.options_platform import build_platform_view  # noqa: E402
 
 _load_env_file()  # so DHAN_CLIENT_ID/DHAN_ACCESS_TOKEN etc. from backend/.env are visible to LiveDhanProvider in local dev
 
@@ -73,6 +74,20 @@ class Handler(SimpleHTTPRequestHandler):
             except ProviderError as exc:
                 self._send_json(502, {"error": str(exc)})
                 return
+        if parsed.path == "/api/options_platform":
+            symbol = (qs.get("symbol") or ["NIFTY"])[0].strip().upper()
+            expiry = (qs.get("expiry") or [""])[0].strip() or None
+            try:
+                self._send_json(200, build_platform_view(symbol, expiry))
+            except SymbolNotFoundError as exc:
+                self._send_json(404, {"error": str(exc)})
+            except (ValueError, TypeError) as exc:
+                self._send_json(400, {"error": str(exc)})
+            except ConfigError as exc:
+                self._send_json(500, {"error": str(exc)})
+            except ProviderError as exc:
+                self._send_json(502, {"error": str(exc)})
+            return
         if parsed.path == "/api/options_backtest":
             try:
                 self._send_json(200, backtest_dispatch(qs))
