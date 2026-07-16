@@ -69,7 +69,7 @@ import requests
 # root on sys.path). On Vercel each api/*.py bundles in isolation and this
 # import would fail -- stub enough for the handler to boot and 501 cleanly.
 try:
-    from api.options_chain import ProviderError, SymbolNotFoundError, _env, _load_env_file, _resolve_symbol
+    from api.options_chain import ProviderError, SymbolNotFoundError, _env, _load_env_file, _resolve_symbol, get_dhan_token
 except ImportError:  # pragma: no cover -- Vercel isolation; endpoint is 501-guarded there
     class ProviderError(Exception):
         pass
@@ -85,6 +85,12 @@ except ImportError:  # pragma: no cover -- Vercel isolation; endpoint is 501-gua
 
     def _resolve_symbol(symbol):
         raise ProviderError("symbol resolution unavailable outside local dev")
+
+    def get_dhan_token(force_refresh=False):
+        tok = os.environ.get("DHAN_ACCESS_TOKEN") or os.environ.get("DHAN_Access_TOKEN")
+        if not tok:
+            raise ProviderError("token minting unavailable outside local dev")
+        return tok
 
 ROLLING_URL = "https://api.dhan.co/v2/charts/rollingoption"
 DB_PATH = Path(__file__).resolve().parent.parent / "backend" / "backtest_cache.db"
@@ -409,17 +415,35 @@ def _db() -> sqlite3.Connection:
 # --- Dhan rollingoption client ---------------------------------------------------
 def _rolling_post(body: dict, max_retries: int = 3) -> dict:
     """One rollingoption call. 429 -> linear backoff retry (5s, 10s, 15s), then
-    ProviderError. Other errors mirror LiveDhanProvider._post's messages."""
-    client_id, token = _env("DHAN_Client_ID"), _env("DHAN_Access_TOKEN")
+    ProviderError. Other errors mirror LiveDhanProvider._post's messages.
+
+    The access token is auto-minted + Upstash-shared via get_dhan_token (same
+    token the option-chain endpoint uses); a 401/403 forces one fresh mint."""
+    client_id = _env("DHAN_CLIENT_ID") or _env("DHAN_Client_ID")
+    try:
+        token = get_dhan_token()
+    except ProviderError:
+        token = _env("DHAN_ACCESS_TOKEN") or _env("DHAN_Access_TOKEN")
     if not client_id or not token:
-        raise ProviderError("DHAN_Client_ID / DHAN_Access_TOKEN not configured")
+        raise ProviderError(
+            "Dhan not configured -- set DHAN_CLIENT_ID + DHAN_PIN + DHAN_TOTP_SECRET "
+            "(auto-mint) or a manual DHAN_ACCESS_TOKEN")
     headers = {"access-token": token, "client-id": client_id,
                "Content-Type": "application/json", "Accept": "application/json"}
+    refreshed = False
     for attempt in range(max_retries + 1):
         try:
             resp = requests.post(ROLLING_URL, headers=headers, json=body, timeout=30)
         except requests.exceptions.RequestException as exc:
             raise ProviderError(f"network error calling Dhan: {exc}") from exc
+        if resp.status_code in (401, 403) and not refreshed:
+            refreshed = True
+            try:
+                headers["access-token"] = get_dhan_token(force_refresh=True)
+            except ProviderError:
+                pass
+            else:
+                continue
         if resp.status_code == 429:
             if attempt < max_retries:
                 time.sleep(5.0 * (attempt + 1))

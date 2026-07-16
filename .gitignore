@@ -15,6 +15,11 @@ dist/
 .env
 .env.local
 
+# Local Dhan credential helpers (hold a live access token — never commit).
+# Dot-source before running dhan_ironcondor scripts: . .\set-dhan-env.local.ps1
+*.local.ps1
+dhan_ironcondor/.env
+
 # Python backend
 __pycache__/
 *.pyc

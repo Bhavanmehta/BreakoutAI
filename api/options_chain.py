@@ -5,10 +5,11 @@ expired/rate-limited on a given call.
 
 Why this exists as its own endpoint (and not client-side fetch()):
 Dhan's option-chain API needs an access-token + client-id sent as request HEADERS
-on every call. Those are long-lived secrets (DHAN_ACCESS_TOKEN currently expires
-~24h after issue, DHAN_CLIENT_ID is a fixed account id) -- they must never reach
-the browser, so the assessor page cannot call api.dhan.co directly. This function
-is the one place that holds/uses them.
+on every call. The client-id is a fixed account id; the access-token expires ~24h
+after issue and is now AUTO-MINTED on demand from three stable secrets (PIN + TOTP,
+see get_dhan_token) and shared via Upstash -- no daily manual token paste. These
+secrets must never reach the browser, so the assessor page cannot call api.dhan.co
+directly. This function is the one place that holds/uses them.
 
 Provider abstraction (this is the piece the original delivery was missing):
   DataProvider            -- interface: get_expiry_list(symbol), get_option_chain(symbol, expiry)
@@ -43,7 +44,8 @@ Query params:
 Self-contained (no sibling imports), same convention as every other api/*.py in
 this repo -- Vercel's Python runtime bundles each file in isolation.
 
-Local smoke test (needs backend/.env populated with DHAN_Client_ID / DHAN_Access_TOKEN):
+Local smoke test (needs backend/.env with DHAN_CLIENT_ID + DHAN_PIN + DHAN_TOTP_SECRET,
+or a manual DHAN_ACCESS_TOKEN):
     python api/options_chain.py [SYMBOL] [EXPIRY]
 """
 from __future__ import annotations
@@ -156,10 +158,19 @@ class LiveDhanProvider(DataProvider):
     label = "live"
 
     def __init__(self):
-        self.client_id = _env("DHAN_Client_ID")
-        self.token = _env("DHAN_Access_TOKEN")
+        # client-id is a stable account id; accept either casing (legacy .env used
+        # DHAN_Client_ID; the auto-mint creds use canonical DHAN_CLIENT_ID).
+        self.client_id = _env("DHAN_CLIENT_ID") or _env("DHAN_Client_ID")
+        # Access token is auto-minted from PIN+TOTP and shared via Upstash; falls
+        # back to a manually-pasted token if the mint creds are absent.
+        try:
+            self.token = get_dhan_token()
+        except ProviderError:
+            self.token = _env("DHAN_ACCESS_TOKEN") or _env("DHAN_Access_TOKEN")
         if not self.client_id or not self.token:
-            raise ProviderError("DHAN_Client_ID / DHAN_Access_TOKEN not configured")
+            raise ProviderError(
+                "Dhan not configured -- set DHAN_CLIENT_ID + DHAN_PIN + DHAN_TOTP_SECRET "
+                "(auto-mint) or a manual DHAN_ACCESS_TOKEN")
 
     def _headers(self):
         return {
@@ -173,11 +184,20 @@ class LiveDhanProvider(DataProvider):
         scrip, seg, _lot = _resolve_symbol(symbol)
         return scrip, seg
 
-    def _post(self, path: str, body: dict) -> dict:
+    def _post(self, path: str, body: dict, _retried: bool = False) -> dict:
         try:
             resp = requests.post(f"{DHAN_BASE}{path}", headers=self._headers(), json=body, timeout=15)
         except requests.exceptions.RequestException as exc:
             raise ProviderError(f"network error calling Dhan: {exc}") from exc
+        if resp.status_code in (401, 403) and not _retried:
+            # Token was rejected (expired / invalidated early). Force one fresh
+            # mint and retry before giving up and falling back to Mock.
+            try:
+                self.token = get_dhan_token(force_refresh=True)
+            except ProviderError:
+                pass
+            else:
+                return self._post(path, body, _retried=True)
         if resp.status_code == 429:
             raise ProviderError("Dhan rate-limited this request (429) -- wait a few seconds and retry")
         if not resp.ok:
@@ -263,7 +283,7 @@ class MockDhanProvider(DataProvider):
         try:
             exp_date = datetime.date.fromisoformat(expiry)
             days = max((exp_date - datetime.date.today()).days, 1)
-        except ValueError:
+        except (ValueError, TypeError):
             days = 3
         t_years = days / 365.0
         atm = round(spot / interval) * interval
@@ -326,6 +346,158 @@ def _cache_set(key: str, value: dict) -> None:
         _upstash("SET", key, json.dumps(value), "EX", str(RATE_CACHE_TTL_SECONDS))
     except Exception:
         pass
+
+
+# --- Dhan access-token auto-mint (PIN + TOTP), Redis-cached -------------------
+# Dhan expires the option-chain access token ~24h after issue. Rather than a
+# human pasting a fresh token into env every day, we mint one on demand from
+# three STABLE secrets (DHAN_CLIENT_ID / DHAN_PIN / DHAN_TOTP_SECRET) and cache
+# it in Upstash so every warm lambda AND every other endpoint (options_backtest,
+# the refresh cron) share one token until it nears expiry.
+#
+# Replicates dhanhq.DhanLogin.generate_token() with raw HTTP + a stdlib RFC-6238
+# TOTP (no dhanhq/pyotp dependency -- keeps this serverless bundle lean, same
+# self-containment rationale as the rest of api/*.py):
+#   POST https://auth.dhan.co/app/generateAccessToken?dhanClientId=..&pin=..&totp=..
+DHAN_AUTH_URL = "https://auth.dhan.co/app/generateAccessToken"
+DHAN_TOKEN_CACHE_KEY = "dhan:access_token:v1"
+DHAN_TOKEN_REFRESH_BUFFER = 3600  # re-mint when <1h of validity remains
+DHAN_TOKEN_FALLBACK_TTL = 20 * 3600  # cache lifetime if the JWT carries no exp
+_DHAN_TOKEN_MEM: tuple[str, float] | None = None  # (token, exp_epoch) warm-lambda memo
+
+_DHAN_TOKEN_KEYS = ("accessToken", "access_token", "accesstoken", "token", "jwt")
+
+
+def _totp_now(secret: str) -> str:
+    """RFC-6238 TOTP (SHA-1, 30s step, 6 digits) from a base32 secret -- the
+    same 6-digit code Google Authenticator / pyotp produce, using only stdlib."""
+    import base64
+    import hashlib
+    import hmac
+    import struct
+    s = secret.strip().replace(" ", "").upper()
+    s += "=" * (-len(s) % 8)  # base32 wants length to be a multiple of 8
+    key = base64.b32decode(s)
+    counter = struct.pack(">Q", int(time.time()) // 30)
+    digest = hmac.new(key, counter, hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    code = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
+    return f"{code:06d}"
+
+
+def _extract_dhan_token(resp) -> str | None:
+    """Pull the access token out of Dhan's mint response defensively (the exact
+    shape isn't rigidly documented): known keys, then any nested dict, then the
+    longest JWT-ish string."""
+    if isinstance(resp, str):
+        return resp.strip() or None
+    if not isinstance(resp, dict):
+        return None
+    for k in _DHAN_TOKEN_KEYS:
+        v = resp.get(k)
+        if isinstance(v, str) and len(v) > 20:
+            return v.strip()
+    for v in resp.values():
+        if isinstance(v, dict):
+            got = _extract_dhan_token(v)
+            if got:
+                return got
+    best = None
+    for v in resp.values():
+        if isinstance(v, str) and len(v) > 40 and "." in v:
+            if best is None or len(v) > len(best):
+                best = v.strip()
+    return best
+
+
+def _jwt_exp(token: str) -> float | None:
+    """Best-effort: read the `exp` (epoch seconds) claim out of a JWT so we can
+    cache the token until just before it actually expires. None if not a JWT."""
+    import base64
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        exp = payload.get("exp")
+        return float(exp) if exp else None
+    except Exception:
+        return None
+
+
+def _mint_dhan_token() -> str:
+    """Mint a fresh Dhan access token from the 3 stable secrets (PIN + TOTP).
+    Raises ProviderError on any failure so callers can fall back."""
+    client_id = _env("DHAN_CLIENT_ID") or _env("DHAN_Client_ID")
+    pin = _env("DHAN_PIN")
+    secret = _env("DHAN_TOTP_SECRET")
+    if not (client_id and pin and secret):
+        raise ProviderError(
+            "cannot auto-mint Dhan token -- need DHAN_CLIENT_ID + DHAN_PIN + DHAN_TOTP_SECRET")
+    try:
+        totp = _totp_now(secret)
+    except Exception as exc:
+        raise ProviderError(
+            f"could not compute TOTP from DHAN_TOTP_SECRET (is it the base32 secret?): {exc}") from exc
+    try:
+        resp = requests.post(
+            DHAN_AUTH_URL,
+            params={"dhanClientId": client_id, "pin": pin, "totp": totp},
+            timeout=15,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise ProviderError(f"network error minting Dhan token: {exc}") from exc
+    if not resp.ok:
+        raise ProviderError(f"Dhan token mint HTTP {resp.status_code}: {resp.text[:300]}")
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise ProviderError(f"Dhan token mint returned non-JSON: {exc}") from exc
+    token = _extract_dhan_token(data)
+    if not token:
+        raise ProviderError(f"no access token in Dhan mint response: {json.dumps(data)[:300]}")
+    return token
+
+
+def _cache_set_token(token: str, exp: float) -> None:
+    ttl = int(max(exp - time.time() - DHAN_TOKEN_REFRESH_BUFFER, 60))
+    try:
+        _upstash("SET", DHAN_TOKEN_CACHE_KEY, json.dumps({"token": token, "exp": exp}), "EX", str(ttl))
+    except Exception:
+        pass  # cache is a best-effort speed-up, never a hard dependency
+
+
+def get_dhan_token(force_refresh: bool = False) -> str:
+    """Return a valid Dhan access token, minting + caching as needed.
+
+    Preference order (each falls through to the next on failure/expiry):
+      1. warm-lambda memo (this process)
+      2. Upstash cache shared across lambdas + endpoints
+      3. mint a fresh one (PIN + TOTP) and write it to memo + Upstash
+      4. a manually-pasted DHAN_ACCESS_TOKEN from env (legacy escape hatch)
+
+    Raises ProviderError only when there is no usable token at all."""
+    global _DHAN_TOKEN_MEM
+    now = time.time()
+
+    if not force_refresh:
+        if _DHAN_TOKEN_MEM and _DHAN_TOKEN_MEM[1] - DHAN_TOKEN_REFRESH_BUFFER > now:
+            return _DHAN_TOKEN_MEM[0]
+        cached = _cache_get(DHAN_TOKEN_CACHE_KEY)
+        if cached and cached.get("token") and cached.get("exp", 0) - DHAN_TOKEN_REFRESH_BUFFER > now:
+            _DHAN_TOKEN_MEM = (cached["token"], cached["exp"])
+            return cached["token"]
+
+    try:
+        token = _mint_dhan_token()
+        exp = _jwt_exp(token) or (now + DHAN_TOKEN_FALLBACK_TTL)
+        _DHAN_TOKEN_MEM = (token, exp)
+        _cache_set_token(token, exp)
+        return token
+    except ProviderError:
+        static = _env("DHAN_ACCESS_TOKEN") or _env("DHAN_Access_TOKEN")
+        if static:
+            return static  # may be stale -> Dhan call fails -> Mock fallback (safe)
+        raise
 
 
 # --- F&O symbol resolver (any NSE stock with options, not just indices) --------

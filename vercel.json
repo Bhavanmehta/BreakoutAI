@@ -1,5 +1,8 @@
 {
   "rewrites": [
     { "source": "/", "destination": "/combined_breakout_scanner_platform.html" }
+  ],
+  "crons": [
+    { "path": "/api/refresh_dhan_token", "schedule": "0 2 * * *" }
   ]
 }

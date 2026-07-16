@@ -2,3 +2,4 @@ dhanhq>=2.0
 websockets
 streamlit
 pandas
+pyotp        # turns DHAN_TOTP_SECRET into a 6-digit TOTP for auto access-token minting

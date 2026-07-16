@@ -156,6 +156,16 @@
 
         <!-- App (hidden until data loads) -->
         <div id="app" class="hidden">
+            <!-- Data-health banner: fundamentals/sector enrichment is merged in by the
+                 daily scan (see daily-scan.yml). If a CI regression ships breakouts.json
+                 with fundamentals:null / sector:"" for most stocks, every cap/sector/
+                 fundamentals filter silently returns nothing. Rather than let that fail
+                 invisibly, surface it. Hidden until renderDataHealth() finds poor coverage. -->
+            <div id="dataHealthBanner" class="hidden mb-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-2">
+                <span aria-hidden="true">⚠</span>
+                <span id="dataHealthMsg" class="flex-1"></span>
+                <button id="dataHealthDismiss" type="button" class="text-amber-300/70 hover:text-amber-200 flex-none" aria-label="Dismiss">✕</button>
+            </div>
 
             <!-- Filter / sort bar (replaces the old watchlist strip) -->
             <div id="filterBar" class="mb-5 p-3 rounded-xl bg-cardBg border border-borderCl flex flex-wrap items-center gap-3">
@@ -1025,6 +1035,41 @@
             const r = MCAP_RANK[s.symbol];
             return r != null && r >= lo && r <= hi;
         };
+
+        // --- Data-health check --------------------------------------------------------
+        // Fundamentals & sector are merged into breakouts.json by the daily scan (see
+        // daily-scan.yml). When a CI regression ships them null/blank for most stocks,
+        // every cap/sector/fundamentals filter silently matches nothing. Surface that
+        // as a visible banner instead of letting the filters fail invisibly.
+        const dataHealthDismissed = new Set();   // markets dismissed this session
+        function renderDataHealth() {
+            const banner = $("dataHealthBanner");
+            if (!banner) return;
+            const dismiss = $("dataHealthDismiss");
+            if (dismiss && !dismiss._wired) {
+                dismiss._wired = true;
+                dismiss.addEventListener("click", () => {
+                    dataHealthDismissed.add(MARKET);
+                    banner.classList.add("hidden");
+                });
+            }
+            const n = STOCKS.length;
+            const hide = () => banner.classList.add("hidden");
+            if (!n) return hide();
+            const withMcap  = STOCKS.filter(s => s.fundamentals && s.fundamentals.market_cap != null).length;
+            const withSector = STOCKS.filter(s => sectorGroup(s) !== "Unclassified").length;
+            const mcapPct = withMcap / n, sectorPct = withSector / n;
+            // A handful of genuinely missing names is normal; < 50% coverage means the
+            // enrichment merge almost certainly didn't run (the exact daily-scan bug).
+            const bad = mcapPct < 0.5 || sectorPct < 0.5;
+            if (!bad || dataHealthDismissed.has(MARKET)) return hide();
+            const parts = [];
+            if (mcapPct < 0.5)   parts.push(`market cap on only ${Math.round(mcapPct * 100)}% of stocks (cap tiers &amp; fundamentals filters)`);
+            if (sectorPct < 0.5) parts.push(`sector on only ${Math.round(sectorPct * 100)}% (sector filter &amp; radar)`);
+            $("dataHealthMsg").innerHTML =
+                `Fundamentals data looks incomplete in this scan — ${parts.join("; ")} may be unreliable until the next scan republishes enriched data.`;
+            banner.classList.remove("hidden");
+        }
         const COLLECTIONS = [
             { key: "", label: "All stocks" },
             { key: "nifty50", label: "Nifty 50", tip: "Nifty 50 large-cap constituents (curated bluechip list; resynced at index reviews).", match: s => NIFTY50.has(s.symbol), inOnly: true },
@@ -1281,6 +1326,7 @@
             }
 
             computeMcapRank();
+            renderDataHealth();
             buildSectorOptions();
             renderCollections();
             renderSetupBreakdown();
