@@ -47,7 +47,15 @@ jobs:
           PREV="$(mktemp -d)"
           if git clone --depth 1 --branch data "$REPO_URL" "$PREV/d" 2>/dev/null; then
             mkdir -p data/us
-            for f in performance.json track_record.json predictions_log.jsonl; do
+            # See daily-scan.yml for the full rationale. Beyond the append-only ledgers,
+            # restore the slow-changing reference enrichments (fundamentals/sectors/
+            # holdings/earnings) that run_scan.py merges only `if <file>.exists()`: they're
+            # produced out-of-band by fetch_*.py (not run here) and live only on the `data`
+            # branch, so without this every US stock ships fundamentals: null and the
+            # site's fundamentals/collection filters match nothing. Guarded per file, so
+            # names not (yet) published for US are simply skipped.
+            for f in performance.json track_record.json predictions_log.jsonl \
+                     fundamentals.json sectors.json holdings.json earnings.json; do
               [ -f "$PREV/d/us/$f" ] && cp "$PREV/d/us/$f" "data/us/$f" || true
             done
           fi
@@ -77,6 +85,11 @@ jobs:
           cp data/us/breakouts.json data/us/track_record.json data/us/performance.json \
              data/us/predictions_log.jsonl "$PUB/pub/us/"
           [ -f data/us/social.json ] && cp data/us/social.json "$PUB/pub/us/" || true
+          # Reference enrichments: preserved by the clone-forward above; re-copy any that
+          # exist locally so an out-of-band refresh (fetch_fundamentals.py etc.) propagates.
+          for f in fundamentals.json sectors.json holdings.json earnings.json; do
+            [ -f "data/us/$f" ] && cp "data/us/$f" "$PUB/pub/us/" || true
+          done
           rm -rf "$PUB/pub/us/ohlc" && cp -r data/us/ohlc "$PUB/pub/us/ohlc"
           cd "$PUB/pub"
           git init -q && git checkout -q -b data

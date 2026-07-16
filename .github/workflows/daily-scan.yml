@@ -43,7 +43,18 @@ jobs:
           PREV="$(mktemp -d)"
           if git clone --depth 1 --branch data "$REPO_URL" "$PREV/d" 2>/dev/null; then
             mkdir -p data
-            for f in performance.json track_record.json predictions_log.jsonl; do
+            # Two kinds of gitignored, branch-resident data must be pulled back into data/
+            # before run_scan.py, or a fresh CI checkout silently loses them:
+            #   (a) append-only ledgers — loaded, appended to, and rewritten each run;
+            #   (b) slow-changing reference enrichments (fundamentals/sectors/holdings/
+            #       earnings) produced OUT-OF-BAND by their own fetch_*.py scripts, which
+            #       do NOT run in this daily job. run_scan.py merges them only `if
+            #       <file>.exists()`; without this restore they don't exist in CI, so every
+            #       stock ships fundamentals: null / sector: "" and the site's fundamentals,
+            #       collection and sector filters all match nothing. (They persist on the
+            #       branch via the publish step's clone-forward; this is the read side.)
+            for f in performance.json track_record.json predictions_log.jsonl \
+                     fundamentals.json sectors.json holdings.json earnings.json; do
               [ -f "$PREV/d/$f" ] && cp "$PREV/d/$f" "data/$f" || true
             done
           fi
@@ -83,6 +94,13 @@ jobs:
              data/predictions_log.jsonl "$PUB/pub/"
           [ -f data/news.json ] && cp data/news.json "$PUB/pub/" || true
           [ -f data/fii_dii_history.json ] && cp data/fii_dii_history.json "$PUB/pub/" || true
+          # Slow-changing reference enrichments are preserved on the branch by the
+          # clone-forward above; re-copy any that exist locally so an out-of-band refresh
+          # (fetch_fundamentals.py / fetch_sectors.py / etc.) propagates instead of the
+          # branch silently pinning the first-ever copy forever.
+          for f in fundamentals.json sectors.json holdings.json earnings.json; do
+            [ -f "data/$f" ] && cp "data/$f" "$PUB/pub/" || true
+          done
           rm -rf "$PUB/pub/ohlc" && cp -r data/ohlc "$PUB/pub/ohlc"
           cd "$PUB/pub"
           git init -q && git checkout -q -b data
