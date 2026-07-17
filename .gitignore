@@ -82,3 +82,10 @@ dhan_ironcondor/runtime/
 # copy lives under dhan_ironcondor/runtime/, already ignored above). Kept on
 # disk pending cleanup; not committed.
 dhan_ironcondor/master_sample.csv
+
+# options_backtest/ raw NSE bhavcopy cache (~87MB, one row per contract per day) —
+# too large to commit and fully regenerable via
+# `python options_backtest/scripts/fetch_bhavcopy.py` (see options_backtest/REPORT.md).
+# fetch_log.txt (small, per-day fetch audit trail) and everything under output/ ARE
+# committed as the source-of-record results.
+options_backtest/data/nifty_fo_daily.csv

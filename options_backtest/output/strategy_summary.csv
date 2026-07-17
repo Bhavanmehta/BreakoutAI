@@ -1,0 +1,14 @@
+strategy,trades,win_rate_pct,total_pnl_rs,total_return_pct,cagr_pct,max_drawdown_pct,avg_win_rs,avg_loss_rs,profit_factor,sharpe_like,period_days,hold_type,notes
+Momentum-Expiry-HoldToSettle,56,91.1,24874.0,24.87,23.5,-7.35,850.0,-3692.0,2.35,1.78,384,expiry,"Momentum-timed spread entered 2 days pre-expiry, held to settlement."
+MeanReversion-Expiry,18,77.8,17246.0,17.25,22.2,-3.13,1531.0,-1046.0,5.12,2.69,290,expiry,"Contrarian entry 2 days pre-expiry, held with EOD SL/target checks."
+Conservative-Wide-Expiry,30,23.3,-2314.0,-2.31,-2.4,-3.36,496.0,-252.0,0.6,-0.96,356,expiry,"Wide 2.5% OTM strikes, only in low-vol regime, tighter SL, held to expiry."
+ThetaHarvest-Baseline-Expiry,57,78.9,-8002.0,-8.0,-7.5,-25.64,866.0,-3915.0,0.83,-0.36,392,expiry,"Non-directional benchmark: always sells a put spread, no signal at all."
+MeanReversion-Overnight,84,32.1,-14764.0,-14.76,-14.0,-23.27,815.0,-645.0,0.6,-1.17,388,overnight,Fades yesterday's >0.6% move; opposite-of-momentum overnight bet.
+GapPosition-Overnight,174,27.6,-29692.0,-29.69,-27.8,-35.09,660.0,-487.0,0.52,-2.26,395,overnight,Direction from where today's futures closed within its day range.
+LowVol-Tight-Overnight,109,27.5,-38711.0,-38.71,-38.6,-40.81,433.0,-655.0,0.25,-4.44,366,overnight,Only trades in calm/contracting-vol regime; tight premium harvesting.
+VolExpansion-Overnight,84,28.6,-39698.0,-39.7,-40.7,-39.86,583.0,-895.0,0.26,-2.9,354,overnight,Only trades when 5d realized vol > 20d (breakout regime) + momentum dir.
+TrendFollow10d-Overnight,202,30.2,-40976.0,-40.98,-39.7,-41.29,676.0,-583.0,0.5,-2.72,381,overnight,"Slower 10-day trend filter instead of 3-day, overnight hold."
+Aggressive-Tight-Overnight,202,38.6,-45656.0,-45.66,-43.4,-47.94,683.0,-798.0,0.54,-2.61,391,overnight,"Very tight ~0.6% OTM strikes -> high premium, high assignment/gap risk."
+SkewFade-Overnight,190,33.7,-54660.0,-54.66,-51.9,-56.67,558.0,-717.0,0.4,-3.28,395,overnight,Direction from relative PE vs CE richness (put/call price skew) at 1% OTM.
+Momentum-Overnight-Wide,202,15.3,-66982.0,-66.98,-64.5,-67.06,622.0,-504.0,0.22,-3.33,391,overnight,"Same signal as #1 but strikes further OTM -> less premium, less gap risk."
+Momentum-Overnight-Tight,202,34.2,-71152.0,-71.15,-68.7,-74.66,626.0,-860.0,0.38,-3.48,391,overnight,"3-day momentum, tight 1.0% OTM short strike, held to next open."
