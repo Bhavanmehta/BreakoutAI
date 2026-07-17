@@ -241,6 +241,12 @@ def build_summary(df: pd.DataFrame, symbol: str, meta: dict) -> dict:
     prev = df.iloc[-2]
 
     price = round(float(latest["close"]), 2)
+    # Reject degenerate rows: delisted / thin penny tickers (common in the large US
+    # universe) can come back with a 0.00 close, which would divide-by-zero below
+    # (change_pct off prev close, dist_pct off price) and abort the whole scan.
+    # Drop them like any other unusable stock rather than crash the run.
+    if price <= 0 or float(prev["close"]) <= 0:
+        return None
     change_pct = round((float(latest["close"]) / float(prev["close"]) - 1) * 100, 2)
 
     # Each EMA carries its actual value, its position vs price, and a friendly label.
