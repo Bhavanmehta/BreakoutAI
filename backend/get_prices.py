@@ -67,6 +67,12 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
     which matters at whole-market scale (~2000 stocks) where per-symbol calls both
     drag and invite rate-limiting.
 
+    Yahoo periodically rate-limits whole IP ranges (common on shared CI runners
+    like GitHub Actions) independent of how much *we* have actually requested.
+    When that happens, back off and retry the same chunk a few times before
+    giving up on it — plowing straight into the next chunk only makes an
+    existing block worse and can wipe out the whole run (seen 2026-07-16).
+
     Returns {symbol: tidy_df} for the symbols that came back with usable data;
     symbols that failed or returned nothing are simply absent from the dict.
     """
@@ -74,15 +80,35 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
     start = (date.today() - timedelta(days=int(years * 365.25) + 5)).isoformat()
     out: dict[str, pd.DataFrame] = {}
 
+    max_retries = 4
+    backoff_base_sec = 20  # doubles each retry: 20s, 40s, 80s, 160s
+
     for i in range(0, len(symbols), chunk_size):
         chunk = symbols[i:i + chunk_size]
         tickers = [f"{s}{settings.TICKER_SUFFIX}" for s in chunk]
-        try:
-            data = yf.download(tickers, start=start, interval="1d", auto_adjust=True,
-                               group_by="ticker", progress=False, threads=True)
-        except Exception as e:
-            print(f"    [batch {i//chunk_size}] download failed: {e}")
-            continue
+
+        data = None
+        for attempt in range(max_retries + 1):
+            try:
+                data = yf.download(tickers, start=start, interval="1d", auto_adjust=True,
+                                   group_by="ticker", progress=False, threads=True)
+                break
+            except Exception as e:
+                is_rate_limit = (
+                    type(e).__name__ == "YFRateLimitError"
+                    or "Rate limited" in str(e)
+                    or "Too Many Requests" in str(e)
+                )
+                if is_rate_limit and attempt < max_retries:
+                    wait = backoff_base_sec * (2 ** attempt)
+                    print(f"    [batch {i//chunk_size}] rate limited, backing off "
+                          f"{wait}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait)
+                    continue
+                print(f"    [batch {i//chunk_size}] download failed: {e}")
+                data = None
+                break
+
         if data is None or len(data) == 0:
             continue
 
@@ -96,7 +122,7 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
             tidy = _tidy_one(sub.copy(), sym)
             if tidy is not None and len(tidy) > 0:
                 out[sym] = tidy
-        time.sleep(0.3)  # be polite between chunks
+        time.sleep(1.5)  # be polite between chunks (was 0.3s — too aggressive)
 
     return out
 
