@@ -14,6 +14,7 @@ sorted oldest -> newest.
 from __future__ import annotations
 from datetime import date, timedelta
 import time
+import random
 import pandas as pd
 
 import settings
@@ -61,17 +62,33 @@ def _tidy_one(sub: pd.DataFrame, symbol: str) -> pd.DataFrame | None:
 
 
 def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTORY_YEARS,
-                                chunk_size: int = 100) -> dict[str, pd.DataFrame]:
+                                chunk_size: int = 25) -> dict[str, pd.DataFrame]:
     """Fetch many symbols in one shot per chunk. `yf.download` with a ticker list
-    is ~30x faster and far fewer HTTP requests than looping one symbol at a time,
-    which matters at whole-market scale (~2000 stocks) where per-symbol calls both
-    drag and invite rate-limiting.
+    is far fewer HTTP requests than looping one symbol at a time, which matters
+    at whole-market scale (~2000-4000 stocks) where per-symbol calls both drag
+    and invite rate-limiting.
 
     Yahoo periodically rate-limits whole IP ranges (common on shared CI runners
     like GitHub Actions) independent of how much *we* have actually requested.
-    When that happens, back off and retry the same chunk a few times before
-    giving up on it — plowing straight into the next chunk only makes an
-    existing block worse and can wipe out the whole run (seen 2026-07-16).
+    Two distinct failure modes have been observed and are both handled here:
+      1. The whole `yf.download()` call raises (YFRateLimitError / "Too Many
+         Requests") -- caught below, back off, retry the chunk.
+      2. The call returns *without raising* but most/all individual tickers in
+         the chunk come back empty -- Yahoo silently drops them server-side.
+         This turned out to be the dominant failure mode (2026-07-15/16/17):
+         retrying only on exception left ~98% of the US universe unfetched
+         even though no exception was ever thrown, because nearly every chunk
+         "succeeded" while yielding almost nothing. We now measure the
+         per-chunk yield (successfully-tidied symbols / chunk size) and treat
+         a low yield the same as an explicit rate limit: back off and
+         re-download the whole chunk.
+    Concurrency is also kept low (small chunks, no internal threading) since a
+    burst of near-simultaneous per-ticker requests inside one `yf.download()`
+    call appears to be what trips the per-ticker throttling in the first
+    place. A run-wide time budget bounds how long we'll keep chasing a
+    persistent block, so a bad day degrades gracefully (partial data, on
+    time) instead of burning the whole job retrying a wall that isn't coming
+    down this run.
 
     Returns {symbol: tidy_df} for the symbols that came back with usable data;
     symbols that failed or returned nothing are simply absent from the dict.
@@ -80,19 +97,30 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
     start = (date.today() - timedelta(days=int(years * 365.25) + 5)).isoformat()
     out: dict[str, pd.DataFrame] = {}
 
-    max_retries = 4
-    backoff_base_sec = 20  # doubles each retry: 20s, 40s, 80s, 160s
+    max_retries = 2
+    backoff_base_sec = 15          # doubles each retry: 15s, 30s
+    min_yield = 0.5                # below this fraction of a chunk coming back
+                                    # usable, treat it as silent rate-limiting
+    fetch_budget_sec = 25 * 60     # hard cap on total time spent fetching prices
+    fetch_deadline = time.monotonic() + fetch_budget_sec
 
     for i in range(0, len(symbols), chunk_size):
         chunk = symbols[i:i + chunk_size]
         tickers = [f"{s}{settings.TICKER_SUFFIX}" for s in chunk]
 
-        data = None
+        chunk_out: dict[str, pd.DataFrame] = {}
         for attempt in range(max_retries + 1):
+            if time.monotonic() > fetch_deadline:
+                print(f"    [batch {i//chunk_size}] fetch time budget "
+                      f"({fetch_budget_sec}s) exceeded -- keeping partial "
+                      f"results and stopping early.")
+                out.update(chunk_out)
+                return out
+
+            data = None
             try:
                 data = yf.download(tickers, start=start, interval="1d", auto_adjust=True,
-                                   group_by="ticker", progress=False, threads=True)
-                break
+                                   group_by="ticker", progress=False, threads=False)
             except Exception as e:
                 is_rate_limit = (
                     type(e).__name__ == "YFRateLimitError"
@@ -100,29 +128,51 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
                     or "Too Many Requests" in str(e)
                 )
                 if is_rate_limit and attempt < max_retries:
-                    wait = backoff_base_sec * (2 ** attempt)
-                    print(f"    [batch {i//chunk_size}] rate limited, backing off "
-                          f"{wait}s (attempt {attempt + 1}/{max_retries})")
+                    wait = backoff_base_sec * (2 ** attempt) + random.uniform(0, 5)
+                    print(f"    [batch {i//chunk_size}] rate limited (exception), "
+                          f"backing off {wait:.0f}s (attempt {attempt + 1}/{max_retries})")
                     time.sleep(wait)
                     continue
                 print(f"    [batch {i//chunk_size}] download failed: {e}")
-                data = None
                 break
 
-        if data is None or len(data) == 0:
-            continue
+            if data is None or len(data) == 0:
+                if attempt < max_retries:
+                    wait = backoff_base_sec * (2 ** attempt) + random.uniform(0, 5)
+                    print(f"    [batch {i//chunk_size}] empty response, backing off "
+                          f"{wait:.0f}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait)
+                    continue
+                break
 
-        for sym in chunk:
-            tkr = f"{sym}{settings.TICKER_SUFFIX}"
-            try:
-                # For a single-ticker chunk yfinance omits the ticker column level.
-                sub = data[tkr] if isinstance(data.columns, pd.MultiIndex) else data
-            except (KeyError, TypeError):
+            chunk_out = {}
+            for sym in chunk:
+                tkr = f"{sym}{settings.TICKER_SUFFIX}"
+                try:
+                    # For a single-ticker chunk yfinance omits the ticker column level.
+                    sub = data[tkr] if isinstance(data.columns, pd.MultiIndex) else data
+                except (KeyError, TypeError):
+                    continue
+                tidy = _tidy_one(sub.copy(), sym)
+                if tidy is not None and len(tidy) > 0:
+                    chunk_out[sym] = tidy
+
+            yield_frac = len(chunk_out) / len(chunk)
+            if yield_frac < min_yield and attempt < max_retries:
+                # Most of the chunk came back empty even though the call itself
+                # didn't raise -- Yahoo silently dropping individual tickers.
+                # Treat like a rate limit and retry the whole chunk.
+                wait = backoff_base_sec * (2 ** attempt) + random.uniform(0, 5)
+                print(f"    [batch {i//chunk_size}] low yield "
+                      f"({len(chunk_out)}/{len(chunk)}), likely silent rate-limiting -- "
+                      f"backing off {wait:.0f}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
                 continue
-            tidy = _tidy_one(sub.copy(), sym)
-            if tidy is not None and len(tidy) > 0:
-                out[sym] = tidy
-        time.sleep(1.5)  # be polite between chunks (was 0.3s — too aggressive)
+
+            break  # good enough (or out of retries) -- stop retrying this chunk
+
+        out.update(chunk_out)
+        time.sleep(2.0 + random.uniform(0, 2.0))  # be polite between chunks, with jitter
 
     return out
 
