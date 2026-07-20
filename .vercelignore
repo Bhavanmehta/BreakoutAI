@@ -1,0 +1,60 @@
+# Minimal-upload ignore file for a lightweight preview deploy of options_strategies.html.
+# .vercelignore REPLACES .gitignore for `vercel deploy` (gitignore rules are not
+# inherited), so we have to be explicit here, including secrets.
+
+# never upload local secrets
+.env.local
+.env
+backend/.env
+
+# big local/dev-only dirs not needed to serve this page
+node_modules/
+__pycache__/
+**/__pycache__/
+.venv/
+venv/
+agent/
+.agents/
+.claude/
+backend/
+dhan_ironcondor/
+docs/
+mockups/
+options_backtest/
+redesign_site/
+reports/
+scratch/
+scratchpad/
+scripts/
+data/us/
+
+# data/ is huge (ohlc dumps, duckdb, etc.) -- keep ONLY the precomputed json the
+# strategies page fetches
+/data/*
+!/data/options_strategies.json
+
+# misc large root-level scratch/debug artifacts
+BreakoutAI Website Redesign.zip
+_check.json
+_live_breakouts.json
+_live_in_perf.json
+_live_us_perf.json
+_p.json
+_payload.json
+_probe.json
+_s.json
+_us_pub_breakouts.json
+_v.json
+pub_breakouts.json
+_review_*.png
+_verify_*.png
+_verify_*.py
+_httpserver.*
+scratch_*.json
+scratch_*.pkl
+scratch_*.log
+ui_dump.xml
+concept_*.html
+concept_*.png
+concepts.html
+breakoutai-datasource-decisions.json

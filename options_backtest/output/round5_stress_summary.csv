@@ -1,0 +1,3 @@
+strategy,trades,n_stop_loss,n_adverse_ge_1pct,n_adverse_ge_1_5pct,worst_trade_pct,worst_trade_exit,max_adverse_move_pct
+MeanReversion-Expiry,18,1,4,2,-3.7,stop_loss,1.72
+FlowExpiry-pcr-Wide,21,0,0,0,-0.23,target,0.99

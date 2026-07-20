@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI — What's Working, What's Not</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121622; --panel2:#161b29; --border:#232a3d;
+    --text:#e6e9f0; --muted:#8b93a7; --green:#3ecf8e; --red:#f2545b;
+    --amber:#f5b942; --blue:#5b8cff; --accent:#8a7cff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding-bottom:80px;
+  }
+  header{
+    padding:36px 24px 24px; max-width:1100px; margin:0 auto;
+  }
+  header h1{font-size:28px; margin:0 0 6px; letter-spacing:-0.02em;}
+  header p.sub{color:var(--muted); margin:0; font-size:15px;}
+  .wrap{max-width:1100px; margin:0 auto; padding:0 24px;}
+  .tldr{
+    background:linear-gradient(135deg, #171d2e, #131727); border:1px solid var(--border);
+    border-radius:14px; padding:22px 24px; margin:20px 0 32px;
+  }
+  .tldr h2{margin:0 0 10px; font-size:16px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent);}
+  .tldr ul{margin:0; padding-left:20px;}
+  .tldr li{margin-bottom:8px; font-size:15px;}
+  .tldr b{color:#fff;}
+  section{margin:44px 0;}
+  h2.section-title{
+    font-size:13px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);
+    border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:20px;
+  }
+  h3{font-size:18px; margin:0 0 4px;}
+  p.desc{color:var(--muted); font-size:14.5px; margin:4px 0 18px; max-width:820px;}
+
+  .scorecards{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media(max-width:700px){.scorecards{grid-template-columns:1fr;}}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px;}
+  .card .flag{font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em;}
+  .card .big{font-size:40px; font-weight:700; margin:6px 0 2px;}
+  .card .big.green{color:var(--green);} .card .big.red{color:var(--red);}
+  .card .note{font-size:13.5px; color:var(--muted);}
+  .barrow{display:flex; align-items:center; gap:10px; margin-top:14px;}
+  .bar{flex:1; height:10px; background:#232a3d; border-radius:6px; overflow:hidden;}
+  .bar > div{height:100%; border-radius:6px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{text-align:left; color:var(--muted); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  td{padding:8px 10px; border-bottom:1px solid #1b2131; vertical-align:middle;}
+  tr:hover td{background:#141a29;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:20px; font-size:12px; font-weight:600;}
+  .pill.good{background:rgba(62,207,142,.15); color:var(--green);}
+  .pill.bad{background:rgba(242,84,91,.15); color:var(--red);}
+  .pill.neutral{background:rgba(139,147,167,.15); color:var(--muted);}
+  .hitbar{display:inline-block; width:70px; height:8px; background:#232a3d; border-radius:4px; overflow:hidden; vertical-align:middle; margin-right:8px;}
+  .hitbar>div{height:100%;}
+  .tables-2{display:grid; grid-template-columns:1fr 1fr; gap:24px;}
+  @media(max-width:900px){.tables-2{grid-template-columns:1fr;}}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 20px;}
+  .panel h4{margin:0 0 12px; font-size:14px; display:flex; align-items:center; gap:8px;}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .dot.g{background:var(--green);} .dot.r{background:var(--red);}
+
+  .glossary{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;}
+  .gloss-item{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:14px 16px;}
+  .gloss-item .code{font-family:ui-monospace,monospace; font-size:12px; color:var(--blue); display:block; margin-bottom:6px;}
+  .gloss-item p{margin:0; font-size:13.5px; color:#c7cce0;}
+
+  .finding{
+    background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--amber);
+    border-radius:10px; padding:16px 18px; margin-bottom:14px;
+  }
+  .finding.red{border-left-color:var(--red);}
+  .finding.green{border-left-color:var(--green);}
+  .finding h5{margin:0 0 6px; font-size:14.5px;}
+  .finding p{margin:0; font-size:13.5px; color:#c7cce0;}
+  .finding .stat{font-family:ui-monospace,monospace; font-size:12.5px; color:var(--muted); margin-top:6px; display:block;}
+
+  .example-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:10px;
+    display:grid; grid-template-columns:90px 1fr auto; gap:14px; align-items:center;
+  }
+  @media(max-width:700px){.example-card{grid-template-columns:1fr; text-align:left;}}
+  .example-card .sym{font-weight:700; font-size:15px;}
+  .example-card .mkt{font-size:11px; color:var(--muted);}
+  .example-card .methods{font-size:12px; color:var(--muted); margin-top:4px;}
+  .example-card .methods span{background:#1c2233; padding:1px 7px; border-radius:5px; margin-right:4px; display:inline-block; margin-bottom:3px;}
+  .example-card .ret{font-size:20px; font-weight:700; text-align:right;}
+  .example-card .ret.pos{color:var(--green);} .example-card .ret.neg{color:var(--red);}
+  .example-card .sub{font-size:11.5px; color:var(--muted); text-align:right;}
+
+  .gate-box{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 24px;
+  }
+  .gate-col{margin-bottom:18px;}
+  .gate-col h4{font-size:14px; margin:0 0 10px;}
+  .gate-col.keep h4{color:var(--green);} .gate-col.drop h4{color:var(--red);}
+  .tag{display:inline-block; background:#1c2233; padding:4px 10px; border-radius:7px; margin:0 6px 6px 0; font-size:12.5px; font-family:ui-monospace,monospace;}
+  .tag.keep{border:1px solid rgba(62,207,142,.35); color:var(--green);}
+  .tag.drop{border:1px solid rgba(242,84,91,.35); color:var(--red);}
+
+  .footnote{color:var(--muted); font-size:12.5px; margin-top:10px;}
+  .caveat{
+    background:rgba(245,185,66,.08); border:1px solid rgba(245,185,66,.3); border-radius:10px;
+    padding:14px 18px; font-size:13.5px; color:#e8d9b0; margin-top:16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>What's working, what's not</h1>
+  <p class="sub">A plain-English diagnostic of BreakoutAI's stock-picking engine — based on a 2+ year / ~293,000-event backtest plus the actual live picks from the last 2 weeks (Jul 2–19, 2026).</p>
+</header>
+
+<div class="wrap">
+
+  <div class="tldr">
+    <h2>TL;DR</h2>
+    <ul>
+      <li>The engine scans stocks with <b>36 different detection strategies</b> ("methods") — things like "relative strength," "volume squeeze," "high conviction combo," etc. Each one fires a "buy signal" independently.</li>
+      <li>Averaged across everything, a signal is right about <b>41% of the time in India</b> and <b>36% of the time in the US</b> — that's the baseline to beat.</li>
+      <li><b>A handful of methods are reliably better than that baseline in both markets</b> (relative-strength, "high conviction" combos, retuned pre-breakout). A handful are <b>reliably worse in both markets</b> — most notably one very high-volume method (<span class="mono">A_donchian_minervini</span>) and everything built on top of it.</li>
+      <li>Two of the engine's own "smart" filters are quietly <b>backwards</b>: stocks with the <b>strongest</b> measured relative strength and the <b>biggest</b> volume spikes actually do <i>worse</i>, not better, in the data.</li>
+      <li>Real live results so far: <b>India 52.0% win rate</b> (running hotter than the 41.1% backtest baseline, on 273 resolved trades), <b>US 32.5%</b> (running colder than the 36.0% backtest baseline, on 265 resolved trades) — both samples are now large enough to take seriously.</li>
+      <li>Bottom section has a proposed "gate" — which signals to lean on more, and which to mute or require confirmation from another signal before acting on.</li>
+    </ul>
+  </div>
+
+  <!-- LIVE SCOREBOARD -->
+  <section>
+    <h2 class="section-title">1 · Live Scoreboard (Real Money Picks, Not Backtest)</h2>
+    <p class="desc">Every stock the system has actually recommended, and what happened to the ones that have finished playing out (hit either the target or the stop-loss).</p>
+    <div class="scorecards">
+      <div class="card">
+        <div class="flag">🇮🇳 India</div>
+        <div class="big green">52.0%</div>
+        <div class="note">142 won / 131 lost (273 resolved out of 500 total picks; 200 still open/pending)</div>
+        <div class="barrow"><div class="bar"><div style="width:52.0%; background:var(--green)"></div></div><span class="footnote">vs 41.1% backtest baseline</span></div>
+      </div>
+      <div class="card">
+        <div class="flag">🇺🇸 United States</div>
+        <div class="big red">32.5%</div>
+        <div class="note">86 won / 179 lost (265 resolved out of 639 total picks; 373 still open/pending)</div>
+        <div class="barrow"><div class="bar"><div style="width:32.5%; background:var(--red)"></div></div><span class="footnote">vs 36.0% backtest baseline</span></div>
+      </div>
+    </div>
+    <div class="caveat">⚠️ <b>Updated read (both samples are now sizeable):</b> India's 273 resolved trades are running noticeably <b>hotter</b> than its 41.1% backtest baseline (52.0% live). The US's 265 resolved trades are running <b>colder</b> than its 36.0% backtest baseline (32.5% live) — the opposite of what an earlier, much-smaller US sample (27 trades) had suggested. Neither market is "small-sample" anymore, so this divergence from backtest is worth taking seriously rather than waved off as noise. Treat the big backtest tables below (section 3) as the structural evidence for which methods work; treat this scoreboard as the live check on whether that structure is still holding up in production.</div>
+  </section>
+
+  <!-- HOW PICKS ARE MADE -->
+  <section>
+    <h2 class="section-title">2 · How a Pick Gets Made (Plain English)</h2>
+    <p class="desc">Every day, the system runs 36 different "detectors" over every stock in the universe (~1,800 in India, ~4,200 in the US). Each detector is a different theory about what makes a stock about to break out. When a stock trips a detector, that's a "method" firing. Sometimes several detectors fire on the same stock the same day — that's called a "combo."</p>
+    <div class="glossary">
+      <div class="gloss-item"><span class="code">E_relative_strength / E2_...</span><p>Stock is outperforming the broader market. The most-used signal by far, and one of the more reliable ones.</p></div>
+      <div class="gloss-item"><span class="code">A_donchian_minervini</span><p>Classic breakout-above-recent-range pattern. Huge volume of signals, but <b>underperforms</b> the average in both markets.</p></div>
+      <div class="gloss-item"><span class="code">G2_pre_breakout_retuned</span><p>A recalibrated "about to break out" detector — consistently one of the better performers.</p></div>
+      <div class="gloss-item"><span class="code">HC_tier1_high_conviction</span><p>The system's own top-confidence bucket. Smaller volume of picks, but a real, consistent edge.</p></div>
+      <div class="gloss-item"><span class="code">AE / AI / AJ_combo</span><p>Donchian-Minervini stacked with other signals. Inherits the weakness — combos don't fix a weak base signal.</p></div>
+      <div class="gloss-item"><span class="code">M_shakeout_rebreak</span><p>Stock got shaken out of a range then re-broke it. Sounds smart, performs below average in both markets.</p></div>
+      <div class="gloss-item"><span class="code">Conviction score</span><p>A 0–100 confidence number the system assigns each pick, blending several of the above.</p></div>
+      <div class="gloss-item"><span class="code">"Hit rate"</span><p>% of the time a signal's picks eventually hit their target price before their stop-loss.</p></div>
+    </div>
+  </section>
+
+  <!-- WHAT'S WORKING / NOT -->
+  <section>
+    <h2 class="section-title">3 · The Big Backtest: 292,961 Signals Over 2+ Years</h2>
+    <p class="desc">This is the trustworthy evidence — every signal fired since Sept 2023, checked against what actually happened afterward. "Hit" = target reached before stop-loss. Only methods with a meaningful sample size (n≥100ish) should be trusted; smaller ones are noise.</p>
+
+    <div class="tables-2">
+      <div class="panel">
+        <h4><span class="dot g"></span> Best performing (both markets, decent sample)</h4>
+        <table>
+          <tr><th>Method</th><th>India</th><th>US</th></tr>
+          <tr><td class="mono">JK_combo</td><td><span class="pill good">49.2%</span></td><td><span class="pill good">43.4%</span></td></tr>
+          <tr><td class="mono">HC_tier1_high_conviction</td><td><span class="pill good">45.6%</span></td><td><span class="pill good">43.6%</span></td></tr>
+          <tr><td class="mono">L2_hc_deep_base</td><td><span class="pill good">45.8%</span></td><td><span class="pill good">43.8%</span></td></tr>
+          <tr><td class="mono">G2_pre_breakout_retuned</td><td><span class="pill good">43.8%</span></td><td><span class="pill good">41.3%</span></td></tr>
+          <tr><td class="mono">SB_tier2_strong_breakout</td><td><span class="pill good">43.8%</span></td><td><span class="pill good">39.0%</span></td></tr>
+          <tr><td class="mono">L_sb_deep_base</td><td><span class="pill good">43.5%</span></td><td><span class="pill good">39.0%</span></td></tr>
+          <tr><td class="mono">G_pre_breakout_composite</td><td><span class="pill good">44.1%</span></td><td><span class="pill good">38.8%</span></td></tr>
+          <tr><td class="mono">E_relative_strength</td><td><span class="pill neutral">41.3%</span></td><td><span class="pill good">38.4%</span></td></tr>
+        </table>
+        <p class="footnote">Baseline to beat: India 41.1% · US 36.0%. Every row above beats baseline in <b>both</b> markets — that's the cross-market consistency that makes these trustworthy.</p>
+      </div>
+
+      <div class="panel">
+        <h4><span class="dot r"></span> Worst performing (both markets, decent sample)</h4>
+        <table>
+          <tr><th>Method</th><th>India</th><th>US</th></tr>
+          <tr><td class="mono">A_donchian_minervini</td><td><span class="pill bad">38.9%</span></td><td><span class="pill bad">30.7%</span></td></tr>
+          <tr><td class="mono">AE_combo</td><td><span class="pill bad">39.4%</span></td><td><span class="pill bad">31.2%</span></td></tr>
+          <tr><td class="mono">AI_combo</td><td><span class="pill bad">40.1%</span></td><td><span class="pill bad">29.7%</span></td></tr>
+          <tr><td class="mono">AJ_combo</td><td><span class="pill bad">39.3%</span></td><td><span class="pill bad">28.4%</span></td></tr>
+          <tr><td class="mono">M_shakeout_rebreak</td><td><span class="pill bad">36.5%</span></td><td><span class="pill bad">31.3%</span></td></tr>
+          <tr><td class="mono">F_episodic_pivot</td><td><span class="pill bad">35.5%</span></td><td><span class="pill bad">31.5%</span></td></tr>
+          <tr><td class="mono">C_squeeze</td><td><span class="pill bad">39.4%</span></td><td><span class="pill bad">34.3%</span></td></tr>
+          <tr><td class="mono">D_trend_inception</td><td><span class="pill good">49.7% *</span></td><td><span class="pill bad">33.1%</span></td></tr>
+        </table>
+        <p class="footnote"><b>A_donchian_minervini</b> is the 3rd-most-used method in India (9,555 signals) and 2nd-most in the US (19,892 signals) — it drags the average down more than any other single method because it fires so often. * = disagrees between markets, treat with caution.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COUNTERINTUITIVE -->
+  <section>
+    <h2 class="section-title">4 · Three Filters That Are Quietly Backwards</h2>
+    <p class="desc">These aren't "methods" — they're the underlying scoring criteria the system uses to rank picks. The data shows the opposite of what the design intended.</p>
+
+    <div class="finding red">
+      <h5>🔻 "Strong relative strength" picks actually do <i>worse</i></h5>
+      <p>Stocks are bucketed into quartiles by how strong their relative-strength reading is. In India, the <b>weakest</b>-RS quartile hits 46.5% of the time, while the <b>strongest</b>-RS quartile hits only 36.3%. The stronger the reading, the worse the outcome — almost certainly because those stocks are already extended / everyone's already bought them by the time the signal fires.</p>
+      <span class="stat">India: Q1(weak)=46.5% → Q4(strong)=36.3% &nbsp;|&nbsp; a straight-line decline across all 4 quartiles</span>
+    </div>
+
+    <div class="finding red">
+      <h5>🔻 Big volume spikes are a red flag, not confirmation, in the US</h5>
+      <p>The system treats a volume surge as a bullish confirmation. In the US, it's the opposite: low-volume days hit 39.5%, but the highest volume-surge quartile hits only 32.3%. Chasing the loudest, most obvious volume spikes is picking up the crowd that's already too late.</p>
+      <span class="stat">US: Q1(low vol)=39.5% → Q4(high surge)=32.3%</span>
+    </div>
+
+    <div class="finding red">
+      <h5>🔻 "Deep base" patterns underperform shallow ones (US)</h5>
+      <p>Conventional technical-analysis wisdom says a deeper pullback before breakout ("deep base") sets up a bigger move. In the US data it's reversed: shallow bases hit 40.1%, deep bases hit only 30.4%.</p>
+      <span class="stat">US: Q1(shallow)=40.1% → Q4(deep)=30.4%</span>
+    </div>
+
+    <div class="finding amber">
+      <h5>🟡 Labeled chart patterns don't add value — "no clear pattern" does just as well or better</h5>
+      <p>The system tags each setup with a chart pattern (Cup & Handle, Ascending Triangle, etc). In both markets, stocks with <b>no identifiable pattern</b> perform at or near the top, while "Ascending Triangle" and "Tight Consolidation" are the worst-performing labels. The pattern-recognition feature isn't currently adding predictive value.</p>
+      <span class="stat">India: No pattern=43.1% (best) vs Ascending Triangle=33.8% (worst) &nbsp;|&nbsp; US: No pattern=38.8% vs Ascending Triangle=28.7% (worst)</span>
+    </div>
+  </section>
+
+  <!-- LIVE EXAMPLES -->
+  <section>
+    <h2 class="section-title">5 · Real Live Examples (Last 2 Weeks)</h2>
+    <p class="desc">Actual picks the system made between Jul 2–7, 2026, matched back to the exact detector(s) that fired. Individual trades are anecdotal — use them to see the mechanism in action, not as proof either way.</p>
+
+    <h3 style="margin-top:8px; color:var(--green); font-size:14px;">Hit target ✅</h3>
+    <div class="example-card">
+      <div><div class="sym">AEGISVOPAK</div><div class="mkt">IN · 2026-07-03</div></div>
+      <div><div class="methods"><span>AE_combo</span><span>A_donchian_minervini</span><span>E_relative_strength</span><span>M_shakeout_rebreak</span></div>Entry ₹257.24 → Target ₹280.19 · Stop ₹234.29. Five signals fired together — even two "weak" methods (donchian_minervini, shakeout_rebreak) can still win when stacked with a strong one.</div>
+      <div><div class="ret pos">+5.4%</div><div class="sub">won</div></div>
+    </div>
+    <div class="example-card">
+      <div><div class="sym">CNL</div><div class="mkt">IN · 2026-07-03</div></div>
+      <div><div class="methods"><span>E_relative_strength</span></div>Entry ₹764.60 → Target ₹805.59 · Stop ₹723.61. Clean single-signal pick from one of the consistently-above-baseline methods.</div>
+      <div><div class="ret pos">+19.9%</div><div class="sub">won</div></div>
+    </div>
+    <div class="example-card">
+      <div><div class="sym">WBX</div><div class="mkt">US · 2026-07-02</div></div>
+      <div><div class="methods"><span>E_relative_strength</span></div>Entry $4.16 → Target $4.58 · Stop $3.74. Small-cap runner — target was modest but the stock kept running well past it.</div>
+      <div><div class="ret pos">+28.6%</div><div class="sub">won</div></div>
+    </div>
+
+    <h3 style="margin-top:20px; color:var(--red); font-size:14px;">Hit stop-loss ❌</h3>
+    <div class="example-card">
+      <div><div class="sym">APOLLO</div><div class="mkt">IN · 2026-07-03</div></div>
+      <div><div class="methods"><span>A_donchian_minervini</span><span>C_squeeze</span></div>Entry ₹450.05 → Target ₹480.01 · Stop ₹420.09. Both signals that fired are on the "below baseline in both markets" list — exactly the pattern the data says to be cautious of.</div>
+      <div><div class="ret neg">-11.6%</div><div class="sub">lost</div></div>
+    </div>
+    <div class="example-card">
+      <div><div class="sym">BLUSPRING</div><div class="mkt">IN · 2026-07-03</div></div>
+      <div><div class="methods"><span>A_donchian_minervini</span><span>L_sb_deep_base</span><span>SB_tier2_strong_breakout</span></div>Entry ₹123.61 → Target ₹133.26 · Stop ₹113.96. Two good methods outvoted by one weak one this time — normal variance, not a system failure.</div>
+      <div><div class="ret neg">-9.9%</div><div class="sub">lost</div></div>
+    </div>
+    <div class="example-card">
+      <div><div class="sym">5PAISA</div><div class="mkt">IN · 2026-07-03</div></div>
+      <div><div class="methods"><span>E2_relative_strength_uptrend</span></div>Entry ₹387.65 → Target ₹404.94 · Stop ₹370.36. Even a "good" method (41.8% hit rate) loses more often than it wins on any single trade — that's expected, not a bug.</div>
+      <div><div class="ret neg">-5.7%</div><div class="sub">lost</div></div>
+    </div>
+    <div class="footnote" style="margin-top:6px;">Only ~9% of live picks (50 of 538 resolved) could be traced back to one of the 36 detailed detector methods (the rest fired from broader signal categories not covered by the detector replay used for this report) — this doesn't affect the backtest numbers above, which are computed directly from the full detector history.</div>
+  </section>
+
+  <!-- GATE RECOMMENDATION -->
+  <section>
+    <h2 class="section-title">6 · Proposed Gate — What To Change</h2>
+    <p class="desc">Based on the cross-market backtest evidence (section 3) plus the reversed-filter findings (section 4). This is a starting proposal for review, not something already implemented.</p>
+    <div class="gate-box">
+      <div class="gate-col keep">
+        <h4>✅ Lean into (consistent edge, both markets)</h4>
+        <span class="tag keep">JK_combo</span>
+        <span class="tag keep">HC_tier1_high_conviction</span>
+        <span class="tag keep">L2_hc_deep_base</span>
+        <span class="tag keep">G2_pre_breakout_retuned</span>
+        <span class="tag keep">SB_tier2_strong_breakout</span>
+        <span class="tag keep">L_sb_deep_base</span>
+        <span class="tag keep">G_pre_breakout_composite</span>
+        <span class="tag keep">E_relative_strength / E2_...</span>
+      </div>
+      <div class="gate-col drop">
+        <h4>🚫 Mute or require a second confirming signal</h4>
+        <span class="tag drop">A_donchian_minervini</span>
+        <span class="tag drop">AE_combo</span>
+        <span class="tag drop">AI_combo</span>
+        <span class="tag drop">AJ_combo</span>
+        <span class="tag drop">M_shakeout_rebreak</span>
+        <span class="tag drop">F_episodic_pivot</span>
+        <span class="tag drop">C_squeeze</span>
+      </div>
+      <div class="gate-col">
+        <h4 style="color:var(--amber)">🔧 Filter logic to fix separately</h4>
+        <p style="font-size:13.5px; color:#c7cce0; margin:0;">Reverse or drop the "strong RS ratio" and "high volume surge" scoring boosts (they're currently rewarding the two worst-performing quartiles). Consider removing the chart-pattern label from the conviction score entirely — it's not adding signal.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="caveat">
+    📌 <b>How this report was built:</b> Backtest tables in section 3–4 come from replaying all 36 detectors against 2+ years of daily price history for the full India (1,812 stocks) and US (4,158 stocks) universes — 92,137 and 200,824 signal-events respectively — and checking each one against what actually happened next. Section 1 and 5 use the system's real live pick log (<span class="mono">data/performance.json</span>, <span class="mono">data/us/performance.json</span>), joined back to the detector run that produced each pick where traceable. Generated Jul 19, 2026.
+  </div>
+
+</div>
+</body>
+</html>

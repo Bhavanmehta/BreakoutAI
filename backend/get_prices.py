@@ -13,6 +13,7 @@ sorted oldest -> newest.
 """
 from __future__ import annotations
 from datetime import date, timedelta
+import os
 import time
 import random
 import pandas as pd
@@ -101,7 +102,10 @@ def fetch_prices_yfinance_batch(symbols: list[str], years: int = settings.HISTOR
     backoff_base_sec = 15          # doubles each retry: 15s, 30s
     min_yield = 0.5                # below this fraction of a chunk coming back
                                     # usable, treat it as silent rate-limiting
-    fetch_budget_sec = 25 * 60     # hard cap on total time spent fetching prices
+    # Hard cap on total time spent fetching prices. Default suits the daily CI
+    # job; offline research runs (e.g. scratch/validate_rules.py over the full
+    # US universe) can raise it via FETCH_BUDGET_SEC without touching CI.
+    fetch_budget_sec = int(os.environ.get("FETCH_BUDGET_SEC", 25 * 60))
     fetch_deadline = time.monotonic() + fetch_budget_sec
 
     for i in range(0, len(symbols), chunk_size):

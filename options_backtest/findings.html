@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Options Strategy Findings — Plain-English Summary</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#ffffff; --ink:#1e293b; --muted:#64748b;
+    --line:#e2e8f0; --soft:#f8fafc;
+    --green:#16a34a; --green-bg:#dcfce7;
+    --red:#dc2626; --red-bg:#fee2e2;
+    --amber:#d97706; --amber-bg:#fef3c7;
+    --blue:#2563eb; --blue-bg:#dbeafe;
+    --shadow:0 1px 3px rgba(15,23,42,.08),0 8px 24px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#eef2f7; color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 80px}
+  header.hero{
+    background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);
+    color:#fff; padding:52px 20px 44px; text-align:center;
+  }
+  header.hero h1{margin:0 0 10px; font-size:30px; letter-spacing:-.5px}
+  header.hero p{margin:0 auto; max-width:640px; color:#cbd5e1; font-size:16px}
+  .hero-tag{display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+    padding:5px 14px; border-radius:999px; font-size:12.5px; letter-spacing:.5px; text-transform:uppercase; margin-bottom:18px; color:#e2e8f0}
+
+  section{margin-top:40px}
+  h2{font-size:22px; margin:0 0 4px; letter-spacing:-.3px}
+  h2 .emoji{margin-right:8px}
+  .sub{color:var(--muted); margin:0 0 20px; font-size:15px}
+
+  /* intro callout */
+  .callout{background:var(--panel); border-radius:16px; box-shadow:var(--shadow); padding:24px 26px; margin-top:-28px; position:relative; z-index:2}
+  .callout.plain{border-left:5px solid var(--blue)}
+  .callout h3{margin:0 0 8px; font-size:17px}
+  .callout p{margin:0 0 10px; font-size:15px}
+  .callout p:last-child{margin-bottom:0}
+
+  /* stat tiles */
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:22px}
+  .tile{background:var(--panel); border-radius:14px; box-shadow:var(--shadow); padding:18px 16px; text-align:center}
+  .tile .big{font-size:26px; font-weight:700; line-height:1.1}
+  .tile .lbl{font-size:12.5px; color:var(--muted); margin-top:6px}
+  .tile.good .big{color:var(--green)} .tile.bad .big{color:var(--red)} .tile.blue .big{color:var(--blue)}
+
+  /* strategy cards */
+  .cards{display:grid; grid-template-columns:repeat(2,1fr); gap:16px}
+  .card{background:var(--panel); border-radius:14px; box-shadow:var(--shadow); padding:20px; border-top:4px solid var(--line); display:flex; flex-direction:column}
+  .card.win{border-top-color:var(--green)}
+  .card.mid{border-top-color:var(--amber)}
+  .card.lose{border-top-color:var(--red)}
+  .card .name{font-weight:700; font-size:16px; margin:0}
+  .card .plain{color:var(--muted); font-size:13.5px; margin:8px 0 14px; flex:0 0 auto}
+  .metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:auto}
+  .m{background:var(--soft); border-radius:10px; padding:9px 6px; text-align:center}
+  .m .v{font-weight:700; font-size:17px; line-height:1}
+  .m .k{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-top:5px}
+  .v.pos{color:var(--green)} .v.neg{color:var(--red)}
+
+  /* winrate bar */
+  .wr{margin:12px 0 2px}
+  .wr .track{height:8px; background:var(--line); border-radius:99px; overflow:hidden}
+  .wr .fill{height:100%; border-radius:99px}
+  .wr .cap{display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); margin-top:5px}
+
+  /* tables */
+  table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:14px; overflow:hidden; box-shadow:var(--shadow); font-size:14px}
+  thead th{background:#f1f5f9; text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted)}
+  tbody td{padding:12px 14px; border-top:1px solid var(--line)}
+  tbody tr:hover{background:var(--soft)}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .pill{display:inline-block; padding:2px 9px; border-radius:99px; font-size:12px; font-weight:600}
+  .pill.g{background:var(--green-bg); color:var(--green)}
+  .pill.r{background:var(--red-bg); color:var(--red)}
+  .pill.a{background:var(--amber-bg); color:var(--amber)}
+  .strat-name{font-weight:600}
+  .strat-desc{color:var(--muted); font-size:12.5px; margin-top:2px}
+
+  /* pros cons */
+  .pc{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px}
+  .pcbox{background:var(--panel); border-radius:14px; box-shadow:var(--shadow); padding:18px 20px}
+  .pcbox h4{margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:8px}
+  .pcbox ul{margin:0; padding-left:18px}
+  .pcbox li{margin-bottom:7px; font-size:13.5px}
+  .pcbox.pros h4{color:var(--green)} .pcbox.cons h4{color:var(--red)}
+
+  .reality{background:#fffbeb; border:1px solid var(--amber-bg); border-left:5px solid var(--amber); border-radius:14px; padding:22px 24px}
+  .reality h3{margin:0 0 10px; color:var(--amber)}
+  .reality ul{margin:0; padding-left:20px}
+  .reality li{margin-bottom:8px; font-size:14.5px}
+
+  .glossary{background:var(--panel); border-radius:14px; box-shadow:var(--shadow); padding:8px 24px}
+  .glossary dl{margin:0} .glossary dt{font-weight:700; margin-top:14px} .glossary dd{margin:2px 0 0; color:var(--muted); font-size:14px}
+  .glossary .row{border-bottom:1px solid var(--line); padding:6px 0} .glossary .row:last-child{border:none}
+
+  footer{text-align:center; color:var(--muted); font-size:13px; margin-top:44px}
+  @media(max-width:760px){
+    .tiles{grid-template-columns:repeat(2,1fr)}
+    .cards{grid-template-columns:1fr}
+    .pc{grid-template-columns:1fr}
+    .hide-sm{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-tag">NIFTY Options Backtest · ~13-month window</div>
+  <h1>What Actually Worked — and What Didn't</h1>
+  <p>A plain-English scoreboard of every options strategy tested: iron condors, "Zen" credit spreads, and a pile of overnight experiments. No jargon, just results.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="callout plain">
+    <h3>📖 Read this first (30 seconds)</h3>
+    <p>Each strategy below is a way of selling <strong>options credit spreads</strong> on the NIFTY index — you collect a premium up front and hope the market behaves so you keep it. I tested 24 different versions on roughly the <strong>last 12–13 months</strong> of real market data (about a 390-day window).</p>
+    <p>Two families made money: <strong>iron condors</strong> (bet the market stays in a range) and <strong>held-to-expiry directional spreads</strong> (the "Zen" style). A big batch of <strong>overnight-hold</strong> ideas all lost money. The numbers below are <em>backtests</em> — see the reality check at the bottom before you get excited.</p>
+  </div>
+
+  <div class="tiles">
+    <div class="tile blue"><div class="big">24</div><div class="lbl">strategies tested</div></div>
+    <div class="tile good"><div class="big">10</div><div class="lbl">made money</div></div>
+    <div class="tile good"><div class="big">+57.5%</div><div class="lbl">best return (iron condor)</div></div>
+    <div class="tile bad"><div class="big">−71%</div><div class="lbl">worst return (overnight)</div></div>
+  </div>
+
+  <!-- ================= TOP PICKS ================= -->
+  <section>
+    <h2><span class="emoji">⭐</span>The stand-outs</h2>
+    <p class="sub">The four strategies worth actually thinking about — a mix of best return and best consistency.</p>
+    <div class="cards" id="topPicks"></div>
+  </section>
+
+  <!-- ================= IRON CONDORS ================= -->
+  <section>
+    <h2><span class="emoji">🎯</span>Iron Condors <span style="font-size:14px;color:var(--muted);font-weight:400">— "the market stays in a range"</span></h2>
+    <p class="sub">You sell a call spread <em>and</em> a put spread at the same time. You win as long as the index doesn't move too far in either direction — no need to guess up or down.</p>
+    <div id="icTable"></div>
+    <div class="pc">
+      <div class="pcbox pros"><h4>👍 Pros</h4><ul>
+        <li><strong>No direction call needed</strong> — it profits from a calm, range-bound market.</li>
+        <li>The best config returned <strong>+57%</strong>, and several landed in the steady <strong>+18% to +37%</strong> band.</li>
+        <li>Risk is <strong>capped on both sides</strong> by the protective "wings", so no single trade can blow up the account.</li>
+      </ul></div>
+      <div class="pcbox cons"><h4>👎 Cons</h4><ul>
+        <li><strong>Deep dips.</strong> Even the good ones dropped 14–29% along the way — you'd need a strong stomach.</li>
+        <li>The top-return version (tight 1% strikes) has a <strong>huge average loss</strong> — one trending month can erase many small wins.</li>
+        <li><strong>Fussy.</strong> Widen the strikes too far (2.5%) or only trade in "calm" markets and it flips to a <strong>loss</strong>.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ================= ZEN / EXPIRY ================= -->
+  <section>
+    <h2><span class="emoji">🧘</span>"Zen" Directional Spreads <span style="font-size:14px;color:var(--muted);font-weight:400">— held to expiry</span></h2>
+    <p class="sub">Pick a direction using a simple signal, sell a one-sided credit spread a couple of days before expiry, and hold it to the finish. "Zen" = set it and let time do the work.</p>
+    <div id="zenTable"></div>
+    <div class="pc">
+      <div class="pcbox pros"><h4>👍 Pros</h4><ul>
+        <li>The two <strong>signal-driven</strong> ones (Momentum &amp; Mean-Reversion) were the <strong>most consistent of everything tested</strong>.</li>
+        <li>Mean-Reversion had the <strong>calmest ride</strong> — smallest drawdown (−3%) and by far the best win-to-loss ratio.</li>
+        <li>Simple to run: enter near expiry, hold, done.</li>
+      </ul></div>
+      <div class="pcbox cons"><h4>👎 Cons</h4><ul>
+        <li>Mean-Reversion only took <strong>18 trades</strong> — a small sample that could partly be luck.</li>
+        <li>You <strong>need a real signal</strong>: the "no-signal" benchmark that just sells blindly <em>lost</em> money.</li>
+        <li>Holding to expiry means you <strong>eat the full move</strong> if the market goes against you late.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ================= OVERNIGHT ================= -->
+  <section>
+    <h2><span class="emoji">❌</span>Overnight Experiments <span style="font-size:14px;color:var(--muted);font-weight:400">— the dead end</span></h2>
+    <p class="sub">Nine variations that opened a spread and held it just overnight, based on different signals. Every single one lost money — shown here so we don't retry them.</p>
+    <div id="onTable"></div>
+    <div class="pc">
+      <div class="pcbox cons"><h4>👎 Why they all failed</h4><ul>
+        <li><strong>Every variant lost</strong>, from −15% to −71%. This isn't one bad idea — the whole approach is weak.</li>
+        <li>Holding option spreads overnight means <strong>price gaps and time-decay quirks</strong> work against you here.</li>
+        <li>More trades didn't help — the biggest losers also traded the most, just bleeding faster.</li>
+      </ul></div>
+      <div class="pcbox pros"><h4>🔎 The one takeaway</h4><ul>
+        <li>They were <strong>cheap and fast to test</strong>, which is exactly why we ran them.</li>
+        <li>Clear verdict: <strong>overnight holding is off the table</strong> — the edge lives in holding to expiry, not overnight.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ================= REALITY CHECK ================= -->
+  <section>
+    <h2><span class="emoji">⚠️</span>Reality check — please read before trusting any number above</h2>
+    <div class="reality">
+      <ul>
+        <li>These are <strong>backtests on ~13 months of history</strong>, not live results. Past behaviour is not a promise.</li>
+        <li>The edges <strong>shrink once real trading costs and slippage</strong> are subtracted — the thin winners can get much thinner.</li>
+        <li><strong>Small samples lie.</strong> Mean-Reversion (18 trades) and the low-vol condor (30 trades) don't have enough history to fully trust.</li>
+        <li>A high win rate ≠ safe. The no-signal benchmark won ~79% of trades and <strong>still lost money</strong> because a couple of losses were huge.</li>
+        <li><strong>Sensible next step:</strong> run the top 1–2 strategies as a <em>small live paper-trade</em> for a few weeks before risking real capital — not another round of tweaking the backtest.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= GLOSSARY ================= -->
+  <section>
+    <h2><span class="emoji">📚</span>Tiny glossary</h2>
+    <div class="glossary">
+      <div class="row"><dt>Return %</dt><dd>How much the account grew (or shrank) over the ~13-month test window.</dd></div>
+      <div class="row"><dt>Win rate</dt><dd>The share of trades that ended in a profit. High win rate is nice but not the whole story.</dd></div>
+      <div class="row"><dt>Max drawdown</dt><dd>The worst peak-to-bottom dip along the way. −20% means the account was once 20% below its high point. Lower is calmer.</dd></div>
+      <div class="row"><dt>Profit factor</dt><dd>Total winnings ÷ total losses. Above 1.0 = profitable; 2.0 means it won ₹2 for every ₹1 lost.</dd></div>
+      <div class="row"><dt>Credit spread</dt><dd>You sell one option and buy a cheaper one for protection, pocketing the difference as your max profit.</dd></div>
+      <div class="row"><dt>Iron condor</dt><dd>Two credit spreads at once (one above, one below the market). Profits if the market stays in the middle.</dd></div>
+    </div>
+  </section>
+
+  <footer>
+    Generated from <code>output/strategy_summary.csv</code> &amp; <code>output/iron_condor_summary.csv</code> · BreakoutAI options backtest · Test window ≈ 384–395 days (~13 months).<br>
+    Backtested results only — not financial advice.
+  </footer>
+
+</div>
+
+<script>
+/* ---- data straight from the summary CSVs ---- */
+const ZEN = [
+  {name:"Momentum · Hold-to-Expiry", desc:"Spots a short momentum push, sells a spread that way 2 days before expiry, holds to settlement. The steadiest winner overall.", trades:56, win:91.1, ret:24.87, dd:-7.35, pf:2.35},
+  {name:"Mean-Reversion · Expiry", desc:"Bets the market over-reacted and drifts back; enters 2 days before expiry. Fewest trades, but the cleanest risk.", trades:18, win:77.8, ret:17.25, dd:-3.13, pf:5.12},
+  {name:"Conservative-Wide · Expiry", desc:"Very far-out strikes, only in quiet markets. So cautious it barely trades — ended slightly negative.", trades:30, win:23.3, ret:-2.31, dd:-3.36, pf:0.60},
+  {name:"Theta-Harvest · Benchmark", desc:"A 'no-brain' benchmark that always sells a put spread with no signal. Wins most days, but a few big losses sink it.", trades:57, win:78.9, ret:-8.00, dd:-25.64, pf:0.83},
+];
+
+const IC = [
+  {name:"IC · 1% strikes · manage-50", desc:"Tight 1% spreads on both sides, take profit at 50% of credit. Fattest credit and the top return — but the biggest single-loss risk.", trades:57, win:89.5, ret:57.51, dd:-14.60, pf:1.94},
+  {name:"IC · 1.5% · tight stop", desc:"Standard 1.5% condor with a tighter stop-loss. Best risk-adjusted ride of the group.", trades:57, win:68.4, ret:37.42, dd:-14.95, pf:2.04},
+  {name:"IC · 1.5% · hold to expiry", desc:"Same condor but no early exit — simply held to settlement. Solid return, but deeper dips.", trades:57, win:75.4, ret:34.20, dd:-24.41, pf:1.64},
+  {name:"IC · 1.5% · manage-75", desc:"Greedier: holds winners until 75% of the credit is captured before closing.", trades:57, win:75.4, ret:30.99, dd:-25.75, pf:1.58},
+  {name:"IC · 1.5% · manage-50", desc:"The 'plain vanilla' 1.5% condor, exit at 50% of the credit.", trades:57, win:68.4, ret:18.91, dd:-28.67, pf:1.35},
+  {name:"IC · 1.5% · manage-35", desc:"Same idea, but banks profit earlier at 35% — smoother but smaller.", trades:57, win:63.2, ret:18.27, dd:-26.76, pf:1.36},
+  {name:"IC · 2% strikes · manage-50", desc:"Wider 2% strikes — safer distance from the market, but thinner credit and a low win rate.", trades:57, win:35.1, ret:13.17, dd:-13.85, pf:1.42},
+  {name:"IC · 1.5% · enter 4 days out", desc:"Opens the condor 4 days before expiry — basically breakeven.", trades:40, win:82.5, ret:1.76, dd:-18.86, pf:1.03},
+  {name:"IC · 1.5% · enter 3 days out", desc:"Opens 3 days before expiry instead of 2 — tipped slightly negative.", trades:55, win:78.2, ret:-7.44, dd:-27.80, pf:0.91},
+  {name:"IC · 1.5% · calm-markets only", desc:"Only trades when short-term vol is below longer-term (calm). Backfired here.", trades:30, win:60.0, ret:-23.07, dd:-30.10, pf:0.51},
+  {name:"IC · 2.5% strikes · manage-50", desc:"Very wide 2.5% strikes, lowest touch risk on paper — but thin credit bled out.", trades:57, win:29.8, ret:-37.41, dd:-38.51, pf:0.43},
+];
+
+const ON = [
+  {name:"Mean-Reversion · Overnight", desc:"Fades yesterday's big move, held overnight.", trades:84, win:32.1, ret:-14.76, dd:-23.27, pf:0.60},
+  {name:"Gap-Position · Overnight", desc:"Direction from where futures closed within the day's range.", trades:174, win:27.6, ret:-29.69, dd:-35.09, pf:0.52},
+  {name:"Low-Vol Tight · Overnight", desc:"Tight premium-selling only in calm vol.", trades:109, win:27.5, ret:-38.71, dd:-40.81, pf:0.25},
+  {name:"Vol-Expansion · Overnight", desc:"Trades when short-term vol jumps above long-term.", trades:84, win:28.6, ret:-39.70, dd:-39.86, pf:0.26},
+  {name:"Trend-Follow 10d · Overnight", desc:"Slower 10-day trend filter, overnight hold.", trades:202, win:30.2, ret:-40.98, dd:-41.29, pf:0.50},
+  {name:"Aggressive-Tight · Overnight", desc:"Very tight strikes for max premium — max gap risk.", trades:202, win:38.6, ret:-45.66, dd:-47.94, pf:0.54},
+  {name:"Skew-Fade · Overnight", desc:"Direction from put-vs-call price richness.", trades:190, win:33.7, ret:-54.66, dd:-56.67, pf:0.40},
+  {name:"Momentum-Wide · Overnight", desc:"Momentum signal, far strikes, held overnight.", trades:202, win:15.3, ret:-66.98, dd:-67.06, pf:0.22},
+  {name:"Momentum-Tight · Overnight", desc:"Momentum signal, tight strikes, held overnight.", trades:202, win:34.2, ret:-71.15, dd:-74.66, pf:0.38},
+];
+
+const fmt = (n,suffix="%")=> (n>0?"+":"") + n.toFixed(n===Math.round(n)?0:2) + suffix;
+const sign = n => n>=0 ? "pos":"neg";
+const wrColor = w => w>=70 ? "var(--green)" : w>=45 ? "var(--amber)" : "var(--red)";
+
+/* --- top picks cards --- */
+const picks = [
+  {...IC[0], klass:"win", badge:"Highest return"},
+  {...IC[1], klass:"win", badge:"Best risk-adjusted"},
+  {...ZEN[0], klass:"win", badge:"Steadiest winner"},
+  {...ZEN[1], klass:"win", badge:"Calmest ride"},
+];
+document.getElementById("topPicks").innerHTML = picks.map(s=>`
+  <div class="card ${s.klass}">
+    <span class="pill g" style="align-self:flex-start;margin-bottom:8px">${s.badge}</span>
+    <p class="name">${s.name}</p>
+    <p class="plain">${s.desc}</p>
+    <div class="wr">
+      <div class="track"><div class="fill" style="width:${s.win}%;background:${wrColor(s.win)}"></div></div>
+      <div class="cap"><span>Win rate</span><span>${s.win}%</span></div>
+    </div>
+    <div class="metrics">
+      <div class="m"><div class="v ${sign(s.ret)}">${fmt(s.ret)}</div><div class="k">Return</div></div>
+      <div class="m"><div class="v">${s.dd.toFixed(1)}%</div><div class="k">Worst dip</div></div>
+      <div class="m"><div class="v">${s.pf.toFixed(2)}</div><div class="k">Profit factor</div></div>
+    </div>
+  </div>`).join("");
+
+/* --- table renderer --- */
+function renderTable(rows){
+  const body = rows.map(s=>{
+    const pill = s.ret>0 ? `<span class="pill g">${fmt(s.ret)}</span>`
+               : `<span class="pill r">${fmt(s.ret)}</span>`;
+    return `<tr>
+      <td><div class="strat-name">${s.name}</div><div class="strat-desc">${s.desc}</div></td>
+      <td class="num">${pill}</td>
+      <td class="num">${s.win}%</td>
+      <td class="num ${sign(s.dd)}">${s.dd.toFixed(1)}%</td>
+      <td class="num hide-sm">${s.pf.toFixed(2)}</td>
+      <td class="num hide-sm">${s.trades}</td>
+    </tr>`;
+  }).join("");
+  return `<table>
+    <thead><tr>
+      <th>Strategy</th><th style="text-align:right">Return</th><th style="text-align:right">Win&nbsp;rate</th>
+      <th style="text-align:right">Worst&nbsp;dip</th><th style="text-align:right" class="hide-sm">Profit&nbsp;factor</th>
+      <th style="text-align:right" class="hide-sm">Trades</th>
+    </tr></thead><tbody>${body}</tbody></table>`;
+}
+document.getElementById("icTable").innerHTML  = renderTable(IC);
+document.getElementById("zenTable").innerHTML = renderTable(ZEN);
+document.getElementById("onTable").innerHTML  = renderTable(ON);
+</script>
+</body>
+</html>

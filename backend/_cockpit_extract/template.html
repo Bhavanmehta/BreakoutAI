@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="bb3543e9-8dd7-4c69-838e-dd7aab6c072b"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("2c95018c-0188-4ab6-9f7b-5360fa29f2b2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("2ee30a94-0f79-44b3-beda-8330813f84ae") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("4cbea7a1-b6c1-43ab-8598-017f2d22d5a1") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("7e3d86b5-7f61-49f5-87a0-a5de9597e157") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("17f2efa2-4995-4296-b67b-938d50fc198e") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("cabe799c-7472-48ec-8810-144b8bb66302") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("9a70546e-694f-4ad9-a4e4-580b1a34d2f9") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("13a9b9e6-421a-4237-95d5-2ed9b9db2579") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("49033e39-ae8c-4329-bf55-579dbadf2112") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("5548f722-8824-46b3-92b0-888e85cc81b5") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("d79081a4-f869-4ad5-ad0c-376385dd06ea") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("ab73d78d-f15b-424f-86a4-d05772f9f671") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("ad7da48a-3b9e-4cca-967b-ca073fbba60c") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("c865e575-6bc3-44e6-8419-9f42e085227a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("c18a3bd5-8789-45ab-80fc-b3dbcb52aaf0") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("65d34eb2-badb-4055-90b3-c31e2a82526b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a5b2d79c-0b96-4f7e-b388-7fa952dc150c") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("65d34eb2-badb-4055-90b3-c31e2a82526b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a5b2d79c-0b96-4f7e-b388-7fa952dc150c") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("65d34eb2-badb-4055-90b3-c31e2a82526b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a5b2d79c-0b96-4f7e-b388-7fa952dc150c") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("65d34eb2-badb-4055-90b3-c31e2a82526b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("a5b2d79c-0b96-4f7e-b388-7fa952dc150c") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+body{margin:0;background:#0d1319;color:#e8eef4;font-family:"Instrument Sans",system-ui,sans-serif}
+a{color:#3fc1ab;text-decoration:none}a:hover{color:#7fdcc9}
+</style>
+</helmet>
+
+<!-- Header -->
+<header style="position:sticky;top:0;z-index:50;border-bottom:1px solid #1c2733;background:rgba(15,22,32,0.96);backdrop-filter:blur(6px)" data-screen-label="Header">
+  <div style="display:flex;align-items:center;gap:20px;padding:14px 28px;max-width:1500px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#3fc1ab,#2a8f80);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#06110f">B</div>
+      <div style="font-size:15px;font-weight:700;letter-spacing:-0.2px">BreakoutAI <span style="color:#93a4b3;font-weight:500">/ Options</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px;background:#141d27;border:1px solid #223040;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer">NIFTY <span style="color:#5c6e7d;font-size:10px">▾</span></div>
+      <div style="display:flex;align-items:center;gap:6px;background:#141d27;border:1px solid #223040;border-radius:8px;padding:7px 12px;font-size:13px;color:#b8c6d2;cursor:pointer">28 Jul 2026 · 5 DTE <span style="color:#5c6e7d;font-size:10px">▾</span></div>
+      <div style="background:transparent;border:1px solid #2a3b4c;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;color:#3fc1ab;cursor:pointer">⟳ Refresh</div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px">
+      <div style="text-align:right;line-height:1.15">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums">24,200.50</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:500;color:#46c98d">+0.21% today</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+        <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;color:#46c98d;background:rgba(70,201,141,0.08);border:1px solid rgba(70,201,141,0.25);border-radius:6px;padding:3px 9px"><span style="width:6px;height:6px;border-radius:50%;background:#46c98d"></span>LIVE</div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.4px;color:#93a4b3;background:#141d27;border:1px solid #223040;border-radius:6px;padding:3px 9px">PAPER MODE · analysis only</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main style="max-width:1500px;margin:0 auto">
+
+  <!-- Regime hero -->
+  <div style="padding:26px 28px 20px;border-bottom:1px solid #1c2733" data-screen-label="Regime">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.6px;color:#46c98d;background:rgba(70,201,141,0.08);border:1px solid rgba(70,201,141,0.25);border-radius:7px;padding:5px 12px">TRENDING BULL</div>
+      <div style="font-size:11.5px;font-weight:600;color:#8fb8d9;background:rgba(107,163,214,0.08);border:1px solid rgba(107,163,214,0.22);border-radius:7px;padding:5px 12px">Long Build-up</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:6px">
+        <span style="font-size:10px;letter-spacing:0.8px;color:#5c6e7d;font-weight:600">CONFIDENCE</span>
+        <div style="width:120px;height:5px;border-radius:3px;background:#1c2733;overflow:hidden"><div style="width:70%;height:100%;background:#3fc1ab;border-radius:3px"></div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#93a4b3">70%</span>
+      </div>
+    </div>
+    <div style="font-size:20px;font-weight:600;letter-spacing:-0.2px;line-height:1.35;max-width:920px">Mild bullish drift with call OI building — the tape favors a <span style="color:#3fc1ab">shallow call swing</span>, and conditions are safe for <span style="color:#3fc1ab">selling premium</span>.</div>
+    <div style="display:flex;gap:22px;margin-top:10px;font-size:12px;color:#8494a3">
+      <div>· Price above VWAP with rising OI</div>
+      <div>· Call writers retreating at the wall</div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:10px;padding:18px 28px;border-bottom:1px solid #1c2733" data-screen-label="KPIs">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="8">
+      <div style="background:#10171f;border:1px solid #1c2733;border-radius:10px;padding:12px 12px 10px">
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:0.7px;color:#5c6e7d;text-transform:uppercase">{{ k.label }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;margin:4px 0 2px;color:{{ k.color }}">{{ k.val }}</div>
+        <sc-if value="{{ showHints }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:10px;color:#66788a;line-height:1.3">{{ k.hint }}</div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- Two columns -->
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:20px;padding:20px 28px 24px">
+
+    <!-- BUY -->
+    <section style="background:#10171f;border:1px solid #1c2733;border-radius:14px;padding:20px" data-screen-label="Buy panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700"><span style="color:#46c98d">▲</span> Buy — directional</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:#46c98d;background:rgba(70,201,141,0.08);border:1px solid rgba(70,201,141,0.25);border-radius:6px;padding:4px 10px">BIAS: CALLS</div>
+      </div>
+      <sc-if value="{{ showHints }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:11.5px;color:#66788a;margin-bottom:14px">Single options to buy when you expect a move. Higher score = better liquidity &amp; positioning.</div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <sc-for list="{{ cands }}" as="c" hint-placeholder-count="2">
+          <div style="background:#141d27;border:1px solid #223040;border-radius:11px;padding:14px 16px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#46c98d">{{ c.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">₹{{ c.ltp }}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+              <div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">DELTA</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b8c6d2">{{ c.d }}</div></div>
+              <div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">IV</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b8c6d2">{{ c.iv }}</div></div>
+              <div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">OI</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b8c6d2">{{ c.oi }}</div></div>
+              <div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">VOLUME</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b8c6d2">{{ c.vol }}</div></div>
+              <div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">SPREAD</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b8c6d2">{{ c.spread }}</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <div style="flex:1;height:5px;border-radius:3px;background:#0d1319;overflow:hidden"><div style="height:100%;border-radius:3px;background:{{ c.scoreColor }};width:{{ c.scoreW }}"></div></div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#93a4b3">{{ c.score }}/100</div>
+            </div>
+            <div style="font-size:11.5px;color:#8494a3;line-height:1.4">{{ c.why }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #1c2733;display:flex;justify-content:flex-end"><a href="#" style="font-size:12px;font-weight:600">Deep-dive in Assessor →</a></div>
+    </section>
+
+    <!-- SELL -->
+    <section style="background:#10171f;border:1px solid #1c2733;border-radius:14px;padding:20px" data-screen-label="Sell panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700"><span style="color:#e5686f">▼</span> Sell — premium</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:#46c98d;background:rgba(70,201,141,0.08);border:1px solid rgba(70,201,141,0.25);border-radius:6px;padding:4px 10px">GATE: PASS ✓</div>
+      </div>
+      <sc-if value="{{ showHints }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:11.5px;color:#66788a;margin-bottom:12px">Defined-risk spreads that profit if the index stays in a range. IV percentile in range · no event risk within expiry.</div>
+      </sc-if>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.7px;color:#5c6e7d;margin:8px 0">IRON CONDOR — PICK A PRESET</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+        <sc-for list="{{ presets }}" as="p" hint-placeholder-count="3">
+          <div sc-camel-on-click="{{ p.pick }}" style="cursor:pointer;background:{{ p.bg }};border:1px solid {{ p.bc }};border-radius:10px;padding:11px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;font-weight:700">{{ p.name }}</span><span style="font-size:9.5px;color:#5c6e7d;font-family:'IBM Plex Mono',monospace">{{ p.tag }}</span></div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:#46c98d;margin:5px 0 2px">₹{{ p.credit }}</div>
+            <div style="font-size:10px;color:#8494a3">POP {{ p.pop }} · R:R {{ p.rr }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Strike ladder -->
+      <div style="position:relative;height:66px;margin:6px 4px 2px">
+        <div style="position:absolute;left:{{ condor.spotLeft }};top:0;transform:translateX(-50%);text-align:center;font-size:9px;font-weight:700;color:#3fc1ab;line-height:1.2">▼<br>spot</div>
+        <div style="position:absolute;left:0;right:0;top:32px;height:2px;background:#223040"></div>
+        <div style="position:absolute;top:29px;height:8px;border-radius:4px;background:rgba(70,201,141,0.22);left:{{ condor.zoneLeft }};width:{{ condor.zoneWidth }}"></div>
+        <sc-for list="{{ condor.marks }}" as="m" hint-placeholder-count="4">
+          <div style="position:absolute;top:26px;width:2px;height:14px;background:#3d4f61;left:{{ m.l }}"></div>
+          <div style="position:absolute;top:44px;transform:translateX(-50%);text-align:center;font-size:9px;font-weight:700;line-height:1.35;color:{{ m.c }};left:{{ m.l }}">{{ m.lab }}<br><span style="font-family:'IBM Plex Mono',monospace;color:#93a4b3">{{ m.val }}</span></div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">NET CREDIT</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">{{ condor.creditPts }} pt</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">CREDIT ₹</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:#46c98d;margin-top:3px">₹{{ condor.credit }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">MAX LOSS ₹</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:#e5686f;margin-top:3px">₹{{ condor.maxLoss }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">PROB. OF PROFIT</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">{{ condor.pop }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">BE LOW</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">{{ condor.beLo }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">BE HIGH</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">{{ condor.beHi }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">R : R</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">{{ condor.rr }}</div></div>
+        <div style="background:#141d27;border-radius:8px;padding:9px;text-align:center"><div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">MARGIN (EST.)</div><div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:3px">₹45,000</div></div>
+      </div>
+
+      <div style="margin-top:16px;padding:13px 16px;background:#141d27;border:1px solid #223040;border-radius:11px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:2px">Butterfly <span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:#5c6e7d;font-size:10px">shorts @ 24,200 · wings ±200</span></div>
+          <div style="font-size:10.5px;color:#8494a3">BE 24,041 – 24,359 · POP 41% · tighter pin, bigger payoff</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:#46c98d">₹11,895</div>
+          <div style="font-size:10px;color:#e5686f;font-family:'IBM Plex Mono',monospace">max loss ₹3,105</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;font-size:10.5px;color:#66788a;line-height:1.5">· Sized for 1 lot — scale margin linearly. · Exit both legs if spot closes beyond either breakeven.</div>
+    </section>
+  </div>
+
+  <footer style="display:flex;justify-content:space-between;padding:14px 28px 22px;border-top:1px solid #1c2733;font-size:10.5px;color:#5c6e7d">
+    <div>generated 14:32:05 · next refresh in <span style="font-family:'IBM Plex Mono',monospace">18</span>s · <a href="#" style="font-weight:600">refresh now</a></div>
+    <div>Paper / analysis only — not an order-routing screen.</div>
+  </footer>
+</main>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;showHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Guidance&quot;},&quot;defaultPreset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Wide&quot;,&quot;Balanced&quot;,&quot;Tight&quot;],&quot;default&quot;:&quot;Tight&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Iron condor&quot;}}">
+class Component extends DCLogic {
+  state = { sel: null };
+
+  condors() {
+    return [
+      { name:"Wide", tag:"Δ0.10 · w200", credit:"1,605", creditPts:"21.4", maxLoss:"13,395", rr:"0.12", pop:"81%", beLo:"23,729", beHi:"24,671",
+        spotLeft:"50%", zoneLeft:"20.8%", zoneWidth:"58.4%",
+        marks:[{l:"9.7%",lab:"LP",val:"23,550",c:"#e5686f"},{l:"22.1%",lab:"SP",val:"23,750",c:"#e58a8f"},{l:"77.9%",lab:"SC",val:"24,650",c:"#6fd3a8"},{l:"90.3%",lab:"LC",val:"24,850",c:"#46c98d"}] },
+      { name:"Balanced", tag:"Δ0.20 · w200", credit:"3,510", creditPts:"46.8", maxLoss:"11,490", rr:"0.31", pop:"66%", beLo:"23,903", beHi:"24,497",
+        spotLeft:"50%", zoneLeft:"23.4%", zoneWidth:"53.2%",
+        marks:[{l:"9.7%",lab:"LP",val:"23,750",c:"#e5686f"},{l:"27.6%",lab:"SP",val:"23,950",c:"#e58a8f"},{l:"72.4%",lab:"SC",val:"24,450",c:"#6fd3a8"},{l:"90.3%",lab:"LC",val:"24,650",c:"#46c98d"}] },
+      { name:"Tight", tag:"Δ0.30 · w200", credit:"5,588", creditPts:"74.5", maxLoss:"9,413", rr:"0.59", pop:"54%", beLo:"23,976", beHi:"24,425",
+        spotLeft:"50%", zoneLeft:"24.1%", zoneWidth:"51.8%",
+        marks:[{l:"9.7%",lab:"LP",val:"23,850",c:"#e5686f"},{l:"32.7%",lab:"SP",val:"24,050",c:"#e58a8f"},{l:"67.3%",lab:"SC",val:"24,350",c:"#6fd3a8"},{l:"90.3%",lab:"LC",val:"24,550",c:"#46c98d"}] },
+    ];
+  }
+
+  selectedIdx() {
+    if (this.state.sel != null) return this.state.sel;
+    const names = ["Wide", "Balanced", "Tight"];
+    const i = names.indexOf(this.props.defaultPreset ?? "Balanced");
+    return i < 0 ? 1 : i;
+  }
+
+  renderVals() {
+    const condors = this.condors();
+    const sel = this.selectedIdx();
+    const presets = condors.map((c, i) => ({ ...c,
+      bg: i === sel ? "rgba(63,193,171,0.10)" : "#141d27",
+      bc: i === sel ? "rgba(63,193,171,0.55)" : "#223040",
+      pick: () => this.setState({ sel: i }) }));
+    return {
+      showHints: this.props.showHints ?? true,
+      kpis: [
+        { label:"PCR Near", val:"1.12", color:"#e8eef4", hint:"balanced flow" },
+        { label:"PCR Far", val:"0.94", color:"#e8eef4", hint:"balanced flow" },
+        { label:"Max Pain", val:"24,150", color:"#e8eef4", hint:"pin strike at expiry" },
+        { label:"Call Wall", val:"24,500", color:"#46c98d", hint:"resistance ceiling" },
+        { label:"Put Wall", val:"24,000", color:"#e5686f", hint:"support floor" },
+        { label:"ATM IV", val:"13.2%", color:"#e8eef4", hint:"annualized vol" },
+        { label:"IV Skew", val:"1.40", color:"#e8eef4", hint:"puts pricier · downside bid" },
+        { label:"Exp. Move", val:"181 pt", color:"#e8eef4", hint:"1σ ±0.75% by expiry" },
+      ],
+      cands: [
+        { name:"24,250 CE", ltp:"95.50", d:"0.48", iv:"13.5%", oi:"15.0L", vol:"2.5L", spread:"0.8%",
+          score:"72", scoreW:"72%", scoreColor:"#46c98d", why:"Near ATM, tight spread, rising OI." },
+        { name:"24,300 CE", ltp:"68.20", d:"0.35", iv:"13.8%", oi:"9.0L", vol:"1.4L", spread:"1.1%",
+          score:"58", scoreW:"58%", scoreColor:"#d9a13e", why:"Cheaper convexity, wider spread." },
+      ],
+      presets,
+      condor: condors[sel],
+    };
+  }
+}
+</script>
+
+
+</body></html>

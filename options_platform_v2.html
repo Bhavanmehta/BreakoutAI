@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI | Options Cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* ---- design tokens (from Options Cockpit standalone) --------------- */
+    :root{
+        --bg:#0d1319; --card:#10171f; --card2:#141d27;
+        --bd:#1c2733; --bd2:#223040;
+        --tx:#e8eef4; --tx2:#b8c6d2; --mut:#93a4b3; --mut2:#8494a3; --mut3:#66788a; --mut4:#5c6e7d;
+        --teal:#3fc1ab; --teal-d:#2a8f80; --teal-h:#7fdcc9;
+        --up:#46c98d; --up2:#6fd3a8; --down:#e5686f; --down2:#e58a8f; --amber:#d9a13e; --sky:#8fb8d9;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:var(--bg);color:var(--tx);min-height:100vh;
+        font-family:'Instrument Sans',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:var(--teal);text-decoration:none;font-weight:600}
+    a:hover{color:var(--teal-h)}
+    .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:#2f4356}
+
+    .wrap{max-width:1500px;margin:0 auto}
+
+    /* header controls styled as design pills */
+    .ctl{background:var(--card2);border:1px solid var(--bd2);border-radius:8px;
+        padding:7px 12px;font-size:13px;color:var(--tx);font-family:inherit;
+        outline:none;cursor:pointer}
+    .ctl:focus{border-color:var(--teal)}
+    select.ctl{font-weight:600}
+    input.ctl{width:130px;cursor:text}
+    input.ctl::placeholder{color:var(--mut4)}
+    .ctl-ghost{background:transparent;border:1px solid #2a3b4c;border-radius:8px;
+        padding:7px 12px;font-size:12px;font-weight:600;color:var(--teal);cursor:pointer;font-family:inherit}
+    .ctl-ghost:hover{border-color:var(--teal);color:var(--teal-h)}
+
+    /* layout grids (design is fixed; add responsive fallbacks) */
+    .kpis{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;padding:18px 28px;border-bottom:1px solid var(--bd)}
+    @media(max-width:1100px){.kpis{grid-template-columns:repeat(4,1fr)}}
+    @media(max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+    .cols{display:grid;grid-template-columns:1fr 1.15fr;gap:20px;padding:20px 28px 24px}
+    @media(max-width:900px){.cols{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:20px}
+
+    /* range inputs (delta/wing tuner — not in mock, kept as a real feature) */
+    input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+        background:var(--bd);cursor:pointer;outline:none}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+        border-radius:50%;background:var(--teal);border:none;cursor:pointer}
+    input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--teal);border:none;cursor:pointer}
+
+    .hidden{display:none!important}
+    .anim-pulse{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
+    @keyframes pulse{50%{opacity:.55}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header style="position:sticky;top:0;z-index:50;border-bottom:1px solid var(--bd);background:rgba(15,22,32,0.96);backdrop-filter:blur(6px)">
+  <div class="wrap" style="display:flex;align-items:center;gap:16px;padding:14px 28px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <div style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#3fc1ab,#2a8f80);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#06110f">B</div>
+      <div style="font-size:15px;font-weight:700;letter-spacing:-0.2px">BreakoutAI <span style="color:var(--mut);font-weight:500">/ Options</span></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <select id="fSymbol" class="ctl" title="Index">
+        <option>NIFTY</option><option>BANKNIFTY</option><option>FINNIFTY</option>
+        <option>MIDCPNIFTY</option><option>SENSEX</option>
+      </select>
+      <input id="fCustomSymbol" class="ctl mono" type="text" placeholder="or F&amp;O stock…" autocomplete="off"
+        title="Type any F&amp;O stock symbol to override the dropdown">
+      <select id="fExpiry" class="ctl" title="Expiry">
+        <option value="">— expiry —</option>
+      </select>
+      <button id="btnRefresh" type="button" class="ctl-ghost">⟳ Refresh</button>
+    </div>
+
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end">
+      <div style="text-align:right;line-height:1.15">
+        <div id="spotVal" class="mono" style="font-size:22px;font-weight:600">—</div>
+        <div id="spotMove" class="mono" style="font-size:11.5px;font-weight:500;color:var(--mut)">—</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+        <span id="sourceBadge" style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;border-radius:6px;padding:3px 9px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2)">—</span>
+        <span style="font-size:10px;font-weight:600;letter-spacing:0.4px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2);border-radius:6px;padding:3px 9px"
+          title="This screen never places orders — analysis only.">PAPER MODE · analysis only</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Error banner -->
+  <div id="errBanner" class="hidden" style="margin:16px 28px 0;padding:10px 14px;border-radius:10px;border:1px solid rgba(229,104,111,0.4);background:rgba(229,104,111,0.10);color:#f2b8bb;font-size:13px;font-weight:500"></div>
+
+  <!-- Regime hero -->
+  <div style="padding:26px 28px 20px;border-bottom:1px solid var(--bd)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <span id="regimeBadge" style="font-size:12px;font-weight:700;letter-spacing:0.6px;border-radius:7px;padding:5px 12px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2)">—</span>
+      <span id="oiStateChip" style="font-size:11.5px;font-weight:600;border-radius:7px;padding:5px 12px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2)">—</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:6px">
+        <span style="font-size:10px;letter-spacing:0.8px;color:var(--mut4);font-weight:600">CONFIDENCE</span>
+        <div style="width:120px;height:5px;border-radius:3px;background:var(--bd);overflow:hidden"><div id="confBar" style="width:0%;height:100%;background:var(--teal);border-radius:3px"></div></div>
+        <span id="confVal" class="mono" style="font-size:11px;color:var(--mut)">—</span>
+      </div>
+    </div>
+    <div id="buyVerdict" style="font-size:20px;font-weight:600;letter-spacing:-0.2px;line-height:1.35;max-width:920px">—</div>
+    <ul id="regimeReasons" style="display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--mut2);list-style:none"></ul>
+  </div>
+
+  <!-- KPI strip -->
+  <div id="kpiGrid" class="kpis"></div>
+
+  <!-- Two columns -->
+  <div class="cols">
+
+    <!-- BUY -->
+    <section class="card" style="position:relative">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700"><span style="color:var(--up)">▲</span> Buy — directional</div>
+        <span id="buyBiasBadge" style="font-size:11px;font-weight:700;letter-spacing:0.5px;border-radius:6px;padding:4px 10px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2)">—</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--mut3);margin-bottom:14px">Single options to buy when you expect a move. Higher score = better liquidity &amp; positioning.</div>
+      <div id="buyExpiryNote" class="hidden" style="font-size:11px;color:#e6c07a;margin-bottom:12px;line-height:1.4;border-left:2px solid rgba(217,161,62,0.5);padding-left:10px"></div>
+      <div id="buyCandidates" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+      <div id="buySuppressed" class="hidden" style="position:absolute;inset:0;border-radius:14px;background:rgba(13,19,25,0.74);backdrop-filter:blur(1px);display:flex;align-items:center;justify-content:center;padding:24px">
+        <p style="font-size:14px;font-weight:600;color:#e6c07a;text-align:center">⚠ Long premium suppressed in this regime</p>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end"><a href="options_assessor.html" style="font-size:12px">Deep-dive in Assessor →</a></div>
+    </section>
+
+    <!-- SELL -->
+    <section class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700"><span style="color:var(--down)">▼</span> Sell — premium</div>
+        <span id="sellGateBadge" style="font-size:11px;font-weight:700;letter-spacing:0.5px;border-radius:6px;padding:4px 10px;color:var(--mut);background:var(--card2);border:1px solid var(--bd2)">—</span>
+      </div>
+      <ul id="sellGateReasons" style="font-size:11.5px;color:var(--mut3);margin:6px 0 12px;list-style:none;line-height:1.5"></ul>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.7px;color:var(--mut4);margin:8px 0">IRON CONDOR — PICK A PRESET</div>
+      <div id="condorPresets" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"></div>
+
+      <!-- delta/wing tuner: recomputes strikes/credit/POP client-side, no round-trip -->
+      <div id="condorTuner" class="hidden" style="border-top:1px solid var(--bd);padding-top:10px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <label style="font-size:10px;color:var(--mut);width:52px;flex-shrink:0">Short Δ</label>
+          <input id="condorDelta" type="range" min="5" max="40" step="1" value="16" style="flex:1">
+          <span id="condorDeltaVal" class="mono" style="font-size:10px;color:var(--tx2);width:34px;text-align:right">0.16</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:10px;color:var(--mut);width:52px;flex-shrink:0">Wing</label>
+          <input id="condorWing" type="range" min="50" max="600" step="50" value="200" style="flex:1">
+          <span id="condorWingVal" class="mono" style="font-size:10px;color:var(--tx2);width:34px;text-align:right">200</span>
+        </div>
+      </div>
+
+      <div id="condorBody"></div>
+      <div id="butterflyBody"></div>
+
+      <ul id="sellNotes" style="margin-top:12px;font-size:10.5px;color:var(--mut3);list-style:none;line-height:1.5"></ul>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end"><a href="http://localhost:8501" target="_blank" rel="noopener" style="font-size:12px">Manage live book → Streamlit →</a></div>
+    </section>
+  </div>
+
+  <footer style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:14px 28px 22px;border-top:1px solid var(--bd);font-size:10.5px;color:var(--mut4)">
+    <div><span id="genAt">generated —</span> · next refresh in <span id="countdown" class="mono">—</span>s · <button id="btnRefresh2" type="button" style="background:none;border:none;color:var(--teal);font:inherit;font-weight:600;cursor:pointer;padding:0">refresh now</button></div>
+    <div>Paper / analysis only — not an order-routing screen.</div>
+  </footer>
+</main>
+
+<script>
+(function () {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const POLL_MS = 20000;
+
+    const state = {
+        data: null,
+        lastError: null,
+        usingDemoFallback: false,
+        expiry: "",
+        lastFetch: 0,
+        pollTimer: null,
+        countdownTimer: null,
+        condor: { sel: "Balanced", delta: 0.15, wing: 200 },
+    };
+
+    // ---- formatting -----------------------------------------------------
+    const isNum = (v) => v != null && typeof v === "number" && isFinite(v);
+    const fmt = (x, d = 2) => isNum(x) ? x.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
+    const fmt0 = (x) => isNum(x) ? Math.round(x).toLocaleString("en-IN") : "—";
+    const fmtInr = (x) => isNum(x) ? "₹" + Math.round(x).toLocaleString("en-IN") : "—";
+    const fmtPct = (x, d = 2) => isNum(x) ? (x >= 0 ? "+" : "") + x.toFixed(d) + "%" : "—";
+    const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    // Standard-normal CDF (Zelen & Severo 26.2.17, |err| < 7.5e-8). Mirrors the
+    // engine's Black-76 N() so the client-side condor slider POP matches server.
+    function normCdf(x) {
+        if (!isNum(x)) return null;
+        const t = 1 / (1 + 0.2316419 * Math.abs(x));
+        const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+        const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        return x >= 0 ? 1 - p : p;
+    }
+
+    // JS mirror of strategy.py::select_condor_at() — sweep one chain into a
+    // (delta, wing) condor. `chain` is the slim rows [{k,ce_ltp,ce_delta,pe_ltp,
+    // pe_delta}], `meta` carries {spot, lot, min_credit}. Kept deliberately in
+    // lock-step with the Python selector so slider previews == server presets.
+    function computeCondor(chain, meta, targetShortDelta, wing) {
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const spot = meta.spot, lot = meta.lot || 75, minCredit = meta.min_credit ?? 0;
+        const base = { name: null, short_delta_target: targetShortDelta, wing };
+        // short call: first strike >= spot whose call delta <= target
+        let sc = null;
+        for (const r of chain.filter(r => r.k >= spot && isNum(r.ce_delta)).sort((a, b) => a.k - b.k)) {
+            if (r.ce_delta <= targetShortDelta) { sc = r; break; }
+        }
+        if (!sc) return { ...base, ok: false, reason: `no call strike >= ${spot} with delta <= ${targetShortDelta}` };
+        // short put: first strike <= spot (descending) whose |put delta| <= target
+        let sp = null;
+        for (const r of chain.filter(r => r.k <= spot && isNum(r.pe_delta)).sort((a, b) => b.k - a.k)) {
+            if (Math.abs(r.pe_delta) <= targetShortDelta) { sp = r; break; }
+        }
+        if (!sp) return { ...base, ok: false, reason: `no put strike <= ${spot} with |delta| <= ${targetShortDelta}` };
+        const lc = rows[sc.k + wing], lp = rows[sp.k - wing];
+        if (!lc || !lp) return { ...base, ok: false, reason: "wing strikes not present in chain" };
+        const netCredit = sc.ce_ltp - lc.ce_ltp + sp.pe_ltp - lp.pe_ltp;
+        if (netCredit < minCredit) return { ...base, ok: false, reason: `net credit ${netCredit.toFixed(2)} < min_credit ${minCredit}` };
+        const maxLossPts = wing - netCredit;
+        const beLo = sp.k - netCredit, beHi = sc.k + netCredit;
+        return {
+            ...base, ok: true, short_call_k: sc.k, long_call_k: lc.k, short_put_k: sp.k, long_put_k: lp.k,
+            net_credit_pts: +netCredit.toFixed(2), credit_rupees: Math.round(netCredit * lot),
+            max_loss_pts: +maxLossPts.toFixed(2), max_loss_rupees: Math.round(maxLossPts * lot),
+            breakeven_low: +beLo.toFixed(1), breakeven_high: +beHi.toFixed(1),
+            pop: condorPop(spot, beLo, beHi, meta.atm_iv, meta.T),
+            short_call_delta: +sc.ce_delta.toFixed(3), short_put_delta: +sp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: meta.margin_rupees ?? 45000, margin_source: "estimated",
+            reward_risk: maxLossPts > 0 ? +(netCredit / maxLossPts).toFixed(2) : null,
+        };
+    }
+
+    // Black-76 lognormal P(be_lo < F_T < be_hi) at a single ATM-IV vol — mirrors
+    // options_platform.py::pop() so the slider's POP matches the server presets.
+    function condorPop(spot, beLo, beHi, atmIvPct, T) {
+        const sig = (atmIvPct || 0) / 100;
+        if (!(spot && beLo && beHi) || sig <= 0 || !(T > 0)) return null;
+        const root = sig * Math.sqrt(T);
+        const pBelow = (K) => normCdf(-((Math.log(spot / K) - 0.5 * sig * sig * T) / root));
+        return +Math.max(0, Math.min(1, pBelow(beHi) - pBelow(beLo))).toFixed(3);
+    }
+
+    function isDemoParam() {
+        return new URLSearchParams(location.search).get("demo") === "1";
+    }
+
+    function getSymbol() {
+        const custom = $("fCustomSymbol").value.trim().toUpperCase();
+        return custom || $("fSymbol").value;
+    }
+
+    // ---- demo condor ladder — generated from a toy Black-76 chain and fed
+    // through the SAME computeCondor() the live slider uses, so demo presets
+    // and the demo slider stay internally consistent (single source of math).
+    const _demoCondor = (() => {
+        const spot = 24200.5, T = 5 / 365, sig = 0.132, lot = 75, wing = 200;
+        const d1 = (K) => (Math.log(spot / K) + 0.5 * sig * sig * T) / (sig * Math.sqrt(T));
+        const callPx = (K) => Math.max(spot * normCdf(d1(K)) - K * normCdf(d1(K) - sig * Math.sqrt(T)), 0.05);
+        const chain = [];
+        for (let K = 23400; K <= 25000; K += 50) {
+            const cd = normCdf(d1(K)), c = callPx(K);
+            chain.push({ k: K, ce_ltp: +c.toFixed(1), ce_delta: +cd.toFixed(3),
+                pe_ltp: +Math.max(c - spot + K, 0.05).toFixed(1), pe_delta: +(cd - 1).toFixed(3) });
+        }
+        const meta = { spot, T, atm_iv: 13.2, interval: 50, wing_default: wing, lot,
+            min_credit: 0, margin_rupees: 45000 };
+        const presets = [["Wide", 0.10], ["Balanced", 0.20], ["Tight", 0.30]].map(([name, td]) => {
+            const c = computeCondor(chain, meta, td, wing);
+            c.name = name; return c;
+        });
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const atm = 24200, bc = rows[atm], bp = rows[atm], blc = rows[atm + wing], blp = rows[atm - wing];
+        const bCredit = bc.ce_ltp - blc.ce_ltp + bp.pe_ltp - blp.pe_ltp, bMaxPts = wing - bCredit;
+        const bLo = atm - bCredit, bHi = atm + bCredit;
+        const butterfly = { name: "Butterfly", short_delta_target: null, wing, ok: true,
+            short_call_k: atm, long_call_k: atm + wing, short_put_k: atm, long_put_k: atm - wing,
+            net_credit_pts: +bCredit.toFixed(2), credit_rupees: Math.round(bCredit * lot),
+            max_loss_pts: +bMaxPts.toFixed(2), max_loss_rupees: Math.round(bMaxPts * lot),
+            breakeven_low: +bLo.toFixed(1), breakeven_high: +bHi.toFixed(1),
+            pop: condorPop(spot, bLo, bHi, meta.atm_iv, T),
+            short_call_delta: +bc.ce_delta.toFixed(3), short_put_delta: +bp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: 22000, margin_source: "estimated",
+            reward_risk: bMaxPts > 0 ? +(bCredit / bMaxPts).toFixed(2) : null };
+        return { chain, meta, presets, butterfly };
+    })();
+
+    // ---- demo payload (only used if ?demo=1 AND a real fetch fails) -----
+    const DEMO_PAYLOAD = {
+        source: "mock", demo_reason: "embedded sample — live fetch failed and ?demo=1 was set",
+        symbol: "NIFTY", expiry: "2026-07-28", expiries: ["2026-07-28", "2026-08-04", "2026-08-25"],
+        spot: 24200.5, lot_size: 75, prev_close: 24150.0, move_pct: 0.21, dte: 5, expiry_day: false,
+        generated_at: new Date().toISOString(), mode: "paper",
+        features: { pcr_near: 1.12, pcr_far: 0.94, oi_concentration: 0.31, max_pain: 24150, call_wall: 24500,
+            put_wall: 24000, atm_strike: 24200, atm_iv: 13.2, iv_skew: 1.4, expected_move_pts: 180.5,
+            expected_move_pct: 0.75, delta_oi_total: 1250000 },
+        regime: { label: "TRENDING_BULL", oi_state: "LONG_BUILD_UP", confidence: 0.7,
+            reasons: ["Price above VWAP with rising OI", "Call writers retreating at the wall"] },
+        buy: { bias: "CALLS", suppressed: false, verdict: "Mild bullish drift with call OI building — the tape favors a shallow call swing, and conditions are safe for selling premium.",
+            candidates: [
+                { type: "CE", strike: 24250, ltp: 95.5, delta: 0.48, iv: 13.5, oi: 1500000, volume: 250000, spread_pct: 0.8, score: 72, why: "Near ATM, tight spread, rising OI." },
+                { type: "CE", strike: 24300, ltp: 68.2, delta: 0.35, iv: 13.8, oi: 900000, volume: 140000, spread_pct: 1.1, score: 58, why: "Cheaper convexity, wider spread." }
+            ] },
+        sell: { gate: { ok: true, reasons: ["IV percentile in range", "No event risk within expiry"] },
+            presets: _demoCondor.presets,
+            butterfly: _demoCondor.butterfly,
+            slim_chain: _demoCondor.chain, chain_meta: _demoCondor.meta,
+            notes: ["Sized for 1 lot — scale margin linearly.", "Exit both legs if spot closes beyond either breakeven."] }
+    };
+
+    // ---- self-check (ponytail: smallest runnable check for the render math) --
+    function selfCheck() {
+        try {
+            console.assert(fmt0(null) === "—", "fmt0 null");
+            console.assert(fmt0(24200.6) === "24,201", "fmt0 rounding/grouping");
+            console.assert(fmtInr(45000) === "₹45,000", "fmtInr grouping");
+            console.assert(fmtPct(0.21) === "+0.21%", "fmtPct sign");
+            console.assert(fmtPct(-0.5) === "-0.50%", "fmtPct negative");
+            const p = ladderPositions({ long_put_k: 23700, short_put_k: 23900, short_call_k: 24500, long_call_k: 24700 }, 24200, 23857.5, 24542.5);
+            console.assert(p && p.pts.length === 4 && p.lo < p.hi, "ladderPositions basic shape");
+            const bal = _demoCondor.presets.find((x) => /balanc/i.test(x.name));
+            const c = computeCondor(_demoCondor.chain, _demoCondor.meta, bal.short_delta_target, bal.wing);
+            console.assert(c.ok && c.short_call_k === bal.short_call_k && c.net_credit_pts === bal.net_credit_pts,
+                "computeCondor reproduces preset");
+            console.assert(c.short_call_k > _demoCondor.meta.spot && c.short_put_k < _demoCondor.meta.spot,
+                "condor shorts straddle spot");
+            console.assert(c.long_call_k - c.short_call_k === bal.wing && c.short_put_k - c.long_put_k === bal.wing,
+                "condor wings symmetric");
+            console.assert(c.pop == null || (c.pop >= 0 && c.pop <= 1), "condorPop in [0,1]");
+            const tight = computeCondor(_demoCondor.chain, _demoCondor.meta, 0.30, bal.wing);
+            console.assert(!tight.ok || tight.short_call_k <= c.short_call_k, "higher delta => nearer short call");
+        } catch (e) { console.warn("options_platform self-check failed:", e); }
+    }
+
+    // ---- tone maps (design palette) --------------------------------------
+    // Each tone is a full CSS string applied via el.style.cssText onto a pill.
+    const PILL = {
+        teal:  "color:#3fc1ab;background:rgba(63,193,171,0.08);border:1px solid rgba(63,193,171,0.25)",
+        green: "color:#46c98d;background:rgba(70,201,141,0.08);border:1px solid rgba(70,201,141,0.25)",
+        red:   "color:#e5686f;background:rgba(229,104,111,0.08);border:1px solid rgba(229,104,111,0.25)",
+        amber: "color:#e6c07a;background:rgba(217,161,62,0.08);border:1px solid rgba(217,161,62,0.28)",
+        sky:   "color:#8fb8d9;background:rgba(107,163,214,0.08);border:1px solid rgba(107,163,214,0.22)",
+        slate: "color:#93a4b3;background:#141d27;border:1px solid #223040",
+    };
+    const REGIME_TONE = {
+        TRENDING_BULL: PILL.green, TRENDING_BEAR: PILL.red, HIGH_VOLATILITY: PILL.amber,
+        LOW_VOLATILITY: PILL.sky, GAMMA_PINNING: PILL.teal,
+    };
+    const REGIME_LABEL = {
+        TRENDING_BULL: "Trending Bull", TRENDING_BEAR: "Trending Bear", HIGH_VOLATILITY: "High Volatility",
+        LOW_VOLATILITY: "Low Volatility", GAMMA_PINNING: "Gamma Pinning",
+    };
+    const OI_TONE = {
+        LONG_BUILD_UP: PILL.green, SHORT_BUILD_UP: PILL.red, SHORT_COVERING: PILL.sky,
+        LONG_UNWINDING: PILL.amber, NEUTRAL: PILL.slate, UNKNOWN: PILL.slate,
+    };
+    const OI_LABEL = {
+        LONG_BUILD_UP: "Long Build-up", SHORT_BUILD_UP: "Short Build-up", SHORT_COVERING: "Short Covering",
+        LONG_UNWINDING: "Long Unwinding", NEUTRAL: "Neutral", UNKNOWN: "Unknown",
+    };
+
+    // apply a pill's palette while preserving its size/shape base style
+    function tone(el, css) { el.style.cssText = el.dataset.base + ";" + css; }
+
+    // ---- rendering ----------------------------------------------------
+    function kpiCard(label, val, color, sub) {
+        return '<div style="background:#10171f;border:1px solid #1c2733;border-radius:10px;padding:12px 12px 10px">' +
+            '<div style="font-size:9.5px;font-weight:700;letter-spacing:0.7px;color:#5c6e7d;text-transform:uppercase">' + esc(label) + '</div>' +
+            '<div class="mono" style="font-size:16px;font-weight:600;margin:4px 0 2px;color:' + (color || "#e8eef4") + '">' + val + '</div>' +
+            (sub ? '<div style="font-size:10px;color:#66788a;line-height:1.3">' + esc(sub) + '</div>' : "") +
+            '</div>';
+    }
+
+    function pcrHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 1.15) return "puts > calls · bullish tilt";
+        if (v <= 0.85) return "calls > puts · bearish tilt";
+        return "balanced flow";
+    }
+    function skewHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 0.5) return "puts pricier · downside bid";
+        if (v <= -0.5) return "calls pricier · upside bid";
+        return "flat skew";
+    }
+
+    function renderHeader(d) {
+        $("spotVal").textContent = isNum(d.spot) ? fmt(d.spot, 2) : "—";
+        const mv = $("spotMove");
+        mv.textContent = fmtPct(d.move_pct);
+        mv.style.color = isNum(d.move_pct) ? (d.move_pct >= 0 ? "#46c98d" : "#e5686f") : "#93a4b3";
+
+        const badge = $("sourceBadge");
+        if (state.usingDemoFallback || d.source === "mock") {
+            badge.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#e6c07a"></span>DEMO DATA';
+            tone(badge, PILL.amber); badge.classList.add("anim-pulse");
+            badge.title = d.demo_reason || "Mock/demo data.";
+        } else {
+            badge.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#46c98d"></span>LIVE';
+            tone(badge, PILL.green); badge.classList.remove("anim-pulse");
+            badge.title = "Live market data.";
+        }
+    }
+
+    function renderExpiries(d) {
+        const sel = $("fExpiry");
+        const expiries = Array.isArray(d.expiries) ? d.expiries : [];
+        const cur = state.expiry || d.expiry || "";
+        sel.innerHTML = '<option value="">' + (d.expiry ? esc(d.expiry) + " (default)" : "— expiry —") + '</option>' +
+            expiries.map((e) => '<option value="' + esc(e) + '"' + (e === cur ? " selected" : "") + '>' + esc(e) + '</option>').join("");
+    }
+
+    function renderRegime(d) {
+        const r = d.regime || {};
+        const badge = $("regimeBadge");
+        badge.textContent = r.label ? (REGIME_LABEL[r.label] || r.label) : "—";
+        tone(badge, REGIME_TONE[r.label] || PILL.slate);
+
+        const chip = $("oiStateChip");
+        chip.textContent = r.oi_state ? (OI_LABEL[r.oi_state] || r.oi_state) : "—";
+        tone(chip, OI_TONE[r.oi_state] || OI_TONE.UNKNOWN);
+
+        const conf = isNum(r.confidence) ? Math.max(0, Math.min(1, r.confidence)) : null;
+        $("confBar").style.width = (conf != null ? conf * 100 : 0) + "%";
+        $("confVal").textContent = conf != null ? Math.round(conf * 100) + "%" : "—";
+
+        const reasons = Array.isArray(r.reasons) ? r.reasons : [];
+        $("regimeReasons").innerHTML = reasons.length
+            ? reasons.map((x) => '<li>· ' + esc(x) + '</li>').join("")
+            : '<li style="color:#5c6e7d">No reasons reported.</li>';
+    }
+
+    function renderKpis(d) {
+        const f = d.features || {};
+        const emSub = isNum(f.expected_move_pct) ? "1σ ±" + fmt(f.expected_move_pct, 2) + "% by expiry" : "1σ range by expiry";
+        $("kpiGrid").innerHTML =
+            kpiCard("PCR Near", fmt(f.pcr_near, 2), null, pcrHint(f.pcr_near)) +
+            kpiCard("PCR Far", fmt(f.pcr_far, 2), null, pcrHint(f.pcr_far)) +
+            kpiCard("Max Pain", fmt0(f.max_pain), null, "pin strike at expiry") +
+            kpiCard("Call Wall", fmt0(f.call_wall), "#46c98d", "resistance ceiling") +
+            kpiCard("Put Wall", fmt0(f.put_wall), "#e5686f", "support floor") +
+            kpiCard("ATM IV", isNum(f.atm_iv) ? fmt(f.atm_iv, 1) + "%" : "—", null, "annualized vol") +
+            kpiCard("IV Skew", fmt(f.iv_skew, 2), null, skewHint(f.iv_skew)) +
+            kpiCard("Exp. Move", isNum(f.expected_move_pts) ? fmt0(f.expected_move_pts) + " pt" : "—", null, emSub);
+        const cards = $("kpiGrid").children;
+        if (cards.length) cards[cards.length - 1].title = "±" + fmt(f.expected_move_pct, 2) + "% of spot";
+    }
+
+    function scoreColor(s) {
+        if (!isNum(s)) return "#5c6e7d";
+        return s >= 70 ? "#46c98d" : s >= 40 ? "#d9a13e" : "#e5686f";
+    }
+
+    function metricCell(label, val) {
+        return '<div><div style="font-size:9px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">' + label +
+            '</div><div class="mono" style="font-size:12px;color:#b8c6d2">' + val + '</div></div>';
+    }
+
+    function candidateCard(c) {
+        const legTone = c.type === "PE" ? "#e5686f" : "#46c98d";
+        const sw = isNum(c.score) ? Math.max(0, Math.min(100, c.score)) : 0;
+        return '<div style="background:#141d27;border:1px solid #223040;border-radius:11px;padding:14px 16px">' +
+            '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">' +
+            '<div class="mono" style="font-size:15px;font-weight:600;color:' + legTone + '">' + fmt0(c.strike) + ' ' + esc(c.type || "—") + '</div>' +
+            '<div class="mono" style="font-size:15px;font-weight:600">₹' + fmt(c.ltp, 2) + '</div></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">' +
+            metricCell("DELTA", fmt(c.delta, 2)) +
+            metricCell("IV", isNum(c.iv) ? fmt(c.iv, 1) + "%" : "—") +
+            metricCell("OI", fmt0(c.oi)) +
+            metricCell("VOLUME", fmt0(c.volume)) +
+            metricCell("SPREAD", isNum(c.spread_pct) ? fmt(c.spread_pct, 1) + "%" : "—") +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+            '<div style="flex:1;height:5px;border-radius:3px;background:#0d1319;overflow:hidden">' +
+            '<div style="height:100%;border-radius:3px;background:' + scoreColor(c.score) + ';width:' + sw + '%"></div></div>' +
+            '<div class="mono" style="font-size:11px;color:#93a4b3">' + fmt0(c.score) + '/100</div></div>' +
+            (c.why ? '<div style="font-size:11.5px;color:#8494a3;line-height:1.4">' + esc(c.why) + '</div>' : "") +
+            '</div>';
+    }
+
+    function renderBuy(d) {
+        const b = d.buy || {};
+        const badge = $("buyBiasBadge");
+        badge.textContent = "BIAS: " + (b.bias || "—");
+        tone(badge, b.bias === "CALLS" ? PILL.green : b.bias === "PUTS" ? PILL.red : PILL.slate);
+
+        // The big regime-hero sentence carries the verdict (design layout).
+        $("buyVerdict").textContent = b.verdict || (d.regime && d.regime.narrative) || "—";
+
+        const note = $("buyExpiryNote");
+        if (d.expiry_day) {
+            note.textContent = b.expiry_note ||
+                "Expiry day — treat any long premium as an intraday SCALP, not a hold: extrinsic value decays to zero by the 15:30 close. Work it intraday and exit before EOD or it settles worthless.";
+            note.classList.remove("hidden");
+        } else {
+            note.textContent = "";
+            note.classList.add("hidden");
+        }
+
+        const cands = Array.isArray(b.candidates) ? b.candidates : [];
+        $("buyCandidates").innerHTML = cands.length
+            ? cands.map(candidateCard).join("")
+            : '<div style="text-align:center;font-size:12px;color:#5c6e7d;padding:16px 0">No candidates available.</div>';
+
+        $("buySuppressed").classList.toggle("hidden", !b.suppressed);
+    }
+
+    // ---- strike ladder (condor / butterfly) ----------------------------
+    function ladderPositions(sp, spot, beLo, beHi) {
+        const raw = [sp.long_put_k, sp.short_put_k, sp.short_call_k, sp.long_call_k];
+        const pts = raw.filter(isNum);
+        if (!pts.length) return null;
+        const all = pts.concat([spot, beLo, beHi].filter(isNum));
+        let lo = Math.min(...all), hi = Math.max(...all);
+        const pad = (hi - lo) * 0.12 || 50;
+        lo -= pad; hi += pad;
+        return { pts, lo, hi, pct: (v) => isNum(v) ? ((v - lo) / (hi - lo)) * 100 : null };
+    }
+
+    function strikeLadderHtml(sp, spot) {
+        const pos = ladderPositions(sp, spot, sp.breakeven_low, sp.breakeven_high);
+        if (!pos) return '<div style="font-size:12px;color:#5c6e7d;padding:12px 0;text-align:center">Strike data unavailable.</div>';
+        const zoneLo = pos.pct(sp.breakeven_low), zoneHi = pos.pct(sp.breakeven_high);
+        const marks = [
+            { v: sp.long_put_k, label: "LP", c: "#e5686f" },
+            { v: sp.short_put_k, label: "SP", c: "#e58a8f" },
+            { v: sp.short_call_k, label: "SC", c: "#6fd3a8" },
+            { v: sp.long_call_k, label: "LC", c: "#46c98d" },
+        ];
+        let html = '<div style="position:relative;height:66px;margin:6px 4px 2px">';
+        html += '<div style="position:absolute;left:0;right:0;top:32px;height:2px;background:#223040"></div>';
+        if (isNum(zoneLo) && isNum(zoneHi)) {
+            html += '<div style="position:absolute;top:29px;height:8px;border-radius:4px;background:rgba(70,201,141,0.22);left:' +
+                Math.max(0, zoneLo).toFixed(1) + '%;width:' + Math.max(0, zoneHi - zoneLo).toFixed(1) + '%"></div>';
+        }
+        marks.forEach((m) => {
+            const p = pos.pct(m.v);
+            if (p == null) return;
+            html += '<div style="position:absolute;top:26px;width:2px;height:14px;background:#3d4f61;left:' + p.toFixed(1) + '%"></div>' +
+                '<div style="position:absolute;top:44px;transform:translateX(-50%);text-align:center;font-size:9px;font-weight:700;line-height:1.35;color:' + m.c + ';left:' + p.toFixed(1) + '%">' +
+                m.label + '<br><span class="mono" style="color:#93a4b3">' + fmt0(m.v) + '</span></div>';
+        });
+        const sPct = pos.pct(spot);
+        if (sPct != null) {
+            html += '<div style="position:absolute;left:' + sPct.toFixed(1) + '%;top:0;transform:translateX(-50%);text-align:center;font-size:9px;font-weight:700;color:#3fc1ab;line-height:1.2">▼<br>spot</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function statCell(label, val, color) {
+        return '<div style="background:#141d27;border-radius:8px;padding:9px;text-align:center">' +
+            '<div style="font-size:8.5px;letter-spacing:0.6px;color:#5c6e7d;font-weight:700">' + label + '</div>' +
+            '<div class="mono" style="font-size:12.5px;font-weight:600;margin-top:3px;color:' + (color || "#e8eef4") + '">' + val + '</div></div>';
+    }
+
+    function spreadCardHtml(sp, spot) {
+        if (!sp || sp.ok === false) {
+            return '<div style="font-size:12px;color:#e6c07a;padding:10px 0">' + esc((sp && sp.reason) || "Not available in current conditions.") + '</div>';
+        }
+        const pop = isNum(sp.pop) ? Math.round(sp.pop * 100) + "%" : "—";
+        let html = strikeLadderHtml(sp, spot);
+        html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">' +
+            statCell("NET CREDIT", isNum(sp.net_credit_pts) ? fmt(sp.net_credit_pts, 1) + " pt" : "—") +
+            statCell("CREDIT ₹", fmtInr(sp.credit_rupees), "#46c98d") +
+            statCell("MAX LOSS ₹", fmtInr(sp.max_loss_rupees), "#e5686f") +
+            statCell("PROB. OF PROFIT", pop) +
+            statCell("BE LOW", fmt(sp.breakeven_low, 0)) +
+            statCell("BE HIGH", fmt(sp.breakeven_high, 0)) +
+            statCell("R : R", fmt(sp.reward_risk, 2)) +
+            statCell("MARGIN (EST.)", fmtInr(sp.margin_rupees)) +
+            '</div>';
+        return html;
+    }
+
+    // Butterfly rendered as the design's compact summary row.
+    function butterflyRowHtml(sp) {
+        if (!sp || sp.ok === false) {
+            return '<div style="margin-top:16px;font-size:11px;color:#e6c07a">' + esc((sp && sp.reason) || "Butterfly not available.") + '</div>';
+        }
+        const pop = isNum(sp.pop) ? Math.round(sp.pop * 100) + "%" : "—";
+        const atm = fmt0(sp.short_call_k);
+        return '<div style="margin-top:16px;padding:13px 16px;background:#141d27;border:1px solid #223040;border-radius:11px;display:flex;align-items:center;justify-content:space-between;gap:14px">' +
+            '<div>' +
+            '<div style="font-size:12px;font-weight:700;margin-bottom:2px">Butterfly <span class="mono" style="font-weight:500;color:#5c6e7d;font-size:10px">shorts @ ' + atm + ' · wings ±' + fmt0(sp.wing) + '</span></div>' +
+            '<div style="font-size:10.5px;color:#8494a3">BE ' + fmt(sp.breakeven_low, 0) + ' – ' + fmt(sp.breakeven_high, 0) + ' · POP ' + pop + ' · tighter pin, bigger payoff</div>' +
+            '</div>' +
+            '<div style="text-align:right">' +
+            '<div class="mono" style="font-size:14px;font-weight:600;color:#46c98d">' + fmtInr(sp.credit_rupees) + '</div>' +
+            '<div class="mono" style="font-size:10px;color:#e5686f">max loss ' + fmtInr(sp.max_loss_rupees) + '</div>' +
+            '</div></div>';
+    }
+
+    // ---- condor compare-cards + delta/wing tuner state -------------------
+    let _sellChain = null, _sellMeta = null, _sellPresets = [], _condorWired = false;
+    const _clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+    function presetCardHtml(p, idx, activeIdx) {
+        const active = idx === activeIdx;
+        if (!p || p.ok === false) {
+            return '<button data-preset="' + idx + '" disabled style="text-align:left;cursor:not-allowed;opacity:0.5;background:#141d27;border:1px solid #223040;border-radius:10px;padding:11px 12px;font-family:inherit;color:inherit">' +
+                '<div style="font-size:12px;font-weight:700;color:#93a4b3">' + esc((p && p.name) || "—") + '</div>' +
+                '<div style="font-size:9.5px;color:#5c6e7d;margin-top:6px">n/a</div></button>';
+        }
+        const pop = isNum(p.pop) ? Math.round(p.pop * 100) + "%" : "—";
+        const bg = active ? "rgba(63,193,171,0.10)" : "#141d27";
+        const bc = active ? "rgba(63,193,171,0.55)" : "#223040";
+        return '<button data-preset="' + idx + '" style="text-align:left;cursor:pointer;background:' + bg + ';border:1px solid ' + bc + ';border-radius:10px;padding:11px 12px;font-family:inherit;color:inherit">' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+            '<span style="font-size:12px;font-weight:700">' + esc(p.name || "—") + '</span>' +
+            '<span class="mono" style="font-size:9.5px;color:#5c6e7d">Δ' + fmt(p.short_delta_target, 2) + ' · w' + fmt0(p.wing) + '</span></div>' +
+            '<div class="mono" style="font-size:14px;font-weight:600;color:#46c98d;margin:5px 0 2px">' + fmtInr(p.credit_rupees) + '</div>' +
+            '<div style="font-size:10px;color:#8494a3">POP ' + pop + ' · R:R ' + fmt(p.reward_risk, 2) + '</div>' +
+            '</button>';
+    }
+
+    function renderCondorPresets(presets, activeIdx) {
+        $("condorPresets").innerHTML = presets.map((p, i) => presetCardHtml(p, i, activeIdx)).join("");
+    }
+
+    function setTuner(td, wing) {
+        if (isNum(td)) $("condorDelta").value = Math.round(_clamp(td * 100, 5, 40));
+        if (isNum(wing)) $("condorWing").value = Math.round(_clamp(wing, 50, 600) / 50) * 50;
+    }
+
+    function applyTuner() {
+        if (!_sellChain || !_sellMeta) return;
+        const td = (+$("condorDelta").value) / 100;
+        const wing = +$("condorWing").value;
+        $("condorDeltaVal").textContent = td.toFixed(2);
+        $("condorWingVal").textContent = fmt0(wing);
+        const c = computeCondor(_sellChain, _sellMeta, td, wing);
+        $("condorBody").innerHTML = spreadCardHtml(c, _sellMeta.spot);
+        const matchIdx = _sellPresets.findIndex((p) => p && p.ok !== false &&
+            Math.round((p.short_delta_target || 0) * 100) === Math.round(td * 100) && +p.wing === wing);
+        renderCondorPresets(_sellPresets, matchIdx);
+    }
+
+    function wireCondorControls() {
+        if (_condorWired) return;
+        _condorWired = true;
+        $("condorDelta").addEventListener("input", applyTuner);
+        $("condorWing").addEventListener("input", applyTuner);
+        $("condorPresets").addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-preset]");
+            if (!btn || btn.disabled) return;
+            const p = _sellPresets[+btn.dataset.preset];
+            if (!p || p.ok === false) return;
+            setTuner(p.short_delta_target, p.wing);
+            applyTuner();
+        });
+    }
+
+    function renderSell(d) {
+        const s = d.sell || {};
+        const gate = s.gate || {};
+        const badge = $("sellGateBadge");
+        badge.textContent = gate.ok ? "GATE: PASS ✓" : "GATE: BLOCKED ✕";
+        tone(badge, gate.ok ? PILL.green : PILL.red);
+        const reasons = Array.isArray(gate.reasons) ? gate.reasons : [];
+        $("sellGateReasons").innerHTML = reasons.map((r) => '<li>· ' + esc(r) + '</li>').join("");
+
+        _sellPresets = Array.isArray(s.presets) ? s.presets : [];
+        _sellChain = Array.isArray(s.slim_chain) ? s.slim_chain : null;
+        _sellMeta = s.chain_meta || null;
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            _sellPresets = _sellPresets.map((p) => {
+                if (!p || !isNum(p.short_delta_target)) return p;
+                const c = computeCondor(_sellChain, _sellMeta, p.short_delta_target, p.wing);
+                return c.ok === false ? p : { ...c, name: p.name };
+            });
+        }
+        wireCondorControls();
+
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            let activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false && /balanc/i.test(p.name || ""));
+            if (activeIdx < 0) activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false);
+            if (activeIdx < 0) activeIdx = 0;
+            const ap = _sellPresets[activeIdx];
+            if (ap && ap.ok !== false) setTuner(ap.short_delta_target, ap.wing);
+            $("condorTuner").classList.remove("hidden");
+            applyTuner();
+        } else {
+            $("condorPresets").innerHTML = "";
+            $("condorTuner").classList.add("hidden");
+            $("condorBody").innerHTML = spreadCardHtml(_sellPresets[0] || s.condor, d.spot);
+        }
+        $("butterflyBody").innerHTML = butterflyRowHtml(s.butterfly);
+
+        const notes = Array.isArray(s.notes) ? s.notes : [];
+        $("sellNotes").innerHTML = notes.map((n) => '<li>· ' + esc(n) + '</li>').join("");
+    }
+
+    function renderFooter(d) {
+        $("genAt").textContent = "generated " + (d.generated_at ? new Date(d.generated_at).toLocaleTimeString("en-IN", { hour12: false }) : "—");
+    }
+
+    function render() {
+        const d = state.data;
+        if (!d) return;
+        renderHeader(d);
+        renderExpiries(d);
+        renderRegime(d);
+        renderKpis(d);
+        renderBuy(d);
+        renderSell(d);
+        renderFooter(d);
+    }
+
+    // ---- fetch / poll ---------------------------------------------------
+    async function loadData() {
+        const symbol = getSymbol();
+        let url = "/api/options_platform?symbol=" + encodeURIComponent(symbol);
+        if (state.expiry) url += "&expiry=" + encodeURIComponent(state.expiry);
+        try {
+            const res = await fetch(url);
+            const j = await res.json();
+            if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
+            state.data = j;
+            state.usingDemoFallback = false;
+            state.lastError = null;
+            $("errBanner").classList.add("hidden");
+        } catch (e) {
+            state.lastError = e.message;
+            const banner = $("errBanner");
+            banner.textContent = "⚠ " + e.message + (state.data ? " — showing last good data." : "");
+            banner.classList.remove("hidden");
+            if (!state.data && isDemoParam()) {
+                state.data = DEMO_PAYLOAD;
+                state.usingDemoFallback = true;
+            }
+        }
+        state.lastFetch = Date.now();
+        render();
+    }
+
+    function tickCountdown() {
+        const remain = Math.max(0, Math.round((state.lastFetch + POLL_MS - Date.now()) / 1000));
+        $("countdown").textContent = remain;
+    }
+
+    function schedulePoll() {
+        clearInterval(state.pollTimer);
+        state.pollTimer = setInterval(loadData, POLL_MS);
+        clearInterval(state.countdownTimer);
+        state.countdownTimer = setInterval(tickCountdown, 1000);
+    }
+
+    function manualRefresh() {
+        loadData();
+        schedulePoll();
+    }
+
+    // ---- wiring -----------------------------------------------------------
+    function wire() {
+        // Capture each pill's shape/size base style so tone() can re-skin palette
+        // without clobbering per-pill geometry.
+        ["sourceBadge", "regimeBadge", "oiStateChip", "buyBiasBadge", "sellGateBadge"].forEach((id) => {
+            const el = $(id); if (el) el.dataset.base = el.getAttribute("style") || "";
+        });
+        $("btnRefresh").addEventListener("click", manualRefresh);
+        $("btnRefresh2").addEventListener("click", manualRefresh);
+        $("fSymbol").addEventListener("change", () => { $("fCustomSymbol").value = ""; state.expiry = ""; manualRefresh(); });
+        $("fCustomSymbol").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.expiry = ""; manualRefresh(); } });
+        $("fCustomSymbol").addEventListener("blur", () => { if ($("fCustomSymbol").value.trim()) { state.expiry = ""; manualRefresh(); } });
+        $("fExpiry").addEventListener("change", () => { state.expiry = $("fExpiry").value; manualRefresh(); });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        selfCheck();
+        wire();
+        loadData();
+        schedulePoll();
+    });
+})();
+</script>
+</body>
+</html>

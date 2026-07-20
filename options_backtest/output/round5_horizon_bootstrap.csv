@@ -1,0 +1,5 @@
+horizon_trades,p5_pct,median_pct,p95_pct,pct_profitable,prob_lose_gt_5pct,strategy
+3,-2.4,3.12,7.45,86.1,0.7,MeanReversion-Expiry
+4,-2.32,3.97,9.14,87.3,1.1,MeanReversion-Expiry
+3,-0.08,1.43,4.37,92.4,0.0,FlowExpiry-pcr-Wide
+4,0.03,1.9,5.25,95.6,0.0,FlowExpiry-pcr-Wide

@@ -1,0 +1,44 @@
+  [universe] bhavcopy fetch failed -- reusing 1817 symbols from the last breakouts.json.
+Recomputing events for 1817 stocks (IN)...
+  batch-fetching 1817 symbols...
+$RPOWER.NS: possibly delisted; no price data found  (1d 2023-07-15 -> 2026-07-19)
+$ACMESOLAR.NS: possibly delisted; no price data found  (1d 2023-07-15 -> 2026-07-19)
+$SIGNATURE.NS: possibly delisted; no price data found  (1d 2023-07-15 -> 2026-07-19)
+$FIVESTAR.NS: possibly delisted; no price data found  (1d 2023-07-15 -> 2026-07-19)
+
+4 Failed downloads:
+['RPOWER.NS', 'ACMESOLAR.NS', 'SIGNATURE.NS', 'FIVESTAR.NS']: possibly delisted; no price data found  (1d 2023-07-15 -> 2026-07-19)
+  got prices for 1813/1817; fetching benchmark...
+  benchmark (^NSEI): ok, 740 bars
+  computing events...
+
+
+========== IN: 92137 events, 1812 stocks, base hit 41.1% ==========
+
+R1 score_g2 (n with score: 91412)
+    <50    n=12096  hit= 42.2%
+    50-64  n=42518  hit= 42.2%
+    65-79  n=35343  hit= 39.2%
+    >=80   n=1455   hit= 43.1%
+
+R2 stop width %
+    <3     n=14195  hit= 40.6%
+    3-4.5  n=10905  hit= 49.2%
+    4.5-6  n=12527  hit= 42.8%
+    >=6    n=54510  hit= 39.2%
+
+R3 entry price
+  [0-100)   n=16782  hit= 47.8%
+  [100-500)   n=33991  hit= 41.4%
+  [500-2000)   n=30170  hit= 39.2%
+  [2000-inf)   n=11194  hit= 35.1%
+
+R4 re-pick after prior outcome (prior resolved: >= 10 calendar days earlier)
+  first pick   n=5779   hit= 47.1%
+  after won    n=24573  hit= 41.9%
+  after lost   n=61785  hit= 40.3%
+
+Combined counterfactual (historical):
+  baseline              n=92137  hit= 41.1%
+  cut stop_w>=6         n=37627  hit= 43.8%
+  ... also cut g2>=80   n=36610  hit= 43.8%

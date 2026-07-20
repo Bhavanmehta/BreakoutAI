@@ -1,0 +1,9 @@
+strategy,trades,win_rate_pct,total_pnl_rs,total_return_pct,cagr_pct,max_drawdown_pct,avg_win_rs,avg_loss_rs,profit_factor,sharpe_like,period_days,signal,width
+FlowExpiry-pcr-Medium,21,95.2,14224.0,14.22,16.0,-0.11,717.0,-116.0,123.35,4.35,328,pcr,Medium
+FlowExpiry-pcr-Wide,21,71.4,11456.0,11.46,12.8,-0.23,794.0,-77.0,25.84,3.14,328,pcr,Wide
+FlowExpiry-oi_bias-Medium,23,87.0,8419.0,8.42,9.2,-6.0,972.0,-3675.0,1.76,0.93,335,oi_bias,Medium
+FlowExpiry-pcr-VeryWide,21,38.1,5438.0,5.44,6.1,-1.29,897.0,-134.0,4.13,1.93,328,pcr,VeryWide
+FlowExpiry-pcr-Tight,21,90.5,4916.0,4.92,5.5,-7.16,772.0,-4871.0,1.5,0.57,328,pcr,Tight
+FlowExpiry-oi_bias-Wide,23,73.9,3191.0,3.19,3.5,-7.56,928.0,-2098.0,1.25,0.32,335,oi_bias,Wide
+FlowExpiry-oi_bias-VeryWide,23,52.2,-1496.0,-1.5,-1.6,-7.58,867.0,-1082.0,0.87,-0.17,335,oi_bias,VeryWide
+FlowExpiry-oi_bias-Tight,23,82.6,-6139.0,-6.14,-6.7,-20.35,984.0,-6208.0,0.75,-0.48,335,oi_bias,Tight

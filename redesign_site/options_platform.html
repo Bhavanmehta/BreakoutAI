@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI | Options Cockpit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: { extend: { colors: {
+            darkBg: '#0b1120', cardBg: '#1e293b', borderCl: '#334155',
+        } } }
+    }
+</script>
+<style>
+    body { -webkit-font-smoothing: antialiased; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .num { font-variant-numeric: tabular-nums; }
+    .ladder-track { height: 2px; background: #334155; }
+    .ladder-tick { width: 2px; }
+    .score-bar-track { background: #0f172a; }
+    .suppressed-overlay {
+        background: rgba(11,17,32,0.72); backdrop-filter: blur(1px);
+    }
+</style>
+</head>
+<body class="bg-darkBg text-slate-200 min-h-screen">
+
+<!-- Header -->
+<header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+    <div class="px-4 sm:px-6 py-3 max-w-[1500px] mx-auto flex flex-wrap items-center gap-3">
+        <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2 shrink-0">
+            <span class="text-purple-500 text-2xl">⚡</span>
+            Options<span class="text-purple-400">Cockpit</span>
+        </h1>
+
+        <div class="flex items-center gap-2 flex-wrap">
+            <select id="fSymbol" title="Index"
+                class="bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                <option>NIFTY</option><option>BANKNIFTY</option><option>FINNIFTY</option>
+                <option>MIDCPNIFTY</option><option>SENSEX</option>
+            </select>
+            <input id="fCustomSymbol" type="text" placeholder="or F&amp;O stock…" autocomplete="off"
+                class="num w-32 bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-purple-500 focus:outline-none"
+                title="Type any F&amp;O stock symbol to override the dropdown">
+            <select id="fExpiry" title="Expiry"
+                class="bg-slate-800 border border-borderCl rounded px-2 py-1.5 text-sm text-slate-100 focus:border-purple-500 focus:outline-none">
+                <option value="">— expiry —</option>
+            </select>
+            <button id="btnRefresh" type="button"
+                class="px-2.5 py-1.5 text-xs font-semibold text-purple-200 bg-purple-900/40 border border-purple-500/30 rounded hover:bg-purple-800/50 transition-colors">
+                ⟳ Refresh
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto flex-wrap justify-end">
+            <div class="text-right leading-tight">
+                <div id="spotVal" class="num text-xl sm:text-2xl font-bold text-white">—</div>
+                <div id="spotMove" class="num text-xs font-semibold">—</div>
+            </div>
+            <span id="sourceBadge" class="px-2.5 py-1 text-[11px] font-bold rounded border whitespace-nowrap cursor-default">—</span>
+            <span class="px-2.5 py-1 text-[11px] font-bold rounded border border-slate-500/40 bg-slate-800 text-slate-300 whitespace-nowrap"
+                title="This screen never places orders — analysis only.">🧾 PAPER MODE — no live orders</span>
+        </div>
+    </div>
+</header>
+
+<main class="px-4 sm:px-6 py-5 max-w-[1500px] mx-auto space-y-5">
+
+    <!-- Error banner -->
+    <div id="errBanner" class="hidden px-4 py-2.5 rounded-lg border border-rose-500/40 bg-rose-950/60 text-rose-200 text-sm font-medium"></div>
+
+    <!-- Regime strip -->
+    <div class="bg-cardBg border border-borderCl rounded-lg p-4">
+        <div class="flex flex-wrap items-center gap-4">
+            <span id="regimeBadge" class="px-3 py-1.5 text-sm font-bold rounded-md border whitespace-nowrap">—</span>
+            <span id="oiStateChip" class="px-2.5 py-1 text-xs font-semibold rounded-md border whitespace-nowrap">—</span>
+            <div class="flex items-center gap-2 min-w-[160px]">
+                <span class="text-[10px] uppercase tracking-wide text-slate-500 whitespace-nowrap">Confidence</span>
+                <div class="w-28 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div id="confBar" class="h-full bg-purple-500 rounded-full" style="width:0%"></div>
+                </div>
+                <span id="confVal" class="num text-xs text-slate-400">—</span>
+            </div>
+            <ul id="regimeReasons" class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500"></ul>
+        </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div id="kpiGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2"></div>
+
+    <!-- Main two-column -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- BUY -->
+        <section class="bg-cardBg border border-borderCl rounded-lg p-4 relative">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="text-emerald-400">▲</span> BUY — directional
+                </h2>
+                <span id="buyBiasBadge" class="px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap">—</span>
+            </div>
+            <p id="buyVerdict" class="text-[13px] text-slate-300 mb-2 leading-snug">—</p>
+            <p id="buyExpiryNote" class="hidden text-[11px] text-amber-300/90 mb-3 leading-snug border-l-2 border-amber-500/50 pl-2"></p>
+            <div id="buyCandidates" class="space-y-2"></div>
+            <div id="buySuppressed" class="hidden absolute inset-0 rounded-lg suppressed-overlay flex items-center justify-center p-6">
+                <p class="text-sm font-semibold text-amber-300 text-center">⚠ Long premium suppressed in this regime</p>
+            </div>
+            <div class="mt-3 pt-3 border-t border-borderCl/60 text-right">
+                <a href="options_assessor.html" class="text-xs font-semibold text-purple-400 hover:text-purple-300">Deep-dive in Assessor →</a>
+            </div>
+        </section>
+
+        <!-- SELL -->
+        <section class="bg-cardBg border border-borderCl rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="text-rose-400">▼</span> SELL — premium
+                </h2>
+                <span id="sellGateBadge" class="px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap">—</span>
+            </div>
+            <ul id="sellGateReasons" class="text-[11px] text-slate-500 mb-3 space-y-0.5"></ul>
+
+            <div class="space-y-3">
+                <div class="border border-borderCl/70 rounded-md p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-bold text-slate-300">Iron Condor</h3>
+                        <span class="text-[9px] uppercase tracking-wide text-slate-500">compare presets</span>
+                    </div>
+                    <!-- preset compare cards; click to load into the tuner below -->
+                    <div id="condorPresets" class="grid grid-cols-3 gap-1.5 mb-3"></div>
+                    <!-- delta/wing tuner: recomputes strikes/credit/POP client-side
+                         from the slim chain via computeCondor(), no round-trip -->
+                    <div id="condorTuner" class="border-t border-borderCl/50 pt-2.5 mb-1 hidden">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <label class="text-[10px] text-slate-400 w-16 shrink-0">Short Δ</label>
+                            <input id="condorDelta" type="range" min="5" max="40" step="1" value="16"
+                                class="flex-1 accent-purple-500 cursor-pointer">
+                            <span id="condorDeltaVal" class="num text-[10px] text-slate-200 w-9 text-right">0.16</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] text-slate-400 w-16 shrink-0">Wing</label>
+                            <input id="condorWing" type="range" min="50" max="600" step="50" value="200"
+                                class="flex-1 accent-purple-500 cursor-pointer">
+                            <span id="condorWingVal" class="num text-[10px] text-slate-200 w-9 text-right">200</span>
+                        </div>
+                    </div>
+                    <div id="condorBody"></div>
+                </div>
+                <div class="border border-borderCl/70 rounded-md p-3">
+                    <h3 class="text-xs font-bold text-slate-300 mb-2">Butterfly</h3>
+                    <div id="butterflyBody"></div>
+                </div>
+            </div>
+
+            <ul id="sellNotes" class="mt-3 text-[10px] text-slate-500 space-y-0.5"></ul>
+            <div class="mt-3 pt-3 border-t border-borderCl/60 text-right">
+                <a href="http://localhost:8501" target="_blank" rel="noopener" class="text-xs font-semibold text-purple-400 hover:text-purple-300">Manage live book → Streamlit (localhost:8501)</a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center text-[11px] text-slate-600 space-y-1 pb-4">
+        <div>
+            <span id="genAt">generated —</span> · next refresh in <span id="countdown" class="num">—</span>s ·
+            <button id="btnRefresh2" type="button" class="text-purple-400 hover:text-purple-300 font-semibold">refresh now</button>
+        </div>
+        <div>Paper/analysis only — not an order-routing screen.</div>
+    </footer>
+</main>
+
+<script>
+(function () {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const POLL_MS = 20000;
+
+    const state = {
+        data: null,
+        lastError: null,
+        usingDemoFallback: false,
+        expiry: "",
+        lastFetch: 0,
+        pollTimer: null,
+        countdownTimer: null,
+        condor: { sel: "Balanced", delta: 0.15, wing: 200 }, // delta/wing slider persistence
+    };
+
+    // ---- formatting -----------------------------------------------------
+    const isNum = (v) => v != null && typeof v === "number" && isFinite(v);
+    const fmt = (x, d = 2) => isNum(x) ? x.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
+    const fmt0 = (x) => isNum(x) ? Math.round(x).toLocaleString("en-IN") : "—";
+    const fmtInr = (x) => isNum(x) ? "₹" + Math.round(x).toLocaleString("en-IN") : "—";
+    const fmtPct = (x, d = 2) => isNum(x) ? (x >= 0 ? "+" : "") + x.toFixed(d) + "%" : "—";
+    const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    // Standard-normal CDF (Zelen & Severo 26.2.17, |err| < 7.5e-8). Mirrors the
+    // engine's Black-76 N() so the client-side condor slider POP matches server.
+    function normCdf(x) {
+        if (!isNum(x)) return null;
+        const t = 1 / (1 + 0.2316419 * Math.abs(x));
+        const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+        const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        return x >= 0 ? 1 - p : p;
+    }
+
+    // JS mirror of strategy.py::select_condor_at() — sweep one chain into a
+    // (delta, wing) condor. `chain` is the slim rows [{k,ce_ltp,ce_delta,pe_ltp,
+    // pe_delta}], `meta` carries {spot, lot, min_credit}. Kept deliberately in
+    // lock-step with the Python selector so slider previews == server presets.
+    function computeCondor(chain, meta, targetShortDelta, wing) {
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const spot = meta.spot, lot = meta.lot || 75, minCredit = meta.min_credit ?? 0;
+        const base = { name: null, short_delta_target: targetShortDelta, wing };
+        // short call: first strike >= spot whose call delta <= target
+        let sc = null;
+        for (const r of chain.filter(r => r.k >= spot && isNum(r.ce_delta)).sort((a, b) => a.k - b.k)) {
+            if (r.ce_delta <= targetShortDelta) { sc = r; break; }
+        }
+        if (!sc) return { ...base, ok: false, reason: `no call strike >= ${spot} with delta <= ${targetShortDelta}` };
+        // short put: first strike <= spot (descending) whose |put delta| <= target
+        let sp = null;
+        for (const r of chain.filter(r => r.k <= spot && isNum(r.pe_delta)).sort((a, b) => b.k - a.k)) {
+            if (Math.abs(r.pe_delta) <= targetShortDelta) { sp = r; break; }
+        }
+        if (!sp) return { ...base, ok: false, reason: `no put strike <= ${spot} with |delta| <= ${targetShortDelta}` };
+        const lc = rows[sc.k + wing], lp = rows[sp.k - wing];
+        if (!lc || !lp) return { ...base, ok: false, reason: "wing strikes not present in chain" };
+        const netCredit = sc.ce_ltp - lc.ce_ltp + sp.pe_ltp - lp.pe_ltp;
+        if (netCredit < minCredit) return { ...base, ok: false, reason: `net credit ${netCredit.toFixed(2)} < min_credit ${minCredit}` };
+        const maxLossPts = wing - netCredit;
+        const beLo = sp.k - netCredit, beHi = sc.k + netCredit;
+        return {
+            ...base, ok: true, short_call_k: sc.k, long_call_k: lc.k, short_put_k: sp.k, long_put_k: lp.k,
+            net_credit_pts: +netCredit.toFixed(2), credit_rupees: Math.round(netCredit * lot),
+            max_loss_pts: +maxLossPts.toFixed(2), max_loss_rupees: Math.round(maxLossPts * lot),
+            breakeven_low: +beLo.toFixed(1), breakeven_high: +beHi.toFixed(1),
+            pop: condorPop(spot, beLo, beHi, meta.atm_iv, meta.T),
+            short_call_delta: +sc.ce_delta.toFixed(3), short_put_delta: +sp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: meta.margin_rupees ?? 45000, margin_source: "estimated",
+            reward_risk: maxLossPts > 0 ? +(netCredit / maxLossPts).toFixed(2) : null,
+        };
+    }
+
+    // Black-76 lognormal P(be_lo < F_T < be_hi) at a single ATM-IV vol — mirrors
+    // options_platform.py::pop() so the slider's POP matches the server presets.
+    function condorPop(spot, beLo, beHi, atmIvPct, T) {
+        const sig = (atmIvPct || 0) / 100;
+        if (!(spot && beLo && beHi) || sig <= 0 || !(T > 0)) return null;
+        const root = sig * Math.sqrt(T);
+        const pBelow = (K) => normCdf(-((Math.log(spot / K) - 0.5 * sig * sig * T) / root));
+        return +Math.max(0, Math.min(1, pBelow(beHi) - pBelow(beLo))).toFixed(3);
+    }
+
+    function isDemoParam() {
+        return new URLSearchParams(location.search).get("demo") === "1";
+    }
+
+    function getSymbol() {
+        const custom = $("fCustomSymbol").value.trim().toUpperCase();
+        return custom || $("fSymbol").value;
+    }
+
+    // ---- demo condor ladder — generated from a toy Black-76 chain and fed
+    // through the SAME computeCondor() the live slider uses, so demo presets
+    // and the demo slider stay internally consistent (single source of math).
+    const _demoCondor = (() => {
+        const spot = 24200.5, T = 5 / 365, sig = 0.132, lot = 75, wing = 200;
+        const d1 = (K) => (Math.log(spot / K) + 0.5 * sig * sig * T) / (sig * Math.sqrt(T));
+        const callPx = (K) => Math.max(spot * normCdf(d1(K)) - K * normCdf(d1(K) - sig * Math.sqrt(T)), 0.05);
+        const chain = [];
+        // Range must cover the widest preset's wings: the 0.10-delta short strikes
+        // sit near 24700 / 23700, so +/-wing needs the chain out to ~24900 / 23500.
+        for (let K = 23400; K <= 25000; K += 50) {
+            const cd = normCdf(d1(K)), c = callPx(K);
+            chain.push({ k: K, ce_ltp: +c.toFixed(1), ce_delta: +cd.toFixed(3),
+                pe_ltp: +Math.max(c - spot + K, 0.05).toFixed(1), pe_delta: +(cd - 1).toFixed(3) });
+        }
+        const meta = { spot, T, atm_iv: 13.2, interval: 50, wing_default: wing, lot,
+            min_credit: 0, margin_rupees: 45000 };
+        // Delta targets MUST match api/options_platform.py::CONDOR_PRESETS so the
+        // demo ladder tells the same story a live user sees.
+        const presets = [["Wide", 0.10], ["Balanced", 0.20], ["Tight", 0.30]].map(([name, td]) => {
+            const c = computeCondor(chain, meta, td, wing);
+            c.name = name; return c;
+        });
+        // Short iron butterfly: both shorts at ATM, longs at +/- wing (mirrors
+        // strategy.py::select_butterfly). Reuse the same toy chain rows.
+        const rows = {}; for (const r of chain) rows[r.k] = r;
+        const atm = 24200, bc = rows[atm], bp = rows[atm], blc = rows[atm + wing], blp = rows[atm - wing];
+        const bCredit = bc.ce_ltp - blc.ce_ltp + bp.pe_ltp - blp.pe_ltp, bMaxPts = wing - bCredit;
+        const bLo = atm - bCredit, bHi = atm + bCredit;
+        const butterfly = { name: "Butterfly", short_delta_target: null, wing, ok: true,
+            short_call_k: atm, long_call_k: atm + wing, short_put_k: atm, long_put_k: atm - wing,
+            net_credit_pts: +bCredit.toFixed(2), credit_rupees: Math.round(bCredit * lot),
+            max_loss_pts: +bMaxPts.toFixed(2), max_loss_rupees: Math.round(bMaxPts * lot),
+            breakeven_low: +bLo.toFixed(1), breakeven_high: +bHi.toFixed(1),
+            pop: condorPop(spot, bLo, bHi, meta.atm_iv, T),
+            short_call_delta: +bc.ce_delta.toFixed(3), short_put_delta: +bp.pe_delta.toFixed(3), lots: 1,
+            margin_rupees: 22000, margin_source: "estimated",
+            reward_risk: bMaxPts > 0 ? +(bCredit / bMaxPts).toFixed(2) : null };
+        return { chain, meta, presets, butterfly };
+    })();
+
+    // ---- demo payload (only used if ?demo=1 AND a real fetch fails) -----
+    const DEMO_PAYLOAD = {
+        source: "mock", demo_reason: "embedded sample — live fetch failed and ?demo=1 was set",
+        symbol: "NIFTY", expiry: "2026-07-28", expiries: ["2026-07-28", "2026-08-04", "2026-08-25"],
+        spot: 24200.5, lot_size: 75, prev_close: 24150.0, move_pct: 0.21, dte: 5, expiry_day: false,
+        generated_at: new Date().toISOString(), mode: "paper",
+        features: { pcr_near: 1.12, pcr_far: 0.94, oi_concentration: 0.31, max_pain: 24150, call_wall: 24500,
+            put_wall: 24000, atm_strike: 24200, atm_iv: 13.2, iv_skew: 1.4, expected_move_pts: 180.5,
+            expected_move_pct: 0.75, delta_oi_total: 1250000 },
+        regime: { label: "TRENDING_BULL", oi_state: "LONG_BUILD_UP", confidence: 0.7,
+            reasons: ["Price above VWAP with rising OI", "Call writers retreating at the wall"] },
+        buy: { bias: "CALLS", suppressed: false, verdict: "Mild bullish drift with call OI building — favors a shallow CE swing.",
+            candidates: [
+                { type: "CE", strike: 24250, ltp: 95.5, delta: 0.48, iv: 13.5, oi: 1500000, volume: 250000, spread_pct: 0.8, score: 72, why: "Near ATM, tight spread, rising OI." },
+                { type: "CE", strike: 24300, ltp: 68.2, delta: 0.35, iv: 13.8, oi: 900000, volume: 140000, spread_pct: 1.1, score: 58, why: "Cheaper convexity, wider spread." }
+            ] },
+        sell: { gate: { ok: true, reasons: ["IV percentile in range", "No event risk within expiry"] },
+            presets: _demoCondor.presets,
+            butterfly: _demoCondor.butterfly,
+            slim_chain: _demoCondor.chain, chain_meta: _demoCondor.meta,
+            notes: ["Sized for 1 lot — scale margin linearly.", "Exit both legs if spot closes beyond either breakeven."] }
+    };
+
+    // ---- self-check (ponytail: smallest runnable check for the render math) --
+    function selfCheck() {
+        try {
+            console.assert(fmt0(null) === "—", "fmt0 null");
+            console.assert(fmt0(24200.6) === "24,201", "fmt0 rounding/grouping");
+            console.assert(fmtInr(45000) === "₹45,000", "fmtInr grouping");
+            console.assert(fmtPct(0.21) === "+0.21%", "fmtPct sign");
+            console.assert(fmtPct(-0.5) === "-0.50%", "fmtPct negative");
+            const p = ladderPositions({ long_put_k: 23700, short_put_k: 23900, short_call_k: 24500, long_call_k: 24700 }, 24200, 23857.5, 24542.5);
+            console.assert(p && p.pts.length === 4 && p.lo < p.hi, "ladderPositions basic shape");
+            // computeCondor: tuner math must agree with the demo presets it feeds.
+            const bal = _demoCondor.presets.find((x) => /balanc/i.test(x.name));
+            const c = computeCondor(_demoCondor.chain, _demoCondor.meta, bal.short_delta_target, bal.wing);
+            console.assert(c.ok && c.short_call_k === bal.short_call_k && c.net_credit_pts === bal.net_credit_pts,
+                "computeCondor reproduces preset");
+            console.assert(c.short_call_k > _demoCondor.meta.spot && c.short_put_k < _demoCondor.meta.spot,
+                "condor shorts straddle spot");
+            console.assert(c.long_call_k - c.short_call_k === bal.wing && c.short_put_k - c.long_put_k === bal.wing,
+                "condor wings symmetric");
+            console.assert(c.pop == null || (c.pop >= 0 && c.pop <= 1), "condorPop in [0,1]");
+            // widening the short delta should pull shorts nearer spot (tighter body).
+            const tight = computeCondor(_demoCondor.chain, _demoCondor.meta, 0.30, bal.wing);
+            console.assert(!tight.ok || tight.short_call_k <= c.short_call_k, "higher delta => nearer short call");
+        } catch (e) { console.warn("options_platform self-check failed:", e); }
+    }
+
+    // ---- tone maps --------------------------------------------------------
+    const REGIME_TONE = {
+        TRENDING_BULL: "border-emerald-500/40 bg-emerald-900/40 text-emerald-300",
+        TRENDING_BEAR: "border-rose-500/40 bg-rose-900/40 text-rose-300",
+        HIGH_VOLATILITY: "border-orange-500/40 bg-orange-900/40 text-orange-300",
+        LOW_VOLATILITY: "border-sky-500/40 bg-sky-900/40 text-sky-300",
+        GAMMA_PINNING: "border-purple-500/40 bg-purple-900/40 text-purple-300",
+    };
+    const REGIME_LABEL = {
+        TRENDING_BULL: "Trending Bull", TRENDING_BEAR: "Trending Bear", HIGH_VOLATILITY: "High Volatility",
+        LOW_VOLATILITY: "Low Volatility", GAMMA_PINNING: "Gamma Pinning",
+    };
+    const OI_TONE = {
+        LONG_BUILD_UP: "border-emerald-500/40 bg-emerald-900/30 text-emerald-300",
+        SHORT_BUILD_UP: "border-rose-500/40 bg-rose-900/30 text-rose-300",
+        SHORT_COVERING: "border-sky-500/40 bg-sky-900/30 text-sky-300",
+        LONG_UNWINDING: "border-amber-500/40 bg-amber-900/30 text-amber-300",
+        NEUTRAL: "border-slate-500/40 bg-slate-800 text-slate-300",
+        UNKNOWN: "border-slate-500/40 bg-slate-800 text-slate-400",
+    };
+    const OI_LABEL = {
+        LONG_BUILD_UP: "Long Build-up", SHORT_BUILD_UP: "Short Build-up", SHORT_COVERING: "Short Covering",
+        LONG_UNWINDING: "Long Unwinding", NEUTRAL: "Neutral", UNKNOWN: "Unknown",
+    };
+
+    // ---- rendering ----------------------------------------------------
+    function kpiCard(label, val, cls, sub) {
+        return '<div class="bg-cardBg border border-borderCl rounded-lg p-2.5 text-center">' +
+            '<div class="text-[9px] uppercase tracking-wide text-slate-500">' + label + '</div>' +
+            '<div class="num text-sm font-bold ' + (cls || "text-slate-100") + '">' + val + '</div>' +
+            (sub ? '<div class="text-[9px] text-slate-500 leading-tight mt-0.5">' + esc(sub) + '</div>' : "") +
+            '</div>';
+    }
+
+    // Plain-English one-liners under each tile — dynamic where the reading flips
+    // meaning (PCR / skew), static context otherwise. Empty string => no subtitle.
+    function pcrHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 1.15) return "puts > calls · bullish tilt";
+        if (v <= 0.85) return "calls > puts · bearish tilt";
+        return "balanced flow";
+    }
+    function skewHint(v) {
+        if (!isNum(v)) return "";
+        if (v >= 0.5) return "puts pricier · downside bid";
+        if (v <= -0.5) return "calls pricier · upside bid";
+        return "flat skew";
+    }
+
+    function renderHeader(d) {
+        $("spotVal").textContent = isNum(d.spot) ? fmt(d.spot, 2) : "—";
+        const mv = $("spotMove");
+        mv.textContent = fmtPct(d.move_pct);
+        mv.className = "num text-xs font-semibold " + (isNum(d.move_pct) ? (d.move_pct >= 0 ? "text-emerald-400" : "text-rose-400") : "text-slate-500");
+
+        const badge = $("sourceBadge");
+        if (state.usingDemoFallback || d.source === "mock") {
+            badge.textContent = "◆ DEMO DATA";
+            badge.className = "px-2.5 py-1 text-[11px] font-bold rounded border whitespace-nowrap cursor-default border-amber-500/50 bg-amber-900/40 text-amber-300 animate-pulse";
+            badge.title = d.demo_reason || "Mock/demo data.";
+        } else {
+            badge.textContent = "● LIVE";
+            badge.className = "px-2.5 py-1 text-[11px] font-bold rounded border whitespace-nowrap cursor-default border-emerald-500/40 bg-emerald-900/30 text-emerald-300";
+            badge.title = "Live market data.";
+        }
+    }
+
+    function renderExpiries(d) {
+        const sel = $("fExpiry");
+        const expiries = Array.isArray(d.expiries) ? d.expiries : [];
+        const cur = state.expiry || d.expiry || "";
+        sel.innerHTML = '<option value="">' + (d.expiry ? esc(d.expiry) + " (default)" : "— expiry —") + '</option>' +
+            expiries.map((e) => '<option value="' + esc(e) + '"' + (e === cur ? " selected" : "") + '>' + esc(e) + '</option>').join("");
+    }
+
+    function renderRegime(d) {
+        const r = d.regime || {};
+        const badge = $("regimeBadge");
+        badge.textContent = r.label ? (REGIME_LABEL[r.label] || r.label) : "—";
+        badge.className = "px-3 py-1.5 text-sm font-bold rounded-md border whitespace-nowrap " + (REGIME_TONE[r.label] || "border-slate-500/40 bg-slate-800 text-slate-400");
+
+        const chip = $("oiStateChip");
+        chip.textContent = r.oi_state ? (OI_LABEL[r.oi_state] || r.oi_state) : "—";
+        chip.className = "px-2.5 py-1 text-xs font-semibold rounded-md border whitespace-nowrap " + (OI_TONE[r.oi_state] || OI_TONE.UNKNOWN);
+
+        const conf = isNum(r.confidence) ? Math.max(0, Math.min(1, r.confidence)) : null;
+        $("confBar").style.width = (conf != null ? conf * 100 : 0) + "%";
+        $("confVal").textContent = conf != null ? Math.round(conf * 100) + "%" : "—";
+
+        const reasons = Array.isArray(r.reasons) ? r.reasons : [];
+        $("regimeReasons").innerHTML = reasons.length
+            ? reasons.map((x) => '<li>· ' + esc(x) + '</li>').join("")
+            : '<li class="text-slate-600">No reasons reported.</li>';
+    }
+
+    function renderKpis(d) {
+        const f = d.features || {};
+        const emSub = isNum(f.expected_move_pct) ? "1σ ±" + fmt(f.expected_move_pct, 2) + "% by expiry" : "1σ range by expiry";
+        $("kpiGrid").innerHTML =
+            kpiCard("PCR Near", fmt(f.pcr_near, 2), null, pcrHint(f.pcr_near)) +
+            kpiCard("PCR Far", fmt(f.pcr_far, 2), null, pcrHint(f.pcr_far)) +
+            kpiCard("Max Pain", fmt0(f.max_pain), null, "pin strike at expiry") +
+            kpiCard("Call Wall", fmt0(f.call_wall), "text-emerald-300", "resistance ceiling") +
+            kpiCard("Put Wall", fmt0(f.put_wall), "text-rose-300", "support floor") +
+            kpiCard("ATM IV", isNum(f.atm_iv) ? fmt(f.atm_iv, 1) + "%" : "—", null, "annualized vol") +
+            kpiCard("IV Skew", fmt(f.iv_skew, 2), null, skewHint(f.iv_skew)) +
+            kpiCard("Exp. Move", isNum(f.expected_move_pts) ? fmt0(f.expected_move_pts) + " pt" : "—",
+                null, emSub);
+        // Fold expected-move % into the same last card's title for a hover detail.
+        const cards = $("kpiGrid").children;
+        if (cards.length) cards[cards.length - 1].title = "±" + fmt(f.expected_move_pct, 2) + "% of spot";
+    }
+
+    function scoreColor(s) {
+        if (!isNum(s)) return "bg-slate-600";
+        return s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-amber-500" : "bg-rose-500";
+    }
+
+    function candidateCard(c) {
+        const legTone = c.type === "PE" ? "text-rose-300" : "text-emerald-300";
+        return '<div class="bg-slate-800/50 border border-borderCl/60 rounded-md p-2.5">' +
+            '<div class="flex items-center justify-between mb-1.5">' +
+            '<span class="num text-sm font-bold ' + legTone + '">' + fmt0(c.strike) + ' ' + esc(c.type || "—") + '</span>' +
+            '<span class="num text-sm font-bold text-slate-100">' + fmt(c.ltp, 2) + '</span></div>' +
+            '<div class="grid grid-cols-4 gap-1.5 text-[10px] text-slate-500 mb-1.5">' +
+            '<div>Δ <span class="num text-slate-300">' + fmt(c.delta, 2) + '</span></div>' +
+            '<div>IV <span class="num text-slate-300">' + (isNum(c.iv) ? fmt(c.iv, 1) + "%" : "—") + '</span></div>' +
+            '<div>OI <span class="num text-slate-300">' + fmt0(c.oi) + '</span></div>' +
+            '<div>Vol <span class="num text-slate-300">' + fmt0(c.volume) + '</span></div></div>' +
+            '<div class="flex items-center gap-2 mb-1.5">' +
+            '<div class="flex-1 h-1.5 rounded-full score-bar-track overflow-hidden">' +
+            '<div class="h-full rounded-full ' + scoreColor(c.score) + '" style="width:' + (isNum(c.score) ? Math.max(0, Math.min(100, c.score)) : 0) + '%"></div></div>' +
+            '<span class="num text-[10px] text-slate-400">' + fmt0(c.score) + '/100</span>' +
+            '<span class="text-[10px] text-slate-500">spread ' + (isNum(c.spread_pct) ? fmt(c.spread_pct, 1) + "%" : "—") + '</span></div>' +
+            (c.why ? '<p class="text-[11px] text-slate-500 leading-snug">' + esc(c.why) + '</p>' : "") +
+            '</div>';
+    }
+
+    function renderBuy(d) {
+        const b = d.buy || {};
+        const badge = $("buyBiasBadge");
+        const biasTone = b.bias === "CALLS" ? "border-emerald-500/40 bg-emerald-900/30 text-emerald-300"
+            : b.bias === "PUTS" ? "border-rose-500/40 bg-rose-900/30 text-rose-300"
+            : "border-slate-500/40 bg-slate-800 text-slate-400";
+        badge.textContent = b.bias || "—";
+        badge.className = "px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap " + biasTone;
+        $("buyVerdict").textContent = b.verdict || "—";
+
+        // Expiry-day reframe: a long option today is a scalp, not a hold — all
+        // extrinsic value burns to zero by the 15:30 close, so it must be worked
+        // intraday and closed before EOD. Prefer a server-supplied note if given.
+        const note = $("buyExpiryNote");
+        if (d.expiry_day) {
+            note.textContent = b.expiry_note ||
+                "Expiry day — treat any long premium as an intraday SCALP, not a hold: extrinsic value decays to zero by the 15:30 close. Work it intraday and exit before EOD or it settles worthless.";
+            note.classList.remove("hidden");
+        } else {
+            note.textContent = "";
+            note.classList.add("hidden");
+        }
+
+        const cands = Array.isArray(b.candidates) ? b.candidates : [];
+        $("buyCandidates").innerHTML = cands.length
+            ? cands.map(candidateCard).join("")
+            : '<div class="text-center text-xs text-slate-600 py-4">No candidates available.</div>';
+
+        $("buySuppressed").classList.toggle("hidden", !b.suppressed);
+    }
+
+    // ---- strike ladder (condor / butterfly) ----------------------------
+    function ladderPositions(sp, spot, beLo, beHi) {
+        const raw = [sp.long_put_k, sp.short_put_k, sp.short_call_k, sp.long_call_k];
+        const pts = raw.filter(isNum);
+        if (!pts.length) return null;
+        const all = pts.concat([spot, beLo, beHi].filter(isNum));
+        let lo = Math.min(...all), hi = Math.max(...all);
+        const pad = (hi - lo) * 0.12 || 50;
+        lo -= pad; hi += pad;
+        return { pts, lo, hi, pct: (v) => isNum(v) ? ((v - lo) / (hi - lo)) * 100 : null };
+    }
+
+    function strikeLadderHtml(sp, spot) {
+        const pos = ladderPositions(sp, spot, sp.breakeven_low, sp.breakeven_high);
+        if (!pos) return '<div class="text-xs text-slate-600 py-3 text-center">Strike data unavailable.</div>';
+        const zoneLo = pos.pct(sp.breakeven_low), zoneHi = pos.pct(sp.breakeven_high);
+        const marks = [
+            { v: sp.long_put_k, label: "LP", cls: "text-rose-400" },
+            { v: sp.short_put_k, label: "SP", cls: "text-rose-300" },
+            { v: sp.short_call_k, label: "SC", cls: "text-emerald-300" },
+            { v: sp.long_call_k, label: "LC", cls: "text-emerald-400" },
+        ];
+        let html = '<div class="relative h-14 mt-4 mb-1">';
+        html += '<div class="absolute left-0 right-0 top-7 ladder-track"></div>';
+        if (isNum(zoneLo) && isNum(zoneHi)) {
+            html += '<div class="absolute top-6 h-2 bg-emerald-500/25 rounded" style="left:' + Math.max(0, zoneLo).toFixed(1) + '%;width:' + Math.max(0, zoneHi - zoneLo).toFixed(1) + '%"></div>';
+        }
+        marks.forEach((m) => {
+            const p = pos.pct(m.v);
+            if (p == null) return;
+            html += '<div class="absolute top-4 ladder-tick h-4 bg-slate-500" style="left:' + p.toFixed(1) + '%"></div>' +
+                '<div class="absolute top-9 text-[9px] font-bold ' + m.cls + ' -translate-x-1/2" style="left:' + p.toFixed(1) + '%">' + m.label + '<br><span class="num">' + fmt0(m.v) + '</span></div>';
+        });
+        const sPct = pos.pct(spot);
+        if (sPct != null) {
+            html += '<div class="absolute top-0 -translate-x-1/2 text-[9px] font-bold text-purple-300" style="left:' + sPct.toFixed(1) + '%">▼<br>spot</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function statCell(label, val, cls) {
+        return '<div class="bg-slate-800/60 rounded p-1.5 text-center"><div class="text-[9px] uppercase tracking-wide text-slate-500">' + label +
+            '</div><div class="num text-xs font-bold ' + (cls || "text-slate-100") + '">' + val + '</div></div>';
+    }
+
+    function spreadCardHtml(sp, spot) {
+        if (!sp || sp.ok === false) {
+            return '<p class="text-xs text-amber-300">' + esc((sp && sp.reason) || "Not available in current conditions.") + '</p>';
+        }
+        let html = strikeLadderHtml(sp, spot);
+        html += '<div class="grid grid-cols-3 sm:grid-cols-4 gap-1.5 mt-2">' +
+            statCell("Net Credit", isNum(sp.net_credit_pts) ? fmt(sp.net_credit_pts, 1) + " pt" : "—") +
+            statCell("Credit ₹", fmtInr(sp.credit_rupees), "text-emerald-300") +
+            statCell("Max Loss ₹", fmtInr(sp.max_loss_rupees), "text-rose-300") +
+            statCell("R:R", fmt(sp.reward_risk, 2)) +
+            statCell("BE Low", fmt(sp.breakeven_low, 0)) +
+            statCell("BE High", fmt(sp.breakeven_high, 0)) +
+            statCell("SC Δ", fmt(sp.short_call_delta, 2)) +
+            statCell("SP Δ", fmt(sp.short_put_delta, 2)) +
+            '</div>';
+        html += '<div class="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-400">' +
+            'Margin: <span class="num text-slate-200 font-semibold">' + fmtInr(sp.margin_rupees) + '</span>' +
+            (sp.margin_source === "estimated" ? '<span class="px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-900/30 text-amber-300 text-[9px] font-bold">ESTIMATED</span>' : "") +
+            '<span class="ml-auto">Lots: <span class="num text-slate-200">' + fmt0(sp.lots) + '</span></span></div>';
+        return html;
+    }
+
+    // ---- condor compare-cards + delta/wing tuner state -------------------
+    // Held at module scope so the slider handlers can re-run computeCondor()
+    // against the same slim chain the presets were built from (no round-trip).
+    let _sellChain = null, _sellMeta = null, _sellPresets = [], _condorWired = false;
+
+    const _clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+    function presetCardHtml(p, idx, activeIdx) {
+        const active = idx === activeIdx;
+        const base = 'data-preset="' + idx + '" class="preset-card text-left rounded border p-1.5 transition-colors ';
+        if (!p || p.ok === false) {
+            return '<button ' + base + 'border-borderCl/50 bg-slate-800/20 opacity-50 cursor-not-allowed" disabled>' +
+                '<div class="text-[10px] font-bold text-slate-400">' + esc((p && p.name) || "—") + '</div>' +
+                '<div class="text-[9px] text-slate-600 mt-2">n/a</div></button>';
+        }
+        const pop = isNum(p.pop) ? Math.round(p.pop * 100) + "%" : "—";
+        return '<button ' + base +
+            (active ? 'border-purple-500/70 bg-purple-900/30' : 'border-borderCl/60 bg-slate-800/40 hover:border-slate-500') + '">' +
+            '<div class="text-[10px] font-bold text-slate-200">' + esc(p.name || "—") + '</div>' +
+            '<div class="text-[9px] text-slate-500">Δ' + fmt(p.short_delta_target, 2) + ' · w' + fmt0(p.wing) + '</div>' +
+            '<div class="num text-xs font-bold text-emerald-300 mt-0.5">' + fmtInr(p.credit_rupees) + '</div>' +
+            '<div class="text-[9px] text-slate-400">POP ' + pop + ' · R:R ' + fmt(p.reward_risk, 2) + '</div>' +
+            '</button>';
+    }
+
+    function renderCondorPresets(presets, activeIdx) {
+        $("condorPresets").innerHTML = presets.map((p, i) => presetCardHtml(p, i, activeIdx)).join("");
+    }
+
+    function setTuner(td, wing) {
+        if (isNum(td)) $("condorDelta").value = Math.round(_clamp(td * 100, 5, 40));
+        if (isNum(wing)) $("condorWing").value = Math.round(_clamp(wing, 50, 600) / 50) * 50;
+    }
+
+    // Recompute the live condor from the current slider position and re-highlight
+    // whichever preset (if any) exactly matches the tuned (delta, wing) pair.
+    function applyTuner() {
+        if (!_sellChain || !_sellMeta) return;
+        const td = (+$("condorDelta").value) / 100;
+        const wing = +$("condorWing").value;
+        $("condorDeltaVal").textContent = td.toFixed(2);
+        $("condorWingVal").textContent = fmt0(wing);
+        const c = computeCondor(_sellChain, _sellMeta, td, wing);
+        $("condorBody").innerHTML = spreadCardHtml(c, _sellMeta.spot);
+        const matchIdx = _sellPresets.findIndex((p) => p && p.ok !== false &&
+            Math.round((p.short_delta_target || 0) * 100) === Math.round(td * 100) && +p.wing === wing);
+        renderCondorPresets(_sellPresets, matchIdx);
+    }
+
+    function wireCondorControls() {
+        if (_condorWired) return;
+        _condorWired = true;
+        $("condorDelta").addEventListener("input", applyTuner);
+        $("condorWing").addEventListener("input", applyTuner);
+        $("condorPresets").addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-preset]");
+            if (!btn || btn.disabled) return;
+            const p = _sellPresets[+btn.dataset.preset];
+            if (!p || p.ok === false) return;
+            setTuner(p.short_delta_target, p.wing);
+            applyTuner();
+        });
+    }
+
+    function renderSell(d) {
+        const s = d.sell || {};
+        const gate = s.gate || {};
+        const badge = $("sellGateBadge");
+        badge.textContent = gate.ok ? "✓ PASS" : "✕ BLOCKED";
+        badge.className = "px-2.5 py-1 text-xs font-bold rounded border whitespace-nowrap " +
+            (gate.ok ? "border-emerald-500/40 bg-emerald-900/30 text-emerald-300" : "border-rose-500/40 bg-rose-900/30 text-rose-300");
+        const reasons = Array.isArray(gate.reasons) ? gate.reasons : [];
+        $("sellGateReasons").innerHTML = reasons.map((r) => '<li>· ' + esc(r) + '</li>').join("");
+
+        // Condor presets + tuner. Prefer the new presets[]/slim_chain payload;
+        // fall back to the legacy single s.condor when a chain isn't available.
+        _sellPresets = Array.isArray(s.presets) ? s.presets : [];
+        _sellChain = Array.isArray(s.slim_chain) ? s.slim_chain : null;
+        _sellMeta = s.chain_meta || null;
+        // Rebuild each preset card from the SAME computeCondor()/slim-chain the
+        // tuner uses, so a card's headline (strikes/credit/POP) always equals
+        // what the slider shows when you load that preset. The server presets
+        // pick short strikes off Black-Scholes-from-IV delta, but the slider
+        // picks off the broker's per-strike delta in slim_chain; right at the
+        // delta cutoff those two sources disagree by a strike (e.g. broker
+        // Δ0.301 vs BS Δ0.268 at the same strike), which made the card and the
+        // calculations below it diverge. Keep the server preset only when the
+        // slim chain can't form the condor (e.g. wings outside the ~8% window).
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            _sellPresets = _sellPresets.map((p) => {
+                if (!p || !isNum(p.short_delta_target)) return p;
+                const c = computeCondor(_sellChain, _sellMeta, p.short_delta_target, p.wing);
+                return c.ok === false ? p : { ...c, name: p.name };
+            });
+        }
+        wireCondorControls();
+
+        if (_sellChain && _sellMeta && _sellPresets.length) {
+            let activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false && /balanc/i.test(p.name || ""));
+            if (activeIdx < 0) activeIdx = _sellPresets.findIndex((p) => p && p.ok !== false);
+            if (activeIdx < 0) activeIdx = 0;
+            const ap = _sellPresets[activeIdx];
+            if (ap && ap.ok !== false) setTuner(ap.short_delta_target, ap.wing);
+            $("condorTuner").classList.remove("hidden");
+            applyTuner();
+        } else {
+            $("condorPresets").innerHTML = "";
+            $("condorTuner").classList.add("hidden");
+            $("condorBody").innerHTML = spreadCardHtml(_sellPresets[0] || s.condor, d.spot);
+        }
+        $("butterflyBody").innerHTML = spreadCardHtml(s.butterfly, d.spot);
+
+        const notes = Array.isArray(s.notes) ? s.notes : [];
+        $("sellNotes").innerHTML = notes.map((n) => '<li>· ' + esc(n) + '</li>').join("");
+    }
+
+    function renderFooter(d) {
+        $("genAt").textContent = "generated " + (d.generated_at ? new Date(d.generated_at).toLocaleTimeString("en-IN", { hour12: false }) : "—");
+    }
+
+    function render() {
+        const d = state.data;
+        if (!d) return;
+        renderHeader(d);
+        renderExpiries(d);
+        renderRegime(d);
+        renderKpis(d);
+        renderBuy(d);
+        renderSell(d);
+        renderFooter(d);
+    }
+
+    // ---- fetch / poll ---------------------------------------------------
+    async function loadData() {
+        const symbol = getSymbol();
+        let url = "/api/options_platform?symbol=" + encodeURIComponent(symbol);
+        if (state.expiry) url += "&expiry=" + encodeURIComponent(state.expiry);
+        try {
+            const res = await fetch(url);
+            const j = await res.json();
+            if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
+            state.data = j;
+            state.usingDemoFallback = false;
+            state.lastError = null;
+            $("errBanner").classList.add("hidden");
+        } catch (e) {
+            state.lastError = e.message;
+            const banner = $("errBanner");
+            banner.textContent = "⚠ " + e.message + (state.data ? " — showing last good data." : "");
+            banner.classList.remove("hidden");
+            if (!state.data && isDemoParam()) {
+                state.data = DEMO_PAYLOAD;
+                state.usingDemoFallback = true;
+            }
+        }
+        state.lastFetch = Date.now();
+        render();
+    }
+
+    function tickCountdown() {
+        const remain = Math.max(0, Math.round((state.lastFetch + POLL_MS - Date.now()) / 1000));
+        $("countdown").textContent = remain;
+    }
+
+    function schedulePoll() {
+        clearInterval(state.pollTimer);
+        state.pollTimer = setInterval(loadData, POLL_MS);
+        clearInterval(state.countdownTimer);
+        state.countdownTimer = setInterval(tickCountdown, 1000);
+    }
+
+    function manualRefresh() {
+        loadData();
+        schedulePoll(); // ponytail: resets cadence on manual refresh; fine at 20s granularity
+    }
+
+    // ---- wiring -----------------------------------------------------------
+    function wire() {
+        $("btnRefresh").addEventListener("click", manualRefresh);
+        $("btnRefresh2").addEventListener("click", manualRefresh);
+        $("fSymbol").addEventListener("change", () => { $("fCustomSymbol").value = ""; state.expiry = ""; manualRefresh(); });
+        $("fCustomSymbol").addEventListener("keydown", (e) => { if (e.key === "Enter") { state.expiry = ""; manualRefresh(); } });
+        $("fCustomSymbol").addEventListener("blur", () => { if ($("fCustomSymbol").value.trim()) { state.expiry = ""; manualRefresh(); } });
+        $("fExpiry").addEventListener("change", () => { state.expiry = $("fExpiry").value; manualRefresh(); });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        selfCheck();
+        wire();
+        loadData();
+        schedulePoll();
+    });
+})();
+</script>
+</body>
+</html>

@@ -22,6 +22,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 import io
 import json
+import time
 
 import pandas as pd
 import requests
@@ -69,16 +70,40 @@ def discover_us_universe(size: int | None = -1) -> dict:
         print("  [universe] finvizfinance not installed -- falling back.")
         return _us_fallback()
 
-    try:
-        fo = Overview()
-        fo.set_filter(filters_dict={"Market Cap.": _US_MARKET_CAP_FLOOR})
-        all_rows = fo.screener_view(verbose=0)
-    except Exception as e:
-        print(f"  [universe] finviz market-cap screen failed ({e}).")
-        all_rows = None
+    # Transient drops (RemoteDisconnected mid-pagination) are common on the
+    # finviz scrape; retry before falling back, because the fallback path can
+    # only ever be as good as the *last* scan.
+    all_rows = None
+    for attempt in range(3):
+        try:
+            fo = Overview()
+            fo.set_filter(filters_dict={"Market Cap.": _US_MARKET_CAP_FLOOR})
+            all_rows = fo.screener_view(verbose=0)
+            break
+        except Exception as e:
+            print(f"  [universe] finviz market-cap screen failed "
+                  f"(attempt {attempt + 1}/3: {e}).")
+            all_rows = None
+            if attempt < 2:
+                time.sleep(5 * (attempt + 1))
 
     if all_rows is None or not len(all_rows):
         return _us_fallback()
+
+    # finviz added a letter-avatar (logo fallback) inside the ticker cell
+    # (observed 2026-07): scraped text comes back with the first letter doubled
+    # ("AAAPL", "BBAX" for BAX, "AA" for A). Under the bug EVERY row has
+    # t[0] == t[1]; in a healthy scrape only ~2-4% of real tickers do (AAPL,
+    # BBY, ...). So detect at table level and strip wholesale -- a per-row
+    # repair would be ambiguous ("AA" = doubled Agilent or real Alcoa?).
+    t = all_rows["Ticker"].astype(str).str.strip()
+    doubled = (t.str.len() > 1) & (t.str[0] == t.str[1])
+    if doubled.mean() > 0.9:
+        print(f"  [universe] US: finviz letter-avatar scrape bug detected "
+              f"({doubled.mean():.0%} of tickers first-letter-doubled) -- "
+              f"stripping the duplicated letter.")
+        all_rows = all_rows.copy()
+        all_rows["Ticker"] = t.str[1:]
 
     # SPACs/blank-check shells (~6% of the market-cap-floor screen, confirmed via a
     # live check) trade near trust value and don't "breakout" in any meaningful sense
@@ -132,9 +157,19 @@ def discover_us_universe(size: int | None = -1) -> dict:
 def _us_fallback() -> dict:
     prior = _universe_from_last_scan()
     if prior:
-        print(f"  [universe] US discovery failed -- reusing {len(prior)} symbols from the last breakouts.json.")
-        return prior
-    print("  [universe] US discovery failed and no prior scan -- falling back to the static watchlist.")
+        # Guard against reusing a scan that was itself produced under the
+        # finviz letter-avatar bug (see discover_us_universe): if nearly every
+        # symbol has its first letter doubled, the prior file is corrupt.
+        syms = [s for s in prior if len(s) > 1]
+        doubled = sum(1 for s in syms if s[0] == s[1]) / len(syms) if syms else 0.0
+        if doubled > 0.9:
+            print(f"  [universe] US: prior breakouts.json looks corrupted "
+                  f"({doubled:.0%} of symbols first-letter-doubled) -- refusing to reuse it.")
+        else:
+            print(f"  [universe] US discovery failed -- reusing {len(prior)} symbols from the last breakouts.json.")
+            return prior
+    else:
+        print("  [universe] US discovery failed and no prior scan -- falling back to the static watchlist.")
     return dict(settings.FALLBACK_WATCHLIST)
 
 # Equity-only, mainline capital-market series. Excludes SME (SM), trade-to-trade

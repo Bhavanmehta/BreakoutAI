@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[C · BENTO] BreakoutAI — Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050B16; --bg-raise:#0A1220; --surface:#0D1526; --card:#111B2E;
+  --border:#20304A; --border-soft:#182438;
+  --text:#F0F4FA; --text-2:#C2CAD8; --muted:#8A94A8;
+  --accent:#4DA3FF; --accent-deep:#1D6FD1; --accent-ink:#04101E;
+  --amber:#FBBF24; --red:#F87171; --green:#34D399;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(77,163,255,.28)}
+button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.up{color:var(--green)} .down{color:var(--red)}
+
+/* ===== chrome ===== */
+header{position:sticky;top:0;z-index:100;background:rgba(6,10,18,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--border-soft)}
+.bar{display:flex;align-items:center;gap:16px;height:54px;padding:0 22px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+.logo i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 9px rgba(77,163,255,.7)}
+.bar .meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.bar .meta b{color:var(--text-2);font-weight:500}
+.bar .spacer{flex:1}
+.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{padding:5px 13px;font-size:12px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.btn-sm{padding:6px 14px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-weight:600;color:var(--text-2);transition:border-color .18s var(--ease),color .18s var(--ease)}
+.btn-sm:hover{border-color:var(--accent-deep);color:var(--text)}
+.idx{display:flex;gap:24px;padding:5px 22px;border-top:1px solid var(--border-soft);font-family:var(--mono);font-size:10.5px;color:var(--muted);overflow:hidden;white-space:nowrap}
+.idx b{color:var(--text-2);font-weight:500;margin-left:5px}
+
+/* ===== layout ===== */
+.wrap{display:grid;grid-template-columns:264px 1fr;gap:20px;max-width:1380px;margin:0 auto;padding:20px 22px 70px}
+
+/* picks rail */
+.rail h4{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;font-weight:500;margin:4px 2px 10px}
+.pick{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .18s var(--ease),transform .18s var(--ease)}
+.pick:hover{border-color:var(--border);transform:translateY(-1px)}
+.pick.sel{border-color:rgba(77,163,255,.5);background:linear-gradient(180deg,rgba(77,163,255,.08),var(--surface))}
+.ring{position:relative;width:38px;height:38px;flex:none}
+.ring svg{width:38px;height:38px;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:11.5px;font-weight:700}
+.pick .nm b{font-family:var(--mono);font-size:13px;font-weight:700;display:block}
+.pick .nm span{font-size:10.5px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.pick .chg{margin-left:auto;font-family:var(--mono);font-size:11.5px}
+
+/* ===== bento grid ===== */
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;align-content:start}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px;transition:border-color .2s var(--ease),transform .2s var(--ease)}
+.card:hover{border-color:#2A3E5E;transform:translateY(-2px)}
+.card h4{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;font-weight:500;margin-bottom:12px}
+.card h4 .tag{color:var(--accent);letter-spacing:.06em}
+
+/* verdict card */
+.v-card{grid-column:span 4;grid-row:span 2;display:flex;flex-direction:column;background:linear-gradient(155deg,#12203A 0%,var(--surface) 55%);border-color:rgba(77,163,255,.35)}
+.v-top{display:flex;align-items:center;gap:16px}
+.dial{position:relative;width:84px;height:84px;flex:none}
+.dial svg{width:84px;height:84px;transform:rotate(-90deg)}
+.dial b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:24px;font-weight:700}
+.v-top h2{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.1;letter-spacing:-.01em}
+.v-top p{font-size:12px;color:var(--muted);margin-top:4px}
+.v-read{margin-top:16px;font-size:13.5px;color:var(--text-2);line-height:1.6}
+.v-read b{color:var(--text)}
+.v-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:auto;padding-top:16px;font-family:var(--mono);font-size:12px}
+.v-stats .r{display:flex;justify-content:space-between;border-bottom:1px dashed var(--border-soft);padding-bottom:6px}
+.v-stats span{color:var(--muted);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.v-stats b{font-weight:700}
+
+/* chart card */
+.c-card{grid-column:span 8;grid-row:span 2;padding:0;overflow:hidden}
+.c-head{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-soft);background:var(--bg-raise)}
+.c-head .t{display:flex;align-items:baseline;gap:10px}
+.c-head .t b{font-family:var(--serif);font-size:19px;font-weight:600}
+.c-head .t span{font-size:11.5px;color:var(--muted)}
+.c-head .px{margin-left:auto;font-family:var(--mono);font-size:17px;font-weight:700}
+.c-head .pxc{font-family:var(--mono);font-size:11.5px}
+svg.chart{display:block;width:100%}
+.istrip{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border-soft)}
+.istrip .cell{padding:8px 14px;border-right:1px solid var(--border-soft)}
+.istrip .cell:last-child{border-right:none}
+.istrip label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.istrip b{font-family:var(--mono);font-size:12px;font-weight:700}
+.istrip small{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+
+/* vcp card */
+.vcp-card{grid-column:span 4}
+.bignum{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--accent);line-height:1}
+.bignum small{font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
+.sq{display:flex;align-items:flex-end;gap:4px;height:44px;margin:12px 0 6px}
+.sq i{flex:1;background:var(--accent-deep);border-radius:2px 2px 0 0;opacity:.5}
+.sq i.hot{background:var(--accent);opacity:1}
+.card p.note{font-size:12px;color:var(--muted);line-height:1.55}
+.card p.note b{color:var(--text-2)}
+
+/* levels card */
+.lv-card{grid-column:span 4}
+.ladder{font-family:var(--mono);font-size:12px}
+.rung{display:flex;align-items:center;gap:10px;padding:6.5px 0;border-bottom:1px dashed var(--border-soft)}
+.rung:last-child{border-bottom:none}
+.rung .lvl{width:62px;color:var(--muted);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase}
+.rung b{font-weight:700}
+.rung .d{margin-left:auto;font-size:10px;color:var(--muted)}
+.rung.now{background:rgba(77,163,255,.08);border-radius:6px;padding:6.5px 8px;margin:0 -8px}
+.rung.now .lvl,.rung.now b{color:var(--accent)}
+
+/* plan card */
+.p-card{grid-column:span 4;border-color:rgba(52,211,153,.28)}
+.plan{display:flex;flex-direction:column;gap:9px;font-family:var(--mono);font-size:12px}
+.plan .row{display:flex;justify-content:space-between;align-items:baseline}
+.plan .row span{color:var(--muted);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.plan .row b{font-weight:700}
+.plan .row b.entry{color:var(--green)} .plan .row b.risk{color:var(--red)}
+.p-card .disc{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border-soft)}
+
+.askai{position:fixed;right:26px;bottom:26px;display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13.5px;padding:11px 20px;border-radius:10px;box-shadow:0 14px 34px -10px rgba(29,111,209,.8)}
+@media(max-width:1100px){.bento{grid-template-columns:1fr}.v-card,.c-card,.vcp-card,.lv-card,.p-card{grid-column:span 1}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="logo"><i></i>Breakout AI</div>
+    <span class="meta">DATA <b>2026-07-17</b> · <b>yfinance/daily</b></span>
+    <span class="meta">MOOD <b style="color:var(--amber)">57 NEUTRAL</b></span>
+    <div class="spacer"></div>
+    <div class="seg"><button class="on">🇮🇳 India</button><button>🇺🇸 US</button></div>
+    <button class="btn-sm">Options</button>
+    <button class="btn-sm">Backtest</button>
+    <button class="btn-sm">Cockpit</button>
+  </div>
+  <div class="idx">
+    <span>NIFTY 50 <b class="num">24,334.2</b> <b class="up">+1.08%</b></span>
+    <span>SENSEX <b class="num">78,151.45</b> <b class="up">+1.25%</b></span>
+    <span>BANK NIFTY <b class="num">58,521.4</b> <b class="up">+1.63%</b></span>
+    <span>NIFTY IT <b class="num">28,226.6</b> <b class="up">+1.75%</b></span>
+    <span>MIDCAP 50 <b class="num">17,930.85</b> <b class="down">−0.3%</b></span>
+    <span>SMALLCAP <b class="num">19,286.3</b> <b class="down">−0.2%</b></span>
+    <span>INDIA VIX <b class="num">13.15</b> <b class="up">+2.1%</b></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ===== PICKS RAIL ===== -->
+  <aside class="rail">
+    <h4>Today's picks · 12 of 2,055 scanned</h4>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="29.1"/></svg><b>71</b></div><div class="nm"><b>KFINTECH</b><span>KFin Technologies</span></div><span class="chg up">+2.4%</span></div>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="32.2"/></svg><b>68</b></div><div class="nm"><b>BEPL</b><span>Bhansali Eng. Polymers</span></div><span class="chg up">+1.9%</span></div>
+    <div class="pick sel"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="34.2"/></svg><b>66</b></div><div class="nm"><b>RELAXO</b><span>Relaxo Footwears</span></div><span class="chg up">+1.2%</span></div>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="36.2"/></svg><b>64</b></div><div class="nm"><b>ASTRAZEN</b><span>AstraZeneca Pharma</span></div><span class="chg down">−0.4%</span></div>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="38.2"/></svg><b>62</b></div><div class="nm"><b>GRAVITA</b><span>Gravita India</span></div><span class="chg up">+0.8%</span></div>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="39.2"/></svg><b>61</b></div><div class="nm"><b>POLYMED</b><span>Poly Medicure</span></div><span class="chg up">+0.3%</span></div>
+    <div class="pick"><div class="ring"><svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="41.2"/></svg><b>59</b></div><div class="nm"><b>JBCHEPHARM</b><span>JB Chemicals</span></div><span class="chg down">−1.1%</span></div>
+  </aside>
+
+  <!-- ===== BENTO ===== -->
+  <main class="bento">
+
+    <!-- verdict -->
+    <div class="card v-card">
+      <h4>Verdict <span class="tag">RANK 3/12</span></h4>
+      <div class="v-top">
+        <div class="dial">
+          <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="#182438" stroke-width="6"/><circle cx="42" cy="42" r="36" fill="none" stroke="#4DA3FF" stroke-width="6" stroke-linecap="round" stroke-dasharray="226.2" stroke-dashoffset="76.9"/></svg>
+          <b>66</b>
+        </div>
+        <div>
+          <h2>Coiling —<br>near trigger</h2>
+          <p>RELAXO · Relaxo Footwears · Footwear</p>
+        </div>
+      </div>
+      <p class="v-read">Twelve months into a <b>−36.7% base</b>, the range has tightened to <b>0.92×</b> baseline while volume dries up. Price presses <b>1.2% under the ₹426 pivot</b> with clear air above.</p>
+      <div class="v-stats">
+        <div class="r"><span>Price</span><b>₹421.15</b></div>
+        <div class="r"><span>Δ Day</span><b class="up">+1.2%</b></div>
+        <div class="r"><span>Trend ADX</span><b>29.8</b></div>
+        <div class="r"><span>Volume</span><b>15.96×</b></div>
+      </div>
+    </div>
+
+    <!-- chart -->
+    <div class="card c-card">
+      <div class="c-head">
+        <div class="t"><b>RELAXO</b><span>Daily · 6M · Annotated</span></div>
+        <span class="px num">₹421.15</span><span class="pxc up">▲ +1.2%</span>
+        <div class="seg"><button class="on">Annotated</button><button>TradingView</button></div>
+      </div>
+      <svg id="chart" class="chart" viewBox="0 0 900 280" preserveAspectRatio="none" aria-label="RELAXO daily chart"></svg>
+      <div class="istrip">
+        <div class="cell"><label>Trend · ADX</label><b>29.8</b> <small>STRONG</small></div>
+        <div class="cell"><label>Volume</label><b>15.96×</b> <small>avg</small></div>
+        <div class="cell"><label>8 EMA</label><b>₹396.95</b></div>
+        <div class="cell"><label>21 EMA</label><b>₹386.58</b></div>
+        <div class="cell"><label>50 EMA</label><b>₹362.40</b></div>
+        <div class="cell"><label>200 EMA</label><b>₹373.26</b></div>
+      </div>
+    </div>
+
+    <!-- vcp -->
+    <div class="card vcp-card">
+      <h4>Volatility Contraction <span class="tag">VCP</span></h4>
+      <div class="bignum">0.92×<small>coiling (squeeze)</small></div>
+      <div class="sq"><i style="height:100%"></i><i style="height:85%"></i><i style="height:70%"></i><i style="height:57%"></i><i style="height:45%"></i><i class="hot" style="height:33%"></i></div>
+      <p class="note">Range is <b>8% tighter</b> than the stock's own baseline — energy building, not fading. Below <b>1.0×</b> = coiling.</p>
+    </div>
+
+    <!-- levels -->
+    <div class="card lv-card">
+      <h4>Key Levels <span class="tag">LADDER</span></h4>
+      <div class="ladder">
+        <div class="rung"><span class="lvl">Resist</span><b>none nearby</b><span class="d">clear air</span></div>
+        <div class="rung"><span class="lvl">Pivot</span><b>₹426.00</b><span class="d">+1.2%</span></div>
+        <div class="rung now"><span class="lvl">Price</span><b>₹421.15</b><span class="d">now</span></div>
+        <div class="rung"><span class="lvl">Support</span><b>₹408.20</b><span class="d">−3.1%</span></div>
+        <div class="rung"><span class="lvl">Cutoff</span><b style="color:var(--red)">₹400.44</b><span class="d">−6.6%</span></div>
+      </div>
+    </div>
+
+    <!-- plan -->
+    <div class="card p-card">
+      <h4>What to Watch For <span class="tag" style="color:var(--green)">IF / THEN</span></h4>
+      <div class="plan">
+        <div class="row"><span>Trigger</span><b>close &gt; ₹426.00 on vol</b></div>
+        <div class="row"><span>Entry</span><b class="entry">₹426.60+</b></div>
+        <div class="row"><span>Risk cutoff</span><b class="risk">₹400.44 (−6.6%)</b></div>
+        <div class="row"><span>Base depth</span><b>−36.7%</b></div>
+      </div>
+      <p class="disc">⚠ Educational content only, not investment advice. Always use a stop-loss.</p>
+    </div>
+
+  </main>
+</div>
+
+<button class="askai">✦ Ask AI</button>
+
+<script>
+(function(){
+  var seed=42; function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+  var W=900,H=280,VH=50,n=88,candles=[];
+  var way=[430,398,362,340,352,338,346,340,352,360,356,366,372,378,384,390,396,402,406,410,414,417,419,421];
+  for(var i=0;i<n;i++){
+    var t=i/(n-1)*(way.length-1),a=Math.floor(t),b=Math.min(a+1,way.length-1),f=t-a;
+    var base=way[a]*(1-f)+way[b]*f;
+    var tight=i>n*.72?0.35:1;
+    var o=base+(rnd()-.5)*10*tight, c=base+(rnd()-.5)*10*tight;
+    var hi=Math.max(o,c)+rnd()*5*tight, lo=Math.min(o,c)-rnd()*5*tight;
+    var v=(.25+rnd()*.75)*(i>n*.72?.45:1)*(i===n-1?3.2:1);
+    candles.push({o:o,c:c,h:hi,l:lo,v:v});
+  }
+  var min=1e9,max=0;candles.forEach(function(k){min=Math.min(min,k.l);max=Math.max(max,k.h)});
+  min-=8;max+=8;
+  function y(p){return (max-p)/(max-min)*(H-VH-14)+7}
+  var svg=document.getElementById('chart'),s='';
+  function line(alpha,color,w){
+    var e=candles[0].c,d='M';
+    candles.forEach(function(k,i){e=e+alpha*(k.c-e);d+=(i?'L':'')+(i*(W-70)/n+8).toFixed(1)+' '+y(e).toFixed(1)+' '});
+    s+='<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" opacity=".8"/>';
+  }
+  line(.09,'#FBBF24',1.2); line(.28,'#8B5CF6',1.2);
+  candles.forEach(function(k,i){
+    var x=i*(W-70)/n+8,cw=Math.max(2.4,(W-70)/n*.55),up=k.c>=k.o;
+    var col=up?'#34D399':'#F87171';
+    s+='<line x1="'+(x+cw/2)+'" y1="'+y(k.h)+'" x2="'+(x+cw/2)+'" y2="'+y(k.l)+'" stroke="'+col+'" stroke-width="1"/>';
+    s+='<rect x="'+x+'" y="'+Math.min(y(k.o),y(k.c))+'" width="'+cw+'" height="'+Math.max(1.5,Math.abs(y(k.o)-y(k.c)))+'" fill="'+col+'" rx="1"/>';
+    s+='<rect x="'+x+'" y="'+(H-k.v*VH*0.9)+'" width="'+cw+'" height="'+(k.v*VH*0.9)+'" fill="#1D6FD1" opacity=".45" rx="1"/>';
+  });
+  [[426,'#4DA3FF','₹426.00'],[408.2,'#34D399','₹408.20'],[400.44,'#F87171','₹400.44']].forEach(function(g){
+    s+='<line x1="8" x2="'+(W-62)+'" y1="'+y(g[0])+'" y2="'+y(g[0])+'" stroke="'+g[1]+'" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>';
+    s+='<text x="'+(W-58)+'" y="'+(y(g[0])+3)+'" fill="'+g[1]+'" font-size="8.5" font-family="JetBrains Mono">'+g[2]+'</text>';
+  });
+  svg.innerHTML=s;
+})();
+</script>
+</body>
+</html>

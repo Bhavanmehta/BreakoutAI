@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI — Setup Pipeline · Design Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1319; --col:#0f161d; --card:#121a23; --line:#1c2733; --line2:#161f29; --hover:#223140;
+  --txt:#e8edf2; --dim:#93a5b6; --micro:#5b6b7a;
+  --mint:#3fc1ab; --mint2:#5cd8c2; --on-accent:#06110f;
+  --amber:#f0b429; --red:#ef6b6b; --green:#35e08f;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 'Instrument Sans',sans-serif;overflow:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:22px;padding:12px 20px;border-bottom:1px solid var(--line2)}
+.brand{display:flex;align-items:baseline;gap:9px;font-weight:700;font-size:15px;white-space:nowrap}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--mint);display:inline-block;align-self:center;animation:blip 2.6s infinite}
+.brand .sub{font:500 10px 'JetBrains Mono',monospace;letter-spacing:.14em;color:var(--micro)}
+.stats{display:flex;gap:24px;margin-left:8px}
+.stat{display:flex;flex-direction:column}
+.stat .k{font:700 15px 'JetBrains Mono',monospace}
+.stat .l{font:500 9px 'JetBrains Mono',monospace;letter-spacing:.13em;color:var(--micro)}
+.status{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:12px;color:var(--dim);white-space:nowrap}
+.live{width:7px;height:7px;border-radius:50%;background:var(--mint);animation:livedot 1.6s infinite}
+#scanBtn{background:var(--mint);color:var(--on-accent);font-weight:600;font-size:13px;padding:8px 16px;border-radius:8px;transition:background .15s,transform .1s}
+#scanBtn:hover{background:var(--mint2)}
+#scanBtn:active{transform:scale(.97)}
+
+/* ---------- board ---------- */
+main{height:calc(100vh - 61px);overflow-x:auto}
+.board{display:flex;gap:12px;padding:16px 20px 20px;align-items:flex-start;height:100%;min-width:1240px}
+.col{flex:1 1 0;min-width:196px;max-height:100%;background:var(--col);border:1px solid var(--line2);border-radius:12px;display:flex;flex-direction:column;border-top:2px solid var(--line)}
+.colhead{padding:11px 12px 9px;border-bottom:1px solid var(--line2)}
+.colhead .row{display:flex;align-items:center;gap:8px}
+.colhead .nm{font:600 11px 'JetBrains Mono',monospace;letter-spacing:.12em}
+.colhead .ct{margin-left:auto;font:600 10.5px 'JetBrains Mono',monospace;padding:1px 7px;border-radius:9px;background:rgba(255,255,255,.06);color:var(--dim)}
+.colhead .ds{font-size:10.5px;color:var(--micro);margin-top:3px}
+.stack{padding:10px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+
+/* ---------- cards ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px 9px;cursor:pointer;
+  animation:riseIn .45s both;transition:transform .15s,border-color .15s,opacity .4s,box-shadow .4s}
+.card:hover{transform:translateY(-2px);border-color:#2a4a42}
+.card.flash{border-color:var(--mint);box-shadow:0 0 0 1px var(--mint),0 8px 26px rgba(63,193,171,.18)}
+.card.stale{opacity:.62}
+.card.dying{opacity:0;transform:scale(.94);pointer-events:none}
+.c-top{display:flex;align-items:center;gap:8px}
+.c-tk{font:700 13px 'JetBrains Mono',monospace}
+.c-conv{margin-left:auto;font:600 11px 'JetBrains Mono',monospace;padding:2px 7px;border-radius:5px}
+.c-name{font-size:11px;color:var(--micro);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-vcp{margin:8px 0 2px}
+.c-meter{height:3px;border-radius:2px;background:var(--line2);margin:7px 0 8px;overflow:hidden}
+.c-meter i{display:block;height:100%;border-radius:2px;transform-origin:left;animation:growBar .8s .2s both cubic-bezier(.2,.8,.2,1)}
+.c-crux{font-size:11.4px;line-height:1.42;color:var(--dim)}
+.c-foot{display:flex;align-items:center;gap:8px;margin-top:9px;font:500 9px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--micro)}
+.c-foot .pl{font:600 11px 'JetBrains Mono',monospace;letter-spacing:0}
+.tag{padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.05)}
+.tag.warn{color:var(--amber);background:rgba(240,180,41,.1)}
+/* expandable detail */
+.more{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s cubic-bezier(.2,.8,.2,1)}
+.more>div{overflow:hidden}
+.card.open .more{grid-template-rows:1fr}
+.m-inner{padding-top:10px;display:flex;flex-direction:column;gap:9px}
+.m-spark{border:1px solid var(--line2);border-radius:8px;background:#0c1219;padding:5px 5px 1px}
+.m-kv{display:flex;gap:14px;font:500 10.5px 'JetBrains Mono',monospace}
+.m-kv .l{color:var(--micro);letter-spacing:.1em;font-size:8.5px;display:block}
+.m-actions{display:flex;gap:7px}
+.btn{flex:1;text-align:center;padding:7px 10px;border-radius:7px;font-size:12px;font-weight:600;transition:background .15s,border-color .15s}
+.btn.pri{background:var(--mint);color:var(--on-accent)}
+.btn.pri:hover{background:var(--mint2)}
+.btn.sec{border:1px solid #1f2a36;color:var(--dim)}
+.btn.sec:hover{border-color:var(--mint);color:var(--txt)}
+
+/* ---------- anims / toast / badge ---------- */
+@keyframes blip{0%,100%{box-shadow:0 0 0 0 rgba(63,193,171,.5)}50%{box-shadow:0 0 0 7px rgba(63,193,171,0)}}
+@keyframes livedot{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes growBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);background:#0a0f14;border:1px solid var(--line);color:var(--dim);
+  padding:9px 16px;border-radius:9px;font-size:12.5px;opacity:0;transition:all .25s;z-index:70;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:80vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast b{color:var(--txt)}
+.badge{position:fixed;left:14px;bottom:12px;font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#3c4a58;z-index:5}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="logo-dot"></span>BreakoutAI<span class="sub">SETUP&nbsp;PIPELINE</span></div>
+  <div class="stats" id="stats"></div>
+  <div class="status">
+    <span><span class="live"></span>&nbsp;LIVE · NSE&nbsp;<span id="clock" class="mono"></span></span>
+    <button id="scanBtn">Run daily scan ▸</button>
+  </div>
+</header>
+
+<main><div class="board" id="board"></div></main>
+
+<div id="toast"></div>
+<div class="badge">DESIGN MOCKUP · OPTION C "THE PIPELINE" · SAMPLE DATA</div>
+
+<script>
+/* ============ stages ============ */
+const STAGES=[
+ {k:"BASE",        c:"#5b7391", d:"Building structure",    typ:"15–35 d"},
+ {k:"CONTRACTION", c:"#7c6cf2", d:"Swings narrowing",      typ:"8–20 d"},
+ {k:"TIGHTENING",  c:"#f0b429", d:"Range compressing",     typ:"4–12 d"},
+ {k:"PRE-BREAKOUT",c:"#3fc1ab", d:"Coiled at the pivot",   typ:"1–6 d"},
+ {k:"TRIGGERED",   c:"#35e08f", d:"Broke out on volume",   typ:"today"},
+ {k:"TRACKED",     c:"#8fd3ff", d:"Open calls · managed",  typ:"open"}
+];
+const hex2rgb=h=>{const n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255].join(",")};
+const convColor=c=>c>=70?"#3fc1ab":(c>=40?"#f0b429":"#ef6b6b");
+
+/* ============ sample data (illustrative) ============ */
+const INITIAL=[
+ {t:"DATAPATTNS",n:"Data Patterns",s:"DEFENCE",c:44,st:0,p:"2,610",pv:"2,940",pct:-11.2,d:22, crux:"Early base — RS rank below 70, waiting for a higher low."},
+ {t:"ELECON",n:"Elecon Engineering",s:"CAP GOODS",c:41,st:0,p:"590",pv:"675",pct:-12.6,d:28, crux:"Day 28 in base. One more flat week and it drops off the scan."},
+ {t:"RVNL",n:"Rail Vikas Nigam",s:"INFRA",c:46,st:0,p:"415",pv:"463",pct:-10.4,d:19, crux:"Recovering after a deep correction; structure improving."},
+ {t:"SONACOMS",n:"Sona BLW Precision",s:"AUTO ANC",c:43,st:0,p:"720",pv:"814",pct:-13.1,d:25, crux:"Early base after downtrend; not yet a setup."},
+ {t:"HAL",n:"Hindustan Aeronautics",s:"DEFENCE",c:58,st:1,p:"4,980",pv:"5,350",pct:-6.9,d:14, crux:"Third contraction leg; the 21DMA must keep holding."},
+ {t:"SYRMA",n:"Syrma SGS Tech.",s:"EMS",c:52,st:1,p:"610",pv:"666",pct:-8.4,d:11, crux:"Second contraction forming; still wide — needs a sub-5% week."},
+ {t:"POLYCAB",n:"Polycab India",s:"CAP GOODS",c:61,st:1,p:"7,380",pv:"7,835",pct:-5.8,d:12, crux:"Contracting after a 30% run; RS must hold above sector line."},
+ {t:"ANGELONE",n:"Angel One",s:"FINANCIALS",c:54,st:1,p:"2,950",pv:"3,206",pct:-8.0,d:13, crux:"Second contraction leg; broker adds slowing."},
+ {t:"EXIDEIND",n:"Exide Industries",s:"AUTO ANC",c:51,st:1,p:"470",pv:"507",pct:-7.8,d:16, crux:"Li-ion capex story; price action still loose."},
+ {t:"BEL",n:"Bharat Electronics",s:"DEFENCE",c:66,st:2,p:"412",pv:"430",pct:-4.1,d:9, crux:"Range down to 3.1%; order-book headline is the likely trigger."},
+ {t:"DIXON",n:"Dixon Technologies",s:"EMS",c:71,st:2,p:"16,480",pv:"17,020",pct:-3.2,d:7, crux:"On the 10-week line, supply shrinking; watch for a pocket pivot."},
+ {t:"CGPOWER",n:"CG Power & Industrial",s:"EMS",c:69,st:2,p:"812",pv:"845",pct:-3.9,d:8, crux:"Higher lows into a flat top — ascending triangle near completion."},
+ {t:"CDSL",n:"Central Depository",s:"FINANCIALS",c:68,st:2,p:"1,860",pv:"1,946",pct:-4.4,d:7, crux:"Tight flag under highs; demat growth is the driver."},
+ {t:"JYOTICNC",n:"Jyoti CNC Automation",s:"CAP GOODS",c:73,st:2,p:"1,388",pv:"1,436",pct:-3.4,d:6, crux:"Earnings digestion done; pivot sits at the all-time-high zone."},
+ {t:"POWERINDIA",n:"Hitachi Energy India",s:"INFRA",c:70,st:2,p:"14,900",pv:"15,360",pct:-3.0,d:5, crux:"Tightening under ₹15,360 with order-inflow tailwind."},
+ {t:"UNOMINDA",n:"Uno Minda",s:"AUTO ANC",c:65,st:2,p:"1,120",pv:"1,175",pct:-4.7,d:8, crux:"EV order wins + tight range; needs a market tailwind."},
+ {t:"KAYNES",n:"Kaynes Technology",s:"EMS",c:82,st:3,p:"6,120",pv:"6,240",pct:-1.9,d:4, crux:"Tightest weekly range in 6 months; needs volume through ₹6,240."},
+ {t:"MAZDOCK",n:"Mazagon Dock Ship.",s:"DEFENCE",c:78,st:3,p:"5,842",pv:"6,005",pct:-2.7,d:6, crux:"Cup-with-handle complete; needs a +40% volume day through ₹6,005."},
+ {t:"APLAPOLLO",n:"APL Apollo Tubes",s:"CAP GOODS",c:76,st:3,p:"1,745",pv:"1,784",pct:-2.2,d:3, crux:"Three tight closes; accumulation visible in delivery data."},
+ {t:"BSE",n:"BSE Ltd",s:"FINANCIALS",c:84,st:4,p:"2,055",pv:"2,027",pct:1.4,d:1, crux:"Broke out on 2.8× volume; follow-through target ₹2,140."},
+ {t:"TRENT",n:"Trent Ltd",s:"RETAIL",c:80,st:5,p:"6,410",pv:"5,685",pct:12.8,d:14,pl:12.8, crux:"Trailing under the 10DMA; half booked at +10%."},
+ {t:"NETWEB",n:"Netweb Technologies",s:"EMS",c:74,st:5,p:"3,024",pv:"2,890",pct:4.6,d:6,pl:4.6, crux:"Post-breakout drift holding above pivot; stop at breakeven."},
+ {t:"ETERNAL",n:"Eternal Ltd",s:"CONSUMER",c:57,st:5,p:"246",pv:"251",pct:-2.1,d:3,pl:-2.1, crux:"Living on the stop at -3%. Losers get logged, not hidden."}
+];
+let DATA=JSON.parse(JSON.stringify(INITIAL));
+let scanned=false;
+
+/* ============ VCP glyph: zigzag with decaying amplitude ============ */
+function vcpSvg(s){
+  const W=150,H=26,mid=H/2,col=STAGES[s.st].c;
+  const decay=[0.97,0.90,0.80,0.66,0.60,0.60][s.st];
+  let amp=10,x=4,pts=[[x,mid]],sign=-1;
+  while(x<W-28){x+=9;pts.push([x,mid+sign*amp]);sign=-sign;amp*=decay;}
+  let path=pts.map((p,i)=>(i?"L":"M")+p[0]+" "+p[1].toFixed(1)).join("");
+  let extra="";
+  if(s.st>=4){ // breakout stroke
+    const lx=pts[pts.length-1][0];
+    path+=`L${lx+12} ${mid}L${W-8} ${s.st===5&&s.pl<0?mid+5:5}`;
+    extra=`<circle cx="${W-8}" cy="${s.st===5&&s.pl<0?mid+5:5}" r="2.4" fill="${col}"/>`;
+  }
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;height:26px">
+    <line x1="0" x2="${W}" y1="${mid}" y2="${mid}" stroke="#1c2733" stroke-width="1"/>
+    <path d="${path}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".9"/>${extra}</svg>`;
+}
+function seededRand(seed){let x=seed;return()=>{x=(x*9301+49297)%233280;return x/233280}}
+function sparkSvg(s){
+  const r=seededRand([...s.t].reduce((a,c)=>a+c.charCodeAt(0),7));
+  const W=200,H=54,pivotY=15,n=44;let y=40,pts=[];
+  for(let i=0;i<n;i++){const prog=i/n,decay=1-prog*(0.25+Math.min(s.st,4)*0.16);
+    y+=(r()-0.52)*11*Math.max(.15,decay);
+    const target=s.st>=4&&prog>.85?(s.pl!==undefined&&s.pl<0?pivotY+8:9):(pivotY+5+(1-prog)*16);
+    y+=(target-y)*0.08;y=Math.max(5,Math.min(H-4,y));
+    pts.push([5+(W-10)*prog,y]);}
+  const line=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join("");
+  const col=STAGES[s.st].c;
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;height:54px">
+    <line x1="5" x2="${W-5}" y1="${pivotY}" y2="${pivotY}" stroke="${col}" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="1.6" stroke-dasharray="600" stroke-dashoffset="600" style="animation:draw .9s .05s forwards"/>
+  </svg>`;
+}
+
+/* ============ render ============ */
+const board=document.getElementById("board");
+let openKey=null,firstRender=true;
+
+function cardHtml(s,idx){
+  const col=STAGES[s.st].c,cc=convColor(s.c);
+  const closeness=s.st>=4?100:Math.max(6,100-Math.abs(s.pct)*(100/15));
+  const stale=s.st<=1&&s.d>=25;
+  const footRight=s.st===5
+    ?`<span class="pl" style="color:${s.pl>=0?"#35e08f":"#ef6b6b"};margin-left:auto">${s.pl>=0?"+":""}${s.pl.toFixed(1)}%</span>`
+    :`<span style="margin-left:auto">${s.pct>0?"+":""}${s.pct.toFixed(1)}% → PIVOT</span>`;
+  return `<div class="card${stale?" stale":""}${openKey===s.t?" open":""}" data-t="${s.t}" style="animation-delay:${firstRender?idx*30:0}ms">
+    <div class="c-top"><span class="c-tk">${s.t}</span>
+      <span class="c-conv" style="color:${cc};background:rgba(${hex2rgb(cc)},.12)">${s.c}</span></div>
+    <div class="c-name">${s.n}</div>
+    <div class="c-vcp">${vcpSvg(s)}</div>
+    <div class="c-meter"><i style="width:${closeness}%;background:${col}"></i></div>
+    <div class="c-crux">${s.crux}</div>
+    <div class="c-foot"><span class="tag${stale?" warn":""}">DAY ${s.d}${stale?" · STALE":""}</span><span>${s.s}</span>${footRight}</div>
+    <div class="more"><div><div class="m-inner">
+      <div class="m-spark">${sparkSvg(s)}</div>
+      <div class="m-kv">
+        <span><span class="l">PRICE</span>₹${s.p}</span>
+        <span><span class="l">${s.st===5?"ENTRY":"PIVOT"}</span>₹${s.pv}</span>
+        <span><span class="l">TYPICAL STAY</span>${STAGES[s.st].typ}</span>
+      </div>
+      <div class="m-actions">
+        <button class="btn pri" data-na>Open full analysis →</button>
+        <button class="btn sec" data-na>☆ Track</button>
+      </div>
+    </div></div></div>
+  </div>`;
+}
+
+function render(){
+  board.innerHTML=STAGES.map((st,i)=>{
+    const items=DATA.filter(s=>s.st===i);
+    return `<div class="col" style="border-top-color:${st.c}">
+      <div class="colhead">
+        <div class="row"><span style="width:8px;height:8px;border-radius:50%;background:${st.c};display:inline-block"></span>
+          <span class="nm" style="color:${st.c}">${st.k}</span><span class="ct">${items.length}</span></div>
+        <div class="ds">${st.d}</div>
+      </div>
+      <div class="stack">${items.map((s,j)=>cardHtml(s,j)).join("")}</div>
+    </div>`;
+  }).join("");
+  firstRender=false;
+  renderStats();
+}
+function renderStats(){
+  const pre=DATA.filter(s=>s.st===3).length,trig=DATA.filter(s=>s.st===4).length;
+  document.getElementById("stats").innerHTML=[
+    ["2,055","SCANNED"],[String(DATA.length),"IN PIPELINE"],[String(pre),"PRE-BREAKOUT"],
+    [String(trig),"TRIGGERED"],["64%","TRACKED WIN RATE"]
+  ].map(([k,l])=>`<div class="stat"><span class="k">${k}</span><span class="l">${l}</span></div>`).join("");
+}
+
+/* ============ interactions ============ */
+board.addEventListener("click",e=>{
+  if(e.target.closest("[data-na]")){showToast("Not part of this mockup — Pipeline home view only.");return;}
+  const card=e.target.closest(".card");if(!card)return;
+  const k=card.dataset.t;
+  openKey=openKey===k?null:k;
+  document.querySelectorAll(".card").forEach(c=>c.classList.toggle("open",c.dataset.t===openKey));
+});
+
+/* ============ FLIP scan simulation ============ */
+const MOVES=[
+ {t:"KAYNES",to:4,note:"KAYNES → TRIGGERED (broke ₹6,240 on 3.1× vol)"},
+ {t:"DIXON",to:3,note:"DIXON → PRE-BREAKOUT"},
+ {t:"SYRMA",to:2,note:"SYRMA → TIGHTENING"}
+];
+const DROP="ELECON";
+function rects(){const m={};document.querySelectorAll(".card").forEach(c=>m[c.dataset.t]=c.getBoundingClientRect());return m;}
+function flip(before,movedKeys){
+  const after=rects();
+  movedKeys.forEach(k=>{
+    const el=document.querySelector(`.card[data-t="${k}"]`);
+    if(!el||!before[k]||!after[k])return;
+    const dx=before[k].left-after[k].left,dy=before[k].top-after[k].top;
+    el.style.transition="none";el.style.transform=`translate(${dx}px,${dy}px)`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      el.style.transition="transform .55s cubic-bezier(.22,1.2,.36,1)";
+      el.style.transform="";
+      el.classList.add("flash");
+      setTimeout(()=>el.classList.remove("flash"),1400);
+    }));
+  });
+}
+document.getElementById("scanBtn").addEventListener("click",()=>{
+  const btn=document.getElementById("scanBtn");
+  if(!scanned){
+    const dropEl=document.querySelector(`.card[data-t="${DROP}"]`);
+    if(dropEl)dropEl.classList.add("dying");
+    setTimeout(()=>{
+      const before=rects();
+      MOVES.forEach(m=>{const s=DATA.find(x=>x.t===m.t);if(s){s.st=m.to;s.d=1;
+        if(m.to===4){s.pct=1.1;s.crux="Broke out on 3.1× average volume; follow-through window open.";s.c=Math.min(95,s.c+4);}}});
+      DATA=DATA.filter(s=>s.t!==DROP);
+      openKey=null;render();
+      flip(before,MOVES.map(m=>m.t));
+      showToast(`<b>Daily scan complete.</b> 3 advanced — ${MOVES[0].note}. 1 dropped (ELECON: stale base, closed below 50DMA).`,4200);
+      btn.textContent="Reset demo ↺";scanned=true;
+    },380);
+  }else{
+    DATA=JSON.parse(JSON.stringify(INITIAL));openKey=null;scanned=false;
+    render();showToast("Demo reset to pre-scan state.");
+    btn.textContent="Run daily scan ▸";
+  }
+});
+
+/* ============ toast / clock ============ */
+const toast=document.getElementById("toast");let toastT;
+function showToast(html,ms){toast.innerHTML=html;toast.classList.add("show");
+  clearTimeout(toastT);toastT=setTimeout(()=>toast.classList.remove("show"),ms||2200);}
+const clock=document.getElementById("clock");
+setInterval(()=>{clock.textContent=new Date().toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour12:false})+" IST"},1000);
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+strategy,trades,win_rate_pct,total_pnl_rs,total_return_pct,cagr_pct,max_drawdown_pct,avg_win_rs,avg_loss_rs,profit_factor,sharpe_like,period_days,exit_mix,notes
+IC-1pct-manage50,57,89.5,57510.0,57.51,52.7,-14.6,2331.0,-10232.0,1.94,1.63,392,target=42;expiry=9;stop_loss=6,"Tight 1% OTM shorts -> fat credit, higher touch probability."
+IC-1.5pct-manage50-sl1.5,57,68.4,37418.0,37.42,34.5,-14.95,1884.0,-2003.0,2.04,1.53,392,target=50;stop_loss=6;expiry=1,Tighter stop at 1.5x credit.
+IC-1.5pct-hold2expiry,57,75.4,34196.0,34.2,31.5,-24.41,2038.0,-3818.0,1.64,1.06,392,target=31;expiry=20;stop_loss=6,No early management (target ~=100%); held to settlement for contrast.
+IC-1.5pct-manage75,57,75.4,30990.0,30.99,28.6,-25.75,1964.0,-3820.0,1.58,0.97,392,target=49;stop_loss=6;expiry=2,Greedier: hold winners until 75% of credit captured.
+IC-1.5pct-manage50,57,68.4,18908.0,18.91,17.5,-28.67,1884.0,-3031.0,1.35,0.61,392,target=50;stop_loss=6;expiry=1,"1.5% OTM shorts, 1.0% wings, both sides, exit at 50% of credit."
+IC-1.5pct-manage35,57,63.2,18266.0,18.27,16.9,-26.76,1921.0,-2424.0,1.36,0.6,392,target=51;stop_loss=5;expiry=1,Same 1.5% IC but bank profit earlier at 35% of credit.
+IC-2pct-manage50,57,35.1,13166.0,13.17,12.2,-13.85,2239.0,-854.0,1.42,0.57,392,target=52;stop_loss=3;expiry=2,"Wider 2% OTM shorts -> lower credit, lower touch probability."
+IC-1.5pct-manage50-4d,40,82.5,1755.0,1.76,1.6,-18.86,2111.0,-9700.0,1.03,0.05,389,target=33;stop_loss=7,Enter 4 days pre-expiry.
+IC-1.5pct-manage50-3d,55,78.2,-7444.0,-7.44,-6.9,-27.8,1808.0,-7098.0,0.91,-0.19,393,target=45;stop_loss=8;expiry=2,Enter 3 days pre-expiry instead of 2.
+IC-1.5pct-manage50-lowvol,30,60.0,-23070.0,-23.07,-23.6,-30.1,1325.0,-3910.0,0.51,-0.97,356,target=25;stop_loss=5,Only opens the condor when 5d vol < 20d vol (calm regime).
+IC-2.5pct-manage50,57,29.8,-37406.0,-37.41,-35.4,-38.51,1634.0,-1630.0,0.43,-1.15,392,target=54;stop_loss=3,"Very wide 2.5% OTM shorts, 1.5% wings, low touch prob."

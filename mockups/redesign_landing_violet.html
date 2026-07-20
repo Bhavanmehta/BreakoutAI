@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[VIOLET] BreakoutAI — Breakouts, before they break out</title>
+<meta name="description" content="AI-powered breakout scanner for NSE. 2,000+ stocks scanned nightly, VCP detection, RS ranking and pivot alerts — before the move happens.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg:#0F081C;
+  --bg-raise:#170F2B;
+  --surface:#1B1234;
+  --card:#221743;
+  --border:#3B2C63;
+  --border-soft:#2C2150;
+  --text:#F2F0FA;
+  --text-2:#C8C2DC;
+  --muted:#8F8AA8;
+  --accent:#B06BFF;
+  --accent-deep:#8B2FFF;
+  --accent-ink:#100A1E;
+  --amber:#FBBF24;
+  --red:#F87171;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --space-1:8px; --space-2:16px; --space-3:24px; --space-4:40px; --space-5:64px; --space-6:104px;
+  --r-sm:8px; --r-md:14px; --r-lg:20px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--sans);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+::selection{background:rgba(176,107,255,.28)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+
+/* a11y */
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:var(--accent-ink);padding:10px 18px;border-radius:0 0 var(--r-sm) 0;font-weight:600;z-index:200}
+.skip-link:focus{left:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+.wrap{max-width:1152px;margin:0 auto;padding:0 var(--space-3)}
+
+/* label chip used everywhere */
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);
+}
+.eyebrow::before{content:"";width:20px;height:1px;background:var(--accent-deep)}
+
+/* ============ NAV ============ */
+header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(6,10,18,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border-soft);
+}
+.nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.02em}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(176,107,255,.7)}
+.nav-links{display:flex;gap:var(--space-3);align-items:center}
+.nav-links a{font-size:14px;color:var(--muted);padding:8px 4px;transition:color .2s var(--ease)}
+.nav-links a:hover{color:var(--text)}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;justify-content:center;
+  padding:11px 22px;border-radius:var(--r-sm);font-size:14.5px;font-weight:600;
+  border:1px solid transparent;min-height:44px;
+  transition:transform .18s var(--ease),background .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease);
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{background:#C68CFF}
+.btn-ghost{border-color:var(--border);color:var(--text-2)}
+.btn-ghost:hover{border-color:var(--accent-deep);color:var(--text)}
+.nav .btn{padding:9px 18px;min-height:40px}
+
+/* ============ HERO ============ */
+.hero{padding:calc(var(--space-6) - 20px) 0 var(--space-5);position:relative}
+.hero::before{ /* single restrained glow — no heavy decoration */
+  content:"";position:absolute;inset:auto auto 0 50%;transform:translateX(-50%);
+  width:min(900px,90vw);height:420px;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 100%,rgba(139,47,255,.14),transparent 65%);
+}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--space-5);align-items:center;position:relative}
+h1{
+  font-size:clamp(2.6rem,6.2vw,4.6rem);
+  font-weight:800;letter-spacing:-.045em;line-height:1.02;
+  margin:18px 0 22px;
+}
+h1 .accent{
+  background:linear-gradient(100deg,var(--accent) 10%,#DCB8FF 90%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.hero p.lede{font-size:18px;color:var(--muted);max-width:46ch;margin-bottom:30px}
+.hero p.lede strong{color:var(--text-2);font-weight:600}
+.hero-ctas{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.hero-note{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:18px;display:flex;align-items:center;gap:8px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(176,107,255,.5)}55%{box-shadow:0 0 0 7px rgba(176,107,255,0)}}
+
+/* terminal */
+.terminal{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  overflow:hidden;box-shadow:0 24px 60px -30px rgba(0,0,0,.7);
+  font-family:var(--mono);font-size:12.75px;line-height:1.75;
+}
+.term-bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--border-soft);background:var(--bg-raise)}
+.term-bar span{width:10px;height:10px;border-radius:50%;background:var(--border)}
+.term-bar b{margin-left:8px;font-weight:500;font-size:11.5px;color:var(--muted);letter-spacing:.08em}
+.term-body{padding:18px 20px;min-height:284px}
+.tl{display:block;white-space:pre-wrap;color:var(--text-2)}
+.tl .p{color:var(--accent)}       /* prompt / positive */
+.tl .d{color:var(--muted)}        /* dim */
+.tl .a{color:var(--amber)}        /* amber highlight */
+.tl.hidden{visibility:hidden}
+.caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ============ TICKER ============ */
+.ticker{border-block:1px solid var(--border-soft);background:var(--bg-raise);overflow:hidden;padding:13px 0}
+.ticker-track{display:flex;gap:44px;width:max-content;animation:scroll 42s linear infinite}
+.tick{font-family:var(--mono);font-size:12.5px;color:var(--muted);white-space:nowrap;display:flex;gap:9px}
+.tick b{color:var(--text-2);font-weight:500}
+.up{color:#34D399}.dn{color:var(--red)}
+@keyframes scroll{to{transform:translateX(-50%)}}
+
+/* ============ SECTIONS ============ */
+section{padding:var(--space-6) 0}
+.sec-head{max-width:640px;margin-bottom:var(--space-5)}
+h2{font-size:clamp(1.9rem,3.6vw,2.8rem);font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:16px 0 14px}
+.sec-head p{color:var(--muted);font-size:16.5px}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-soft);border:1px solid var(--border-soft);border-radius:var(--r-md);overflow:hidden}
+.stat{background:var(--surface);padding:30px 26px}
+.stat b{display:block;font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:9px}
+.stat b em{font-style:normal;color:var(--accent);font-size:.65em;vertical-align:6px}
+.stat > span{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
+.step{border-top:1px solid var(--border);padding-top:22px;position:relative}
+.step i{font-family:var(--mono);font-style:normal;font-size:12px;color:var(--accent);letter-spacing:.12em}
+.step h3{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:10px 0 8px}
+.step p{color:var(--muted);font-size:14.5px}
+
+/* bento features */
+.bento{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
+.cell{
+  background:var(--card);border:1px solid var(--border-soft);border-radius:var(--r-md);
+  padding:26px;transition:border-color .25s var(--ease),transform .25s var(--ease);
+}
+.cell:hover{border-color:#2A3A50;transform:translateY(-3px)}
+.cell.wide{grid-column:span 2}
+.cell .ic{
+  width:40px;height:40px;border-radius:10px;display:grid;place-items:center;
+  background:rgba(176,107,255,.09);border:1px solid rgba(176,107,255,.18);margin-bottom:18px;
+}
+.cell .ic svg{width:19px;height:19px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cell h3{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-bottom:7px}
+.cell p{color:var(--muted);font-size:14px}
+.cell .spark{margin-top:18px;color:var(--accent-deep)}
+.cell .spark svg{width:100%;height:44px;fill:none;stroke:currentColor;stroke-width:1.6}
+
+/* pipeline preview */
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-2)}
+.pstage{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:18px}
+.pstage h4{font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.13em;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:14px;color:var(--text-2)}
+.pstage h4 .n{margin-left:auto;color:var(--muted)}
+.pdot{width:7px;height:7px;border-radius:50%}
+.pcard{background:var(--card);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:9px}
+.pcard b{font-family:var(--mono);font-weight:500;font-size:12.5px;display:flex;justify-content:space-between}
+.pcard b span{color:var(--muted)}
+.pcard i{font-style:normal;font-size:11px;color:var(--muted)}
+
+/* quotes */
+.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2)}
+.quote{background:var(--card);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:26px;display:flex;flex-direction:column;gap:18px}
+.quote p{color:var(--text-2);font-size:15px}
+.quote footer{display:flex;align-items:center;gap:12px}
+.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--border-soft);font-family:var(--mono);font-size:12px;color:var(--accent)}
+.quote footer b{display:block;font-size:13.5px;font-weight:600}
+.quote footer span{font-size:12px;color:var(--muted)}
+
+/* CTA */
+.cta{text-align:center;border-top:1px solid var(--border-soft)}
+.cta h2{font-size:clamp(2.2rem,5.5vw,3.8rem);max-width:18ch;margin-inline:auto}
+.cta p{color:var(--muted);margin:0 auto 34px;max-width:44ch}
+.cta .btn-primary{padding:15px 34px;font-size:16px}
+
+/* footer */
+.footer{border-top:1px solid var(--border-soft);padding:38px 0;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.footer small{font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.06em}
+.footer nav{display:flex;gap:22px}
+.footer nav a{font-size:13px;color:var(--muted)}
+.footer nav a:hover{color:var(--text)}
+
+/* reveal motion */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.rv.in{opacity:1;transform:none}
+
+/* ============ RESPONSIVE ============ */
+@media(max-width:1024px){
+  .hero-grid{grid-template-columns:1fr;gap:var(--space-4)}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .bento{grid-template-columns:repeat(2,1fr)}
+  .cell.wide{grid-column:span 2}
+  .pipe{grid-template-columns:repeat(3,1fr)}
+  .pipe .pstage:nth-child(n+4){display:none}
+  .quotes{grid-template-columns:1fr 1fr}
+  .quotes .quote:last-child{display:none}
+}
+@media(max-width:640px){
+  section{padding:var(--space-5) 0}
+  .nav-links a:not(.btn){display:none}
+  .stats,.steps,.bento,.quotes{grid-template-columns:1fr}
+  .cell.wide{grid-column:span 1}
+  .pipe{grid-template-columns:1fr 1fr}
+  .pipe .pstage:nth-child(n+3){display:none}
+  .quotes .quote:last-child{display:flex}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}
+  .tl.hidden{visibility:visible}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#"><span class="logo-dot"></span>BreakoutAI</a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pipeline">Pipeline</a>
+      <a class="btn btn-primary" href="#start">Start scanning</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">NSE · 2,000+ stocks · nightly</span>
+      <h1>Breakouts,<br>before they<br><span class="accent">break out.</span></h1>
+      <p class="lede">BreakoutAI scans the entire NSE every night for <strong>volatility contraction, relative strength and pivot setups</strong> — and hands you a ranked watchlist before the market opens.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#start">Start scanning free</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="hero-note"><span class="live-dot" aria-hidden="true"></span>LIVE · last scan 02:10 IST · 23 setups in pipeline</p>
+    </div>
+
+    <div class="terminal" role="img" aria-label="Terminal showing a nightly BreakoutAI scan: 2,055 stocks scanned, 23 setups found, top ranked BEL, DIXON and CDSL">
+      <div class="term-bar"><span></span><span></span><span></span><b>breakoutai — nightly scan</b></div>
+      <div class="term-body" id="term">
+        <span class="tl hidden" data-t><span class="p">$</span> breakoutai scan --universe nse --mode vcp</span>
+        <span class="tl hidden" data-t><span class="d">→ loading universe………… 2,055 symbols</span></span>
+        <span class="tl hidden" data-t><span class="d">→ filtering RS &gt; 60, ADV &gt; ₹5 Cr…… 312 pass</span></span>
+        <span class="tl hidden" data-t><span class="d">→ detecting contractions………………… 41 coils</span></span>
+        <span class="tl hidden" data-t>&nbsp;</span>
+        <span class="tl hidden" data-t><span class="p">✓ 23 setups → pipeline</span>  <span class="a">3 pre-breakout</span></span>
+        <span class="tl hidden" data-t>&nbsp;</span>
+        <span class="tl hidden" data-t><span class="d">TOP RANKED</span></span>
+        <span class="tl hidden" data-t>  BEL     <span class="p">RS 66</span>  tightening   -4.1% → pivot</span>
+        <span class="tl hidden" data-t>  DIXON   <span class="p">RS 71</span>  tightening   -3.2% → pivot</span>
+        <span class="tl hidden" data-t>  CDSL    <span class="p">RS 68</span>  pre-breakout <span class="a">-1.8% → pivot</span></span>
+        <span class="tl hidden" data-t>&nbsp;</span>
+        <span class="tl hidden" data-t><span class="p">$</span> <span class="caret" aria-hidden="true"></span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-track" id="tickerTrack">
+    <span class="tick"><b>HAL</b><span class="up">+2.4%</span></span>
+    <span class="tick"><b>BEL</b><span class="up">+1.8%</span></span>
+    <span class="tick"><b>DIXON</b><span class="up">+3.1%</span></span>
+    <span class="tick"><b>CDSL</b><span class="up">+2.2%</span></span>
+    <span class="tick"><b>POLYCAB</b><span class="dn">-0.6%</span></span>
+    <span class="tick"><b>KAYNES</b><span class="up">+4.0%</span></span>
+    <span class="tick"><b>SYRMA</b><span class="dn">-1.1%</span></span>
+    <span class="tick"><b>CGPOWER</b><span class="up">+1.5%</span></span>
+    <span class="tick"><b>ANGELONE</b><span class="up">+0.9%</span></span>
+    <span class="tick"><b>MAZDOCK</b><span class="up">+2.7%</span></span>
+    <span class="tick"><b>RVNL</b><span class="dn">-0.4%</span></span>
+    <span class="tick"><b>APLAPOLLO</b><span class="up">+1.2%</span></span>
+  </div>
+</div>
+
+<!-- STATS -->
+<section aria-label="Key numbers">
+  <div class="wrap">
+    <div class="stats rv">
+      <div class="stat"><b class="num" data-count="2055">0</b><span>stocks scanned nightly</span></div>
+      <div class="stat"><b class="num"><span data-count="64">0</span><em>%</em></b><span>tracked win rate</span></div>
+      <div class="stat"><b class="num" data-count="23">0</b><span>live setups in pipeline</span></div>
+      <div class="stat"><b class="num"><span data-count="9">0</span><em>:15 pm</em></b><span>watchlist in your inbox</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">How it works</span>
+      <h2>Three steps between you and tomorrow's watchlist.</h2>
+    </div>
+    <div class="steps">
+      <div class="step rv"><i>01 / SCAN</i><h3>Every stock, every night</h3><p>After close, the engine sweeps 2,000+ NSE symbols for volatility contraction patterns, dry-ups in volume and higher lows.</p></div>
+      <div class="step rv"><i>02 / RANK</i><h3>Only the strongest survive</h3><p>Setups are scored on relative strength, base depth, contraction count and closeness to pivot — weak structures never reach you.</p></div>
+      <div class="step rv"><i>03 / ALERT</i><h3>Act at the pivot, not after</h3><p>A ranked watchlist lands before open. Intraday, you're pinged the moment price and volume confirm the breakout.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Features</span>
+      <h2>A full-time analyst that never sleeps.</h2>
+      <p>Everything a swing trader needs to run a Minervini-style playbook on Indian markets — automated.</p>
+    </div>
+    <div class="bento">
+      <div class="cell wide rv">
+        <div class="ic"><svg viewBox="0 0 24 24"><polyline points="2 15 6 11 10 14 15 7 18 9 22 4"/><polyline points="16 4 22 4 22 10"/></svg></div>
+        <h3>VCP detection engine</h3>
+        <p>Finds volatility contraction patterns automatically — each leg measured, each dry-up verified, from first pullback to final coil.</p>
+        <div class="spark"><svg viewBox="0 0 300 44" preserveAspectRatio="none"><path d="M2 8 L26 34 L50 12 L74 32 L98 16 L122 30 L146 20 L170 28 L194 22 L218 27 L242 24 L266 26 L298 25"/></svg></div>
+      </div>
+      <div class="cell rv">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <h3>RS ranking</h3>
+        <p>Every symbol ranked against the whole market, so you only trade leaders.</p>
+      </div>
+      <div class="cell rv">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>Pivot alerts</h3>
+        <p>Price + volume confirmation at the pivot, delivered in seconds.</p>
+      </div>
+      <div class="cell rv">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="10" rx="1.5"/></svg></div>
+        <h3>Stage pipeline</h3>
+        <p>Watch setups mature: base → contraction → tightening → pre-breakout.</p>
+      </div>
+      <div class="cell rv">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h3>Backtested rules</h3>
+        <p>Every rule validated on 10 years of NSE data. 64% tracked win rate.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PIPELINE PREVIEW -->
+<section id="pipeline">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Live pipeline</span>
+      <h2>Setups don't appear. They develop.</h2>
+      <p>BreakoutAI tracks every base day by day, promoting stocks stage to stage as the structure tightens.</p>
+    </div>
+    <div class="pipe rv">
+      <div class="pstage"><h4><span class="pdot" style="background:#64748B"></span>Base<span class="n num">4</span></h4>
+        <div class="pcard"><b>DATAPATTNS <span class="num">44</span></b><i>Day 22 · early base</i></div>
+        <div class="pcard"><b>RVNL <span class="num">46</span></b><i>Day 19 · recovering</i></div>
+      </div>
+      <div class="pstage"><h4><span class="pdot" style="background:#5EA0EF"></span>Contraction<span class="n num">5</span></h4>
+        <div class="pcard"><b>HAL <span class="num">58</span></b><i>Day 14 · 3rd leg</i></div>
+        <div class="pcard"><b>POLYCAB <span class="num">61</span></b><i>Day 12 · post-run</i></div>
+      </div>
+      <div class="pstage"><h4><span class="pdot" style="background:#FBBF24"></span>Tightening<span class="n num">7</span></h4>
+        <div class="pcard"><b>BEL <span class="num">66</span></b><i>Day 9 · range 3.1%</i></div>
+        <div class="pcard"><b>DIXON <span class="num">71</span></b><i>Day 7 · supply dry</i></div>
+      </div>
+      <div class="pstage"><h4><span class="pdot" style="background:#34D399"></span>Pre-breakout<span class="n num">3</span></h4>
+        <div class="pcard"><b>CDSL <span class="num">68</span></b><i>Day 4 · coiled</i></div>
+        <div class="pcard"><b>KAYNES <span class="num">72</span></b><i>Day 4 · tight weeks</i></div>
+      </div>
+      <div class="pstage"><h4><span class="pdot" style="background:#F0F4FA"></span>Triggered<span class="n num">1</span></h4>
+        <div class="pcard"><b>CGPOWER <span class="num">69</span></b><i>Broke out +2.1%</i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTES -->
+<section aria-label="What traders say">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Traders</span>
+      <h2>Built with the people who trade it.</h2>
+    </div>
+    <div class="quotes">
+      <div class="quote rv"><p>"I used to spend two hours a night on charts. Now the scan does the grinding and I just review the top ten. My hit rate went up because I stopped forcing trades."</p><footer><span class="avatar" aria-hidden="true">AR</span><div><b>Arjun R.</b><span>Swing trader · Bengaluru</span></div></footer></div>
+      <div class="quote rv"><p>"The stage pipeline is the killer feature. Watching BEL walk from contraction to pre-breakout over two weeks — you're prepared, not reacting."</p><footer><span class="avatar" aria-hidden="true">MS</span><div><b>Meera S.</b><span>Full-time trader · Mumbai</span></div></footer></div>
+      <div class="quote rv"><p>"Pivot alerts with volume confirmation are the difference between buying a breakout and chasing one. Caught KAYNES on day one of the move."</p><footer><span class="avatar" aria-hidden="true">VK</span><div><b>Vikram K.</b><span>Positional · Delhi</span></div></footer></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="start">
+  <div class="wrap">
+    <span class="eyebrow" style="justify-content:center;display:inline-flex">Free while in beta</span>
+    <h2 class="rv">Tomorrow's leaders are coiling <span style="color:var(--accent)">tonight.</span></h2>
+    <p class="rv">Join the beta and get the nightly watchlist in your inbox at 9:15 pm — before everyone else finds them on the chart.</p>
+    <a class="btn btn-primary rv" href="#">Start scanning free</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer wrap">
+  <a class="logo" href="#"><span class="logo-dot"></span>BreakoutAI</a>
+  <nav aria-label="Footer">
+    <a href="#how">How it works</a><a href="#features">Features</a><a href="#pipeline">Pipeline</a><a href="#">Contact</a>
+  </nav>
+  <small>NSE DATA · NOT INVESTMENT ADVICE · © 2026</small>
+</footer>
+
+<script>
+(function(){
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* duplicate ticker content for seamless loop */
+  var track = document.getElementById('tickerTrack');
+  track.innerHTML += track.innerHTML;
+
+  /* scroll reveals with 40ms stagger per sibling group */
+  var seen = new WeakMap();
+  if(!reduced && 'IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(!e.isIntersecting) return;
+        var el = e.target, parent = el.parentElement;
+        var idx = seen.get(parent) || 0; seen.set(parent, idx+1);
+        el.style.transitionDelay = Math.min(idx*40,240)+'ms';
+        el.classList.add('in');
+        io.unobserve(el);
+      });
+    },{threshold:.15});
+    document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
+  } else {
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in');});
+  }
+
+  /* count-up stats (skipped under reduced motion) */
+  function countUp(el){
+    var target = +el.getAttribute('data-count'), t0 = null;
+    function frame(ts){
+      if(!t0) t0 = ts;
+      var p = Math.min((ts-t0)/1100, 1);
+      el.textContent = Math.round(target * (1-Math.pow(1-p,3))).toLocaleString('en-IN');
+      if(p<1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  var counters = document.querySelectorAll('[data-count]');
+  if(reduced){ counters.forEach(function(el){el.textContent = (+el.getAttribute('data-count')).toLocaleString('en-IN');}); }
+  else if('IntersectionObserver' in window){
+    var cio = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ countUp(e.target); cio.unobserve(e.target);} });
+    },{threshold:.6});
+    counters.forEach(function(el){cio.observe(el);});
+  } else { counters.forEach(countUp); }
+
+  /* terminal line-by-line reveal */
+  var lines = document.querySelectorAll('#term [data-t]');
+  if(reduced){ lines.forEach(function(l){l.classList.remove('hidden');}); }
+  else {
+    lines.forEach(function(l,i){
+      setTimeout(function(){l.classList.remove('hidden');}, 500 + i*230);
+    });
+  }
+})();
+</script>
+</body>
+</html>

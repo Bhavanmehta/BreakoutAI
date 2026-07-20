@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Funnel section — 3 options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050B16;--bg-raise:#0A1220;--surface:#0D1526;--card:#111B2E;
+  --border:#20304A;--border-soft:#182438;
+  --text:#F0F4FA;--text-2:#C2CAD8;--muted:#8A94A8;
+  --accent:#4DA3FF;--accent-soft:#A8D3FF;
+  --serif:'Fraunces',Georgia,serif;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --r-md:14px;--ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:0 32px}
+.intro{padding:64px 0 8px;text-align:center}
+.intro h1{font-family:var(--serif);font-weight:600;font-size:2rem}
+.intro p{color:var(--muted);font-size:14px;margin-top:8px}
+section{min-height:82vh;display:flex;align-items:center;padding:48px 0}
+.opt-tag{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;display:block;margin-bottom:10px}
+h2{font-family:var(--serif);font-weight:600;font-size:1.7rem;margin-bottom:6px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:34px}
+.rv{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.num{font-family:var(--mono)}
+
+/* ===== OPTION 1: NIGHT LOG ===== */
+.log-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;max-width:720px;box-shadow:0 24px 60px -30px rgba(0,0,0,.7)}
+.log-head{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:var(--bg-raise);border-bottom:1px solid var(--border-soft);font-family:var(--mono)}
+.log-head b{font-size:12px;letter-spacing:.1em;font-weight:500;color:var(--muted)}
+.log-head span{font-size:11px;color:var(--muted)}
+.lrow{display:flex;gap:18px;align-items:baseline;padding:13px 20px;border-bottom:1px solid var(--border-soft);font-family:var(--mono);font-size:13px;
+  opacity:0;transform:translateY(8px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.log-card.in .lrow{opacity:1;transform:none}
+.lrow:last-child{border-bottom:none}
+.lt{color:var(--muted);font-size:12px;min-width:44px}
+.lmsg{color:var(--text-2);flex:1}
+.lnum{color:var(--accent)}
+.lrow.hot .lmsg{color:var(--text)}
+.lrow.hot .lnum{color:var(--accent-soft)}
+.caret{display:inline-block;width:7px;height:14px;background:var(--accent);margin-left:8px;vertical-align:text-bottom;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ===== OPTION 2: HORIZONTAL PIPELINE ===== */
+.pipe{position:relative;height:170px}
+.pipe svg{position:absolute;inset:0;width:100%;height:100%;clip-path:inset(0 100% 0 0);transition:clip-path 1s var(--ease)}
+.pgate{position:absolute;top:22px;bottom:22px;width:0;border-left:1px dashed rgba(240,244,250,.22);opacity:0;transition:opacity .5s var(--ease)}
+.pgate.g1{left:34%;transition-delay:.4s}
+.pgate.g2{left:64%;transition-delay:.65s}
+.pnode{position:absolute;left:88%;top:50%;width:10px;height:10px;border-radius:50%;background:var(--accent-soft);box-shadow:0 0 18px rgba(77,163,255,.8);transform:translate(-50%,-50%) scale(0);transition:transform .4s var(--ease) .95s}
+.parrow{display:block;position:absolute;left:88%;bottom:85px;width:3px;height:58px;border-radius:2px;background:linear-gradient(to top,rgba(77,163,255,0),var(--accent-soft) 55%);transform:translateX(-50%) scaleY(0);transform-origin:bottom;transition:transform .5s var(--ease) 1.15s}
+.parrow::after{content:"";position:absolute;top:0;left:50%;width:11px;height:11px;border-top:3px solid var(--accent-soft);border-right:3px solid var(--accent-soft);transform:translate(-50%,-1px) rotate(-45deg)}
+.fnote{position:absolute;left:88%;top:0;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--accent-soft);white-space:nowrap;opacity:0;transform:translate(-50%,8px);transition:opacity .5s var(--ease) 1.5s,transform .5s var(--ease) 1.5s}
+.fwrap.in .pipe svg{clip-path:inset(0 0 0 0)}
+.fwrap.in .pgate{opacity:1}
+.fwrap.in .pnode{transform:translate(-50%,-50%) scale(1)}
+.fwrap.in .parrow{transform:translateX(-50%) scaleY(1)}
+.fwrap.in .fnote{opacity:1;transform:translate(-50%,0)}
+.flabels{display:flex;margin-top:14px}
+.flabels div:nth-child(1){width:34%}
+.flabels div:nth-child(2){width:30%}
+.flabels div:nth-child(3){width:24%}
+.flabels div:nth-child(4){flex:1}
+.flabels b{font-family:var(--mono);font-weight:500;font-size:26px;color:var(--text);display:block}
+.flabels span{font-size:12.5px;color:var(--muted)}
+.flabels div:last-child b{color:var(--accent-soft)}
+
+/* ===== OPTION 4: TYPOGRAPHIC COUNTDOWN ===== */
+.tline{display:flex;align-items:baseline;gap:26px;flex-wrap:wrap}
+.tstep{opacity:0;transform:translateY(14px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.tstep b{position:relative;display:block;font-family:var(--mono);font-weight:500;color:var(--text);line-height:1}
+.tstep b::after{content:"";position:absolute;left:-3%;top:52%;height:3px;width:0;background:var(--muted);transition:width .4s var(--ease)}
+.tstep span{display:block;margin-top:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--muted)}
+.tstep.s1 b{font-size:64px}
+.tstep.s2 b{font-size:52px}
+.tstep.s3 b{font-size:44px}
+.tstep.s4 b{font-size:120px;color:var(--accent-soft);text-shadow:0 0 40px rgba(77,163,255,.45)}
+.tstep.s4 b::after{display:none}
+.tstep.s4 span{color:var(--accent-soft)}
+.tarrow{font-family:var(--mono);font-size:26px;color:var(--muted);opacity:0;transition:opacity .5s var(--ease)}
+.tc.in .tstep{opacity:1;transform:none}
+.tc.in .s1{transition-delay:.05s}
+.tc.in .a1{opacity:.55;transition-delay:.4s}
+.tc.in .s2{transition-delay:.55s}
+.tc.in .a2{opacity:.55;transition-delay:.9s}
+.tc.in .s3{transition-delay:1.05s}
+.tc.in .a3{opacity:.55;transition-delay:1.4s}
+.tc.in .s4{transition-delay:1.6s}
+.tc.in .s1 b{color:var(--muted);transition:color .4s var(--ease) .8s}
+.tc.in .s1 b::after{width:106%;transition-delay:.8s}
+.tc.in .s2 b{color:var(--muted);transition:color .4s var(--ease) 1.3s}
+.tc.in .s2 b::after{width:106%;transition-delay:1.3s}
+.tc.in .s3 b{color:var(--muted);transition:color .4s var(--ease) 1.8s}
+.tc.in .s3 b::after{width:106%;transition-delay:1.8s}
+
+/* ===== OPTION 3: DOT CARDS ===== */
+.dcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.dcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:16px 16px 20px}
+.dcard canvas{width:100%;height:130px;display:block;margin-bottom:14px}
+.dcard b{font-family:var(--mono);font-weight:500;font-size:24px;color:var(--text);display:block}
+.dcard span{font-size:12.5px;color:var(--muted)}
+.dcard:last-child{border-color:rgba(77,163,255,.4)}
+.dcard:last-child b{color:var(--accent-soft)}
+
+@media(max-width:820px){
+  .dcards{grid-template-columns:repeat(2,1fr)}
+  .flabels b{font-size:19px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rv,.lrow,.fchart i,.pivot,.fnote{opacity:1!important;transform:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="intro wrap">
+  <h1>Funnel section — 3 options</h1>
+  <p>Scroll down. Each option animates once as it enters the viewport — pick the one that feels right.</p>
+</div>
+
+<!-- OPTION 1 -->
+<section>
+  <div class="wrap">
+    <div class="rv">
+      <span class="opt-tag">Option 1 — Night log</span>
+      <h2>While you slept, it worked.</h2>
+      <p class="sub">The section reads as the scanner's own overnight run log — timestamped, matter-of-fact, alive.</p>
+    </div>
+    <div class="log-card" id="logCard">
+      <div class="log-head"><b>SCAN LOG</b><span>17 JUL 2026 &middot; NSE &middot; complete</span></div>
+      <div class="lrow"><span class="lt">00:12</span><span class="lmsg">full sweep complete</span><span class="lnum">2,055 symbols</span></div>
+      <div class="lrow"><span class="lt">00:31</span><span class="lmsg">trend &amp; liquidity filters applied</span><span class="lnum">312 remain</span></div>
+      <div class="lrow"><span class="lt">01:04</span><span class="lmsg">contraction &amp; base structure checks</span><span class="lnum">23 valid bases</span></div>
+      <div class="lrow hot"><span class="lt">03:10</span><span class="lmsg">watchlist ranked &amp; built</span><span class="lnum">3 pre-breakout</span></div>
+      <div class="lrow"><span class="lt">08:45</span><span class="lmsg">delivered to your inbox<span class="caret"></span></span><span class="lnum"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- OPTION 2 -->
+<section>
+  <div class="wrap">
+    <div class="rv">
+      <span class="opt-tag">Option 2 — Pipeline</span>
+      <h2>2,055 in. 3 break out.</h2>
+      <p class="sub">The scan flows left to right — every gate thins the stream, and whatever survives exits upward.</p>
+    </div>
+    <div class="fwrap" id="fbar">
+      <div class="pipe">
+        <svg viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="pipeg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="rgba(77,163,255,.10)"/>
+            <stop offset=".6" stop-color="rgba(77,163,255,.28)"/>
+            <stop offset="1" stop-color="rgba(77,163,255,.55)"/>
+          </linearGradient></defs>
+          <polygon points="0,47 340,57 640,69 880,80 880,90 640,101 340,113 0,123" fill="url(#pipeg)"/>
+        </svg>
+        <span class="pgate g1"></span>
+        <span class="pgate g2"></span>
+        <em class="parrow"></em>
+        <span class="pnode"></span>
+        <span class="fnote">&uarr; 3 break out</span>
+      </div>
+      <div class="flabels">
+        <div><b class="num" data-count="2055">0</b><span>symbols scanned</span></div>
+        <div><b class="num" data-count="312">0</b><span>pass filters</span></div>
+        <div><b class="num" data-count="23">0</b><span>valid bases</span></div>
+        <div><b class="num" data-count="3">0</b><span>pre-breakout</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OPTION 3 -->
+<section>
+  <div class="wrap">
+    <div class="rv">
+      <span class="opt-tag">Option 3 — Dot cards</span>
+      <h2>From everything, to almost nothing.</h2>
+      <p class="sub">The dot-field metaphor from the scrollytelling version — kept, but static and glanceable.</p>
+    </div>
+    <div class="dcards rv">
+      <div class="dcard"><canvas data-dots="410" data-a=".28"></canvas><b class="num" data-count="2055">0</b><span>symbols scanned</span></div>
+      <div class="dcard"><canvas data-dots="62" data-a=".45"></canvas><b class="num" data-count="312">0</b><span>pass filters</span></div>
+      <div class="dcard"><canvas data-dots="23" data-a=".8"></canvas><b class="num" data-count="23">0</b><span>valid bases</span></div>
+      <div class="dcard"><canvas data-dots="3" data-glow="1"></canvas><b class="num" data-count="3">0</b><span>pre-breakout</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- OPTION 4 -->
+<section>
+  <div class="wrap">
+    <div class="rv">
+      <span class="opt-tag">Option 4 — Countdown</span>
+      <h2>The market, reduced.</h2>
+      <p class="sub">No chart at all — just the arithmetic of elimination, ending on the only number that matters.</p>
+    </div>
+    <div class="tc" id="tcount">
+      <div class="tline">
+        <div class="tstep s1"><b data-count="2055">0</b><span>SCANNED</span></div>
+        <div class="tarrow a1">&rarr;</div>
+        <div class="tstep s2"><b data-count="312">0</b><span>PASS FILTERS</span></div>
+        <div class="tarrow a2">&rarr;</div>
+        <div class="tstep s3"><b data-count="23">0</b><span>VALID BASES</span></div>
+        <div class="tarrow a3">&rarr;</div>
+        <div class="tstep s4"><b data-count="3">0</b><span>PRE-BREAKOUT</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var seed = 7;
+  function rnd(){ seed = (seed*16807)%2147483647; return (seed-1)/2147483646; }
+
+  /* reveals: generic .rv + log rows + bar segments, staggered */
+  function stagger(container, sel, step){
+    var kids = container.querySelectorAll(sel);
+    kids.forEach(function(k,i){ k.style.transitionDelay = (i*step)+'ms'; });
+  }
+  stagger(document.getElementById('logCard'), '.lrow', 340);
+
+  function countUp(el){
+    var target = +el.getAttribute('data-count'), t0 = null;
+    function frame(ts){
+      if(!t0) t0 = ts;
+      var p = Math.min((ts-t0)/1100, 1);
+      el.textContent = Math.round(target*(1-Math.pow(1-p,3))).toLocaleString('en-IN');
+      if(p<1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  var targets = document.querySelectorAll('.rv, #logCard, #fbar, #tcount');
+  if(!reduced && 'IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(!e.isIntersecting) return;
+        e.target.classList.add('in');
+        e.target.querySelectorAll('[data-count]').forEach(countUp);
+        io.unobserve(e.target);
+      });
+    },{threshold:.35});
+    targets.forEach(function(t){ io.observe(t); });
+  } else {
+    targets.forEach(function(t){ t.classList.add('in'); });
+    document.querySelectorAll('[data-count]').forEach(function(el){
+      el.textContent = (+el.getAttribute('data-count')).toLocaleString('en-IN');
+    });
+  }
+
+  /* option 3: static dot fields */
+  document.querySelectorAll('.dcard canvas').forEach(function(cv){
+    var dpr = window.devicePixelRatio||1, w = cv.clientWidth||220, h = cv.clientHeight||130;
+    cv.width = w*dpr; cv.height = h*dpr;
+    var c = cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
+    var n = +cv.getAttribute('data-dots'), glow = cv.hasAttribute('data-glow'), a = cv.getAttribute('data-a');
+    for(var i=0;i<n;i++){
+      var x = 6+rnd()*(w-12), y = 6+rnd()*(h-12);
+      if(glow){
+        c.fillStyle = 'rgba(77,163,255,.18)';
+        c.beginPath(); c.arc(x,y,11,0,6.2832); c.fill();
+        c.fillStyle = '#A8D3FF';
+        c.beginPath(); c.arc(x,y,4,0,6.2832); c.fill();
+      } else {
+        c.fillStyle = 'rgba(77,163,255,'+a+')';
+        c.fillRect(x-1.2,y-1.2,2.4,2.4);
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>

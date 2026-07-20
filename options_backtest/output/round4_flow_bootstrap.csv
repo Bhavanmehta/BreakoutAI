@@ -1,0 +1,7 @@
+n_trades,n_boot,mean_return_pct,median_return_pct,p5_return_pct,p95_return_pct,pct_boot_profitable,strategy
+21,5000,14.25,14.1,8.69,20.44,100.0,FlowExpiry-pcr-Medium
+21,5000,11.49,11.24,5.57,18.15,100.0,FlowExpiry-pcr-Wide
+21,5000,5.42,5.24,0.92,10.47,98.1,FlowExpiry-pcr-VeryWide
+21,5000,5.06,5.94,-11.03,17.53,73.6,FlowExpiry-pcr-Tight
+23,5000,8.48,9.22,-8.23,22.91,81.6,FlowExpiry-oi_bias-Medium
+23,5000,3.13,3.93,-15.32,18.47,64.1,FlowExpiry-oi_bias-Wide

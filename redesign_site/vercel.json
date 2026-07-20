@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    { "source": "/api/options_strategies", "destination": "/api/options_strategies.py" },
+    { "source": "/api/options_chain", "destination": "/api/options_chain.py" },
+    { "source": "/api/index_ohlc", "destination": "/api/index_ohlc.py" },
+    { "source": "/api/quotes", "destination": "/api/quotes.py" },
+    { "source": "/api/trades", "destination": "/api/trades.py" },
+    { "source": "/api/watchlist", "destination": "/api/watchlist.py" },
+    { "source": "/api/verdict", "destination": "/api/verdict.py" },
+    { "source": "/api/options_platform", "destination": "/api/options_platform.py" }
+  ],
+  "crons": [
+    { "path": "/api/refresh_dhan_token", "schedule": "0 2 * * *" }
+  ]
+}

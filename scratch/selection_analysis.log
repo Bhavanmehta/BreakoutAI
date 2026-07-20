@@ -1,0 +1,214 @@
+
+==============================================================================
+IN: 92137 events, 1812 stocks, 36 distinct methods/combos, baseline hit 41.1%
+==============================================================================
+
+### 1. HIT RATE BY METHOD/COMBO (sorted by n; * = n<30, treat as noise) ###
+  E_relative_strength              n=19395   hit= 41.3%  (+0.2pp vs base)
+  E2_relative_strength_uptrend     n=14895   hit= 41.8%  (+0.6pp vs base)
+  A_donchian_minervini             n=9555    hit= 38.9%  (-2.2pp vs base)
+  I_volume_profile                 n=7279    hit= 43.4%  (+2.3pp vs base)
+  C_squeeze                        n=5856    hit= 39.4%  (-1.7pp vs base)
+  J_ttm_squeeze                    n=4930    hit= 41.2%  (+0.1pp vs base)
+  M_shakeout_rebreak               n=4180    hit= 36.5%  (-4.6pp vs base)
+  AE_combo                         n=4064    hit= 39.4%  (-1.7pp vs base)
+  K_anchored_vwap                  n=2669    hit= 42.5%  (+1.4pp vs base)
+  SB_tier2_strong_breakout         n=2404    hit= 43.8%  (+2.6pp vs base)
+  L_sb_deep_base                   n=2392    hit= 43.5%  (+2.4pp vs base)
+  AI_combo                         n=2288    hit= 40.1%  (-1.0pp vs base)
+  G2_pre_breakout_retuned          n=2180    hit= 43.8%  (+2.7pp vs base)
+  AJ_combo                         n=1860    hit= 39.3%  (-1.8pp vs base)
+  G_pre_breakout_composite         n=1694    hit= 44.1%  (+3.0pp vs base)
+  F_episodic_pivot                 n=1543    hit= 35.5%  (-5.7pp vs base)
+  IJ_combo                         n=979     hit= 43.5%  (+2.4pp vs base)
+  H_pressure_cooker                n=907     hit= 40.2%  (-0.9pp vs base)
+  D2_trend_inception_loose         n=667     hit= 42.3%  (+1.2pp vs base)
+  IK_combo                         n=501     hit= 44.5%  (+3.4pp vs base)
+  JK_combo                         n=398     hit= 49.2%  (+8.1pp vs base)
+  HC_tier1_high_conviction         n=353     hit= 45.6%  (+4.5pp vs base)
+  L2_hc_deep_base                  n=349     hit= 45.8%  (+4.7pp vs base)
+  B_vcp                            n=188     hit= 38.8%  (-2.3pp vs base)
+  D_trend_inception                n=171     hit= 49.7%  (+8.6pp vs base)
+  SB_after_G2_alert                n=133     hit= 39.1%  (-2.0pp vs base)
+  IJK_combo                        n=113     hit= 55.8%  (+14.6pp vs base)
+  ED_combo                         n=46      hit= 52.2%  (+11.1pp vs base)
+  HC_after_G2_alert                n=35      hit= 42.9%  (+1.7pp vs base)
+  AD_combo                         n=33      hit= 54.5%  (+13.4pp vs base)
+  SB_after_H_alert                 n=32      hit= 50.0%  (+8.9pp vs base)
+  AED_combo                        n=22      hit= 54.5%  (+13.4pp vs base) *
+  SB_and_G2                        n=9       hit= 11.1%  (-30.0pp vs base) *
+  HC_after_H_alert                 n=7       hit= 42.9%  (+1.7pp vs base) *
+  HC_and_G2                        n=7       hit= 57.1%  (+16.0pp vs base) *
+  SB_and_H                         n=3       hit= 33.3%  (-7.8pp vs base) *
+
+### 2. SINGLE METHOD vs COMBO: does stacking signals help? ###
+  base methods (n=78850): weighted hit = 41.0%
+  combos       (n=13287): weighted hit = 41.5%
+
+### 3. COFIRE CONFIRMATION (multiple independent signals agree same day) ###
+  rs_cofire: True n=67765  hit= 41.0%  |  False n=24372  hit= 41.5%
+  d_cofire: True n=742    hit= 49.2%  |  False n=91395  hit= 41.0%
+  l_cofire: True n=11936  hit= 44.0%  |  False n=80201  hit= 40.7%
+
+### 4. SELECTION FEATURES (the actual filter criteria, not display fields) ###
+
+-- rs_ratio (n with data: 92137) --
+  Q1(weak RS)    n=23033  hit= 46.5%
+  Q2             n=23035  hit= 41.2%
+  Q3             n=23034  hit= 40.4%
+  Q4(strong RS)  n=23032  hit= 36.3%
+
+-- vol_contraction (n with data: 92074) --
+  Q1(tight)      n=23014  hit= 39.4%
+  Q2             n=23018  hit= 40.0%
+  Q3             n=23023  hit= 41.6%
+  Q4(loose)      n=23018  hit= 43.5%
+
+-- dist_from_52w_high (n with data: 92137) --
+  at/above high  n=11     hit= 81.8%
+  0-5% off       n=55844  hit= 42.4%
+  5-15% off      n=19815  hit= 38.9%
+  >15% off       n=16467  hit= 39.2%
+
+-- adx (n with data: 92122) --
+  <20 weak trend n=25680  hit= 43.1%
+  20-30          n=35144  hit= 40.7%
+  30-40          n=19046  hit= 39.5%
+  >40 strong     n=12252  hit= 40.8%
+
+-- vol_surge (n with data: 92068) --
+  Q1(low vol)    n=23016  hit= 42.3%
+  Q2             n=23015  hit= 41.0%
+  Q3             n=23018  hit= 41.2%
+  Q4(high vol surge) n=23018  hit= 39.9%
+
+-- base_depth_pct (n with data: 92137) --
+  Q1(shallow base) n=23028  hit= 43.2%
+  Q2             n=23038  hit= 41.7%
+  Q3             n=23035  hit= 41.8%
+  Q4(deep base)  n=23017  hit= 37.7%
+
+### 5. ANALOG MATCH (does a similar historical pattern match predict outcome?) ###
+  events with an analog: n=4541
+
+-- analog_sim (n with data: 4765) --
+  low sim        n=1594   hit= 32.2%
+  mid sim        n=1587   hit= 34.5%
+  high sim       n=1583   hit= 35.4%
+  analog_worked==1 (prior similar case worked): n=1580   hit= 36.7%
+  analog_worked==0 (prior similar case failed): n=2961   hit= 32.4%
+
+### 6. PATTERN TYPE ###
+  No clear pattern             n=40369   hit= 43.1%
+  Cup & Handle                 n=33045   hit= 40.0%
+  Double Bottom                n=6614    hit= 40.9%
+  Head & Shoulders             n=5119    hit= 43.1%
+  Ascending Triangle           n=3625    hit= 33.8%
+  Tight Consolidation          n=3365    hit= 33.3%
+
+==============================================================================
+US: 200824 events, 4158 stocks, 36 distinct methods/combos, baseline hit 36.0%
+==============================================================================
+
+### 1. HIT RATE BY METHOD/COMBO (sorted by n; * = n<30, treat as noise) ###
+  E_relative_strength              n=46078   hit= 38.4%  (+2.5pp vs base)
+  E2_relative_strength_uptrend     n=37168   hit= 38.2%  (+2.3pp vs base)
+  A_donchian_minervini             n=19892   hit= 30.7%  (-5.2pp vs base)
+  I_volume_profile                 n=16078   hit= 36.5%  (+0.5pp vs base)
+  C_squeeze                        n=14753   hit= 34.3%  (-1.7pp vs base)
+  M_shakeout_rebreak               n=9934    hit= 31.3%  (-4.7pp vs base)
+  J_ttm_squeeze                    n=9213    hit= 34.6%  (-1.4pp vs base)
+  AE_combo                         n=6635    hit= 31.2%  (-4.8pp vs base)
+  G_pre_breakout_composite         n=5449    hit= 38.8%  (+2.8pp vs base)
+  AI_combo                         n=4659    hit= 29.7%  (-6.2pp vs base)
+  G2_pre_breakout_retuned          n=4369    hit= 41.3%  (+5.3pp vs base)
+  H_pressure_cooker                n=4056    hit= 38.7%  (+2.7pp vs base)
+  AJ_combo                         n=3153    hit= 28.4%  (-7.5pp vs base)
+  SB_tier2_strong_breakout         n=2994    hit= 39.0%  (+3.0pp vs base)
+  L_sb_deep_base                   n=2985    hit= 39.0%  (+3.0pp vs base)
+  D2_trend_inception_loose         n=2498    hit= 36.4%  (+0.5pp vs base)
+  K_anchored_vwap                  n=2427    hit= 37.6%  (+1.7pp vs base)
+  F_episodic_pivot                 n=2350    hit= 31.5%  (-4.5pp vs base)
+  IJ_combo                         n=1882    hit= 33.2%  (-2.8pp vs base)
+  HC_tier1_high_conviction         n=732     hit= 43.6%  (+7.6pp vs base)
+  L2_hc_deep_base                  n=726     hit= 43.8%  (+7.8pp vs base)
+  IK_combo                         n=629     hit= 35.9%  (-0.0pp vs base)
+  D_trend_inception                n=613     hit= 33.1%  (-2.9pp vs base)
+  B_vcp                            n=449     hit= 38.1%  (+2.1pp vs base)
+  JK_combo                         n=316     hit= 43.4%  (+7.4pp vs base)
+  SB_after_G2_alert                n=145     hit= 35.2%  (-0.8pp vs base)
+  IJK_combo                        n=128     hit= 39.1%  (+3.1pp vs base)
+  AD_combo                         n=122     hit= 23.0%  (-13.0pp vs base)
+  ED_combo                         n=122     hit= 27.0%  (-8.9pp vs base)
+  SB_after_H_alert                 n=82      hit= 37.8%  (+1.8pp vs base)
+  AED_combo                        n=79      hit= 24.1%  (-11.9pp vs base)
+  HC_after_G2_alert                n=58      hit= 46.6%  (+10.6pp vs base)
+  HC_after_H_alert                 n=29      hit= 65.5%  (+29.5pp vs base) *
+  HC_and_G2                        n=13      hit= 23.1%  (-12.9pp vs base) *
+  SB_and_G2                        n=6       hit= 33.3%  (-2.6pp vs base) *
+  SB_and_H                         n=2       hit=100.0%  (+64.0pp vs base) *
+
+### 2. SINGLE METHOD vs COMBO: does stacking signals help? ###
+  base methods (n=179038): weighted hit = 36.4%
+  combos       (n=21786): weighted hit = 32.5%
+
+### 3. COFIRE CONFIRMATION (multiple independent signals agree same day) ###
+  rs_cofire: True n=133982 hit= 36.2%  |  False n=66842  hit= 35.5%
+  d_cofire: True n=2591   hit= 29.1%  |  False n=198233 hit= 36.1%
+  l_cofire: True n=15816  hit= 38.8%  |  False n=185008 hit= 35.7%
+
+### 4. SELECTION FEATURES (the actual filter criteria, not display fields) ###
+
+-- rs_ratio (n with data: 200824) --
+  Q1(weak RS)    n=50205  hit= 36.0%
+  Q2             n=50207  hit= 35.1%
+  Q3             n=50204  hit= 37.0%
+  Q4(strong RS)  n=50206  hit= 35.7%
+
+-- vol_contraction (n with data: 200815) --
+  Q1(tight)      n=50204  hit= 35.0%
+  Q2             n=50203  hit= 35.9%
+  Q3             n=50204  hit= 36.2%
+  Q4(loose)      n=50199  hit= 36.8%
+
+-- dist_from_52w_high (n with data: 200824) --
+  at/above high  n=19     hit= 36.8%
+  0-5% off       n=139672 hit= 34.3%
+  5-15% off      n=35335  hit= 39.3%
+  >15% off       n=25798  hit= 40.5%
+
+-- adx (n with data: 200824) --
+  <20 weak trend n=60343  hit= 36.1%
+  20-30          n=73567  hit= 35.3%
+  30-40          n=40794  hit= 36.5%
+  >40 strong     n=26120  hit= 36.7%
+
+-- vol_surge (n with data: 200803) --
+  Q1(low vol)    n=50201  hit= 39.5%
+  Q2             n=50200  hit= 37.4%
+  Q3             n=50201  hit= 34.7%
+  Q4(high vol surge) n=50200  hit= 32.3%
+
+-- base_depth_pct (n with data: 200824) --
+  Q1(shallow base) n=50205  hit= 40.1%
+  Q2             n=50206  hit= 37.7%
+  Q3             n=50207  hit= 35.6%
+  Q4(deep base)  n=50205  hit= 30.4%
+
+### 5. ANALOG MATCH (does a similar historical pattern match predict outcome?) ###
+  events with an analog: n=13636
+
+-- analog_sim (n with data: 14144) --
+  low sim        n=4720   hit= 27.7%
+  mid sim        n=4670   hit= 31.2%
+  high sim       n=4753   hit= 31.1%
+  analog_worked==1 (prior similar case worked): n=3611   hit= 34.4%
+  analog_worked==0 (prior similar case failed): n=10025  hit= 27.9%
+
+### 6. PATTERN TYPE ###
+  No clear pattern             n=73146   hit= 38.8%
+  Cup & Handle                 n=70252   hit= 36.0%
+  Tight Consolidation          n=21000   hit= 31.1%
+  Ascending Triangle           n=15503   hit= 28.7%
+  Double Bottom                n=10597   hit= 38.8%
+  Head & Shoulders             n=10326   hit= 33.1%

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[A · TERMINAL] BreakoutAI — Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050B16; --bg-raise:#0A1220; --surface:#0D1526; --card:#111B2E;
+  --border:#20304A; --border-soft:#182438;
+  --text:#F0F4FA; --text-2:#C2CAD8; --muted:#8A94A8;
+  --accent:#4DA3FF; --accent-deep:#1D6FD1; --accent-ink:#04101E;
+  --amber:#FBBF24; --red:#F87171; --green:#34D399;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;height:100vh;display:grid;grid-template-rows:46px 30px 1fr 28px;overflow:hidden}
+::selection{background:rgba(77,163,255,.28)}
+button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.up{color:var(--green)} .down{color:var(--red)}
+
+/* ===== top bar ===== */
+.topbar{display:flex;align-items:center;gap:18px;padding:0 16px;background:var(--bg-raise);border-bottom:1px solid var(--border-soft)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:-.02em}
+.logo i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 9px rgba(77,163,255,.7)}
+.tagline{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.topbar .spacer{flex:1}
+.meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.meta b{color:var(--text-2);font-weight:500}
+.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{padding:4px 12px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.chip-live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--accent);border:1px solid rgba(77,163,255,.32);border-radius:5px;padding:3px 9px;letter-spacing:.08em}
+.chip-live i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(77,163,255,.5)}55%{box-shadow:0 0 0 6px rgba(77,163,255,0)}}
+.btn-sm{padding:5px 13px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:var(--text-2);transition:border-color .18s var(--ease),color .18s var(--ease)}
+.btn-sm:hover{border-color:var(--accent-deep);color:var(--text)}
+
+/* ===== index strip ===== */
+.idx{display:flex;align-items:center;gap:26px;padding:0 16px;background:var(--bg);border-bottom:1px solid var(--border-soft);font-family:var(--mono);font-size:11px;overflow:hidden;white-space:nowrap}
+.idx span{color:var(--muted)}
+.idx b{color:var(--text-2);font-weight:500;margin-left:6px}
+
+/* ===== main grid ===== */
+.main{display:grid;grid-template-columns:250px 1fr 316px;min-height:0}
+.col{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+
+/* ----- left rail ----- */
+.rail{border-right:1px solid var(--border-soft);background:var(--bg-raise);display:flex;flex-direction:column}
+.rail-head{padding:10px 12px;border-bottom:1px solid var(--border-soft)}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.search kbd{margin-left:auto;font-size:10px;border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--muted)}
+.rail-cols{display:grid;grid-template-columns:1fr 52px 52px;padding:7px 12px 5px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.rail-cols span:nth-child(n+2){text-align:right}
+.pick{display:grid;grid-template-columns:1fr 52px 52px;align-items:center;padding:8px 12px;border-left:2px solid transparent;cursor:pointer;transition:background .15s var(--ease)}
+.pick:hover{background:rgba(77,163,255,.05)}
+.pick.sel{background:rgba(77,163,255,.09);border-left-color:var(--accent)}
+.pick .tkr{font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.02em}
+.pick .co{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.pick .score{text-align:right}
+.pick .score b{font-family:var(--mono);font-size:12.5px;font-weight:700}
+.scorebar{height:2px;border-radius:1px;background:var(--border-soft);margin-top:4px;overflow:hidden}
+.scorebar i{display:block;height:100%;background:var(--accent)}
+.pick .chg{text-align:right;font-family:var(--mono);font-size:11.5px}
+.rail-foot{margin-top:auto;padding:8px 12px;border-top:1px solid var(--border-soft);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em}
+
+/* ----- center ----- */
+.center{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.stock-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.stock-head h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.01em;line-height:1}
+.stock-head .co{color:var(--muted);font-size:12.5px}
+.stock-head .px{font-family:var(--mono);font-size:22px;font-weight:700;margin-left:auto}
+.stock-head .pxchg{font-family:var(--mono);font-size:12.5px}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:3px 9px;border-radius:5px;border:1px solid var(--border);color:var(--text-2)}
+.badge.hot{border-color:rgba(77,163,255,.4);color:var(--accent);background:rgba(77,163,255,.07)}
+.badge.warn{border-color:rgba(251,191,36,.35);color:var(--amber)}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.chart-tools{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border-soft);background:var(--bg-raise)}
+.chart-tools b{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:500}
+.chart-tools .seg{margin-left:auto}
+svg{display:block;width:100%}
+.istrip{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border-soft)}
+.istrip .cell{padding:8px 12px;border-right:1px solid var(--border-soft)}
+.istrip .cell:last-child{border-right:none}
+.istrip label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.istrip b{font-family:var(--mono);font-size:12.5px;font-weight:700}
+.istrip small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.checks{display:flex;gap:8px;flex-wrap:wrap}
+.check{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--text-2);border:1px solid var(--border-soft);border-radius:6px;padding:5px 11px}
+.check i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* ----- right stack ----- */
+.stack{border-left:1px solid var(--border-soft);background:var(--bg-raise);padding:12px;display:flex;flex-direction:column;gap:10px}
+.mod{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.mod-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.mod-h b{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;font-weight:500}
+.mod-h .tag{font-family:var(--mono);font-size:10px;color:var(--accent)}
+.verdict-line{display:flex;align-items:center;gap:12px}
+.dial{position:relative;width:58px;height:58px;flex:none}
+.dial svg{width:58px;height:58px;transform:rotate(-90deg)}
+.dial b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:16px;font-weight:700}
+.verdict-line h3{font-family:var(--serif);font-size:16.5px;font-weight:600;line-height:1.2}
+.verdict-line p{font-size:11.5px;color:var(--muted);margin-top:2px}
+.ladder{display:flex;flex-direction:column;gap:0;font-family:var(--mono);font-size:11.5px}
+.rung{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--border-soft)}
+.rung:last-child{border-bottom:none}
+.rung .lvl{width:64px;color:var(--muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.rung b{font-weight:700}
+.rung .d{margin-left:auto;font-size:10.5px;color:var(--muted)}
+.rung.px-now{background:rgba(77,163,255,.07);border-radius:6px;padding:7px 8px;margin:0 -8px;border-bottom:1px dashed var(--border-soft)}
+.sq{display:flex;align-items:flex-end;gap:3px;height:38px;margin:6px 0 8px}
+.sq i{flex:1;background:var(--accent-deep);border-radius:2px 2px 0 0;opacity:.55}
+.sq i.hot{background:var(--accent);opacity:1}
+.mod p.note{font-size:11.5px;color:var(--muted);line-height:1.55}
+.mod p.note b{color:var(--text-2);font-weight:600}
+.plan{display:flex;flex-direction:column;gap:7px;font-family:var(--mono);font-size:11.5px}
+.plan .row{display:flex;justify-content:space-between;align-items:baseline}
+.plan .row span{color:var(--muted);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+.plan .row b{font-weight:700}
+.plan .row b.entry{color:var(--green)} .plan .row b.risk{color:var(--red)}
+.disc{font-size:10px;color:var(--muted);line-height:1.5;padding:0 2px}
+.askai{position:fixed;right:330px;bottom:40px;display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:12.5px;padding:9px 16px;border-radius:8px;box-shadow:0 12px 30px -10px rgba(29,111,209,.8)}
+
+/* ===== hotkey footer ===== */
+.hotkeys{display:flex;align-items:center;gap:22px;padding:0 16px;background:var(--bg-raise);border-top:1px solid var(--border-soft);font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.hotkeys kbd{border:1px solid var(--border);border-radius:4px;padding:0 6px;font-size:10px;color:var(--text-2);margin-right:5px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo"><i></i>Breakout AI</div>
+  <span class="tagline">PRE-BREAKOUT RADAR</span>
+  <div class="spacer"></div>
+  <span class="meta">DATA <b>2026-07-17</b> · SRC <b>yfinance/daily</b></span>
+  <span class="meta">MOOD <b style="color:var(--amber)">57 NEUTRAL</b></span>
+  <div class="seg"><button class="on">🇮🇳 INDIA</button><button>🇺🇸 US</button></div>
+  <span class="chip-live"><i></i>LIVE</span>
+  <button class="btn-sm">Options</button>
+  <button class="btn-sm">Backtest</button>
+  <button class="btn-sm">Cockpit</button>
+</div>
+
+<!-- INDEX STRIP -->
+<div class="idx">
+  <span>NIFTY 50 <b class="num">24,334.2</b> <b class="up">+1.08%</b></span>
+  <span>SENSEX <b class="num">78,151.45</b> <b class="up">+1.25%</b></span>
+  <span>BANK NIFTY <b class="num">58,521.4</b> <b class="up">+1.63%</b></span>
+  <span>NIFTY IT <b class="num">28,226.6</b> <b class="up">+1.75%</b></span>
+  <span>MIDCAP 50 <b class="num">17,930.85</b> <b class="down">−0.3%</b></span>
+  <span>SMALLCAP <b class="num">19,286.3</b> <b class="down">−0.2%</b></span>
+  <span>INDIA VIX <b class="num">13.15</b> <b class="up">+2.1%</b></span>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT RAIL -->
+  <aside class="rail col">
+    <div class="rail-head"><div class="search">⌕ Filter picks… <kbd>/</kbd></div></div>
+    <div class="rail-cols"><span>Ticker</span><span>Score</span><span>Δ Day</span></div>
+    <div class="pick"><div><span class="tkr">KFINTECH</span><span class="co">KFin Technologies</span><div class="scorebar"><i style="width:71%"></i></div></div><div class="score"><b>71</b></div><div class="chg up">+2.4%</div></div>
+    <div class="pick"><div><span class="tkr">BEPL</span><span class="co">Bhansali Eng. Polymers</span><div class="scorebar"><i style="width:68%"></i></div></div><div class="score"><b>68</b></div><div class="chg up">+1.9%</div></div>
+    <div class="pick sel"><div><span class="tkr">RELAXO</span><span class="co">Relaxo Footwears</span><div class="scorebar"><i style="width:66%"></i></div></div><div class="score"><b>66</b></div><div class="chg up">+1.2%</div></div>
+    <div class="pick"><div><span class="tkr">ASTRAZEN</span><span class="co">AstraZeneca Pharma</span><div class="scorebar"><i style="width:64%"></i></div></div><div class="score"><b>64</b></div><div class="chg down">−0.4%</div></div>
+    <div class="pick"><div><span class="tkr">GRAVITA</span><span class="co">Gravita India</span><div class="scorebar"><i style="width:62%"></i></div></div><div class="score"><b>62</b></div><div class="chg up">+0.8%</div></div>
+    <div class="pick"><div><span class="tkr">POLYMED</span><span class="co">Poly Medicure</span><div class="scorebar"><i style="width:61%"></i></div></div><div class="score"><b>61</b></div><div class="chg up">+0.3%</div></div>
+    <div class="pick"><div><span class="tkr">JBCHEPHARM</span><span class="co">JB Chemicals</span><div class="scorebar"><i style="width:59%"></i></div></div><div class="score"><b>59</b></div><div class="chg down">−1.1%</div></div>
+    <div class="pick"><div><span class="tkr">SUPRIYA</span><span class="co">Supriya Lifescience</span><div class="scorebar"><i style="width:57%"></i></div></div><div class="score"><b>57</b></div><div class="chg up">+0.6%</div></div>
+    <div class="rail-foot">12 PICKS · SCAN 2,055 NSE SYMBOLS</div>
+  </aside>
+
+  <!-- CENTER -->
+  <section class="center col">
+    <div class="stock-head">
+      <h1>RELAXO</h1>
+      <span class="co">Relaxo Footwears Ltd · Footwear · NSE</span>
+      <span class="px num">₹421.15</span>
+      <span class="pxchg up">▲ +1.2%</span>
+    </div>
+    <div class="badges">
+      <span class="badge hot">VCP 0.92× COILING</span>
+      <span class="badge hot">VOL 15.96× AVG</span>
+      <span class="badge">ADX 29.8 STRONG</span>
+      <span class="badge warn">EARNINGS 22D</span>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-tools">
+        <b>Price · Daily · 6M</b>
+        <div class="seg"><button class="on">Annotated</button><button>TradingView</button></div>
+      </div>
+      <svg id="chart" viewBox="0 0 860 300" preserveAspectRatio="none" aria-label="RELAXO daily chart"></svg>
+      <div class="istrip">
+        <div class="cell"><label>Trend · ADX</label><b>29.8</b> <small>STRONG</small></div>
+        <div class="cell"><label>Volume</label><b>15.96×</b> <small>avg</small></div>
+        <div class="cell"><label>8 EMA</label><b>₹396.95</b></div>
+        <div class="cell"><label>21 EMA</label><b>₹386.58</b></div>
+        <div class="cell"><label>50 EMA</label><b>₹362.40</b></div>
+        <div class="cell"><label>200 EMA</label><b>₹373.26</b></div>
+      </div>
+    </div>
+
+    <div class="checks">
+      <span class="check"><i></i>Avg $ volume OK</span>
+      <span class="check"><i></i>Breakout volume ≥1.5×</span>
+      <span class="check"><i></i>Outside earnings window</span>
+    </div>
+  </section>
+
+  <!-- RIGHT STACK -->
+  <aside class="stack col">
+    <div class="mod">
+      <div class="mod-h"><b>Verdict</b><span class="tag">RANK 3/12</span></div>
+      <div class="verdict-line">
+        <div class="dial">
+          <svg viewBox="0 0 58 58"><circle cx="29" cy="29" r="25" fill="none" stroke="#182438" stroke-width="5"/><circle cx="29" cy="29" r="25" fill="none" stroke="#4DA3FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="53.4"/></svg>
+          <b>66</b>
+        </div>
+        <div>
+          <h3>Coiling — near trigger</h3>
+          <p>Tight range on shrinking volume, 1.2% under the pivot.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mod">
+      <div class="mod-h"><b>Key Levels</b><span class="tag">LADDER</span></div>
+      <div class="ladder">
+        <div class="rung"><span class="lvl">Resist</span><b>none nearby</b><span class="d">clear air above</span></div>
+        <div class="rung"><span class="lvl">Pivot</span><b>₹426.00</b><span class="d">+1.2%</span></div>
+        <div class="rung px-now"><span class="lvl" style="color:var(--accent)">Price</span><b style="color:var(--accent)">₹421.15</b><span class="d">now</span></div>
+        <div class="rung"><span class="lvl">Support</span><b>₹408.20</b><span class="d">−3.1%</span></div>
+        <div class="rung"><span class="lvl">Cutoff</span><b style="color:var(--red)">₹400.44</b><span class="d">−6.6% vs pivot</span></div>
+        <div class="rung"><span class="lvl">Base</span><b>−36.7% deep</b><span class="d">12-mo base</span></div>
+      </div>
+    </div>
+
+    <div class="mod">
+      <div class="mod-h"><b>Volatility Contraction</b><span class="tag">0.92×</span></div>
+      <div class="sq"><i style="height:100%"></i><i style="height:84%"></i><i style="height:72%"></i><i style="height:58%"></i><i style="height:46%"></i><i class="hot" style="height:34%"></i></div>
+      <p class="note">Recent range is <b>8% tighter</b> than the stock's own baseline — energy building, not fading. Below <b>1.0</b> = coiling; this is a constructive squeeze.</p>
+    </div>
+
+    <div class="mod">
+      <div class="mod-h"><b>The Plan</b><span class="tag">IF / THEN</span></div>
+      <div class="plan">
+        <div class="row"><span>Trigger</span><b>close &gt; ₹426.00 on vol</b></div>
+        <div class="row"><span>Entry</span><b class="entry">₹426.60+</b></div>
+        <div class="row"><span>Risk cutoff</span><b class="risk">₹400.44 (−6.6%)</b></div>
+      </div>
+    </div>
+
+    <p class="disc">⚠ Educational content only, not investment advice. Patterns can fail — always use a stop-loss and consult a SEBI-registered adviser before trading.</p>
+  </aside>
+</div>
+
+<!-- HOTKEY FOOTER -->
+<div class="hotkeys">
+  <span><kbd>↑</kbd><kbd>↓</kbd>navigate picks</span>
+  <span><kbd>⏎</kbd>open</span>
+  <span><kbd>T</kbd>chart mode</span>
+  <span><kbd>M</kbd>market</span>
+  <span><kbd>A</kbd>ask AI</span>
+  <span style="margin-left:auto">BREAKOUTAI · TERMINAL VIEW</span>
+</div>
+
+<button class="askai">✦ Ask AI</button>
+
+<script>
+/* seeded candle sketch: downtrend → base → tighten → push toward pivot */
+(function(){
+  var seed=42; function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+  var W=860,H=300,VH=54,n=88,candles=[],px=430;
+  var way=[430,398,362,340,352,338,346,340,352,360,356,366,372,378,384,390,396,402,406,410,414,417,419,421];
+  for(var i=0;i<n;i++){
+    var t=i/(n-1)*(way.length-1),a=Math.floor(t),b=Math.min(a+1,way.length-1),f=t-a;
+    var base=way[a]*(1-f)+way[b]*f;
+    var tight=i>n*.72?0.35:1;                      /* range tightens late */
+    var o=base+(rnd()-.5)*10*tight, c=base+(rnd()-.5)*10*tight;
+    var hi=Math.max(o,c)+rnd()*5*tight, lo=Math.min(o,c)-rnd()*5*tight;
+    var v=(.25+rnd()*.75)*(i>n*.72?.45:1)*(i===n-1?3.2:1);
+    candles.push({o:o,c:c,h:hi,l:lo,v:v});
+  }
+  var min=1e9,max=0;candles.forEach(function(k){min=Math.min(min,k.l);max=Math.max(max,k.h)});
+  min-=8;max+=8;
+  function y(p){return (max-p)/(max-min)*(H-VH-16)+8}
+  var svg=document.getElementById('chart'),s='';
+  /* EMA-ish smooth lines */
+  function line(alpha,color,w){
+    var e=candles[0].c,d='M';
+    candles.forEach(function(k,i){e=e+alpha*(k.c-e);d+=(i?'L':'')+(i*(W-70)/n+8).toFixed(1)+' '+y(e).toFixed(1)+' '});
+    s+='<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" opacity=".8"/>';
+  }
+  line(.09,'#FBBF24',1.2); line(.28,'#8B5CF6',1.2);
+  /* candles + volume */
+  candles.forEach(function(k,i){
+    var x=i*(W-70)/n+8,cw=Math.max(2.4,(W-70)/n*.55),up=k.c>=k.o;
+    var col=up?'#34D399':'#F87171';
+    s+='<line x1="'+(x+cw/2)+'" y1="'+y(k.h)+'" x2="'+(x+cw/2)+'" y2="'+y(k.l)+'" stroke="'+col+'" stroke-width="1"/>';
+    s+='<rect x="'+x+'" y="'+Math.min(y(k.o),y(k.c))+'" width="'+cw+'" height="'+Math.max(1.5,Math.abs(y(k.o)-y(k.c)))+'" fill="'+col+'" rx="1"/>';
+    s+='<rect x="'+x+'" y="'+(H-k.v*VH*0.9)+'" width="'+cw+'" height="'+(k.v*VH*0.9)+'" fill="#1D6FD1" opacity=".45" rx="1"/>';
+  });
+  /* pivot + support guides */
+  [[426,'#4DA3FF','PIVOT ₹426.00'],[408.2,'#34D399','SUPPORT ₹408.20'],[400.44,'#F87171','CUTOFF ₹400.44']].forEach(function(g){
+    s+='<line x1="8" x2="'+(W-62)+'" y1="'+y(g[0])+'" y2="'+y(g[0])+'" stroke="'+g[1]+'" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>';
+    s+='<text x="'+(W-58)+'" y="'+(y(g[0])+3)+'" fill="'+g[1]+'" font-size="8.5" font-family="JetBrains Mono">'+g[2].split(' ')[1]+'</text>';
+  });
+  svg.innerHTML=s;
+})();
+</script>
+</body>
+</html>

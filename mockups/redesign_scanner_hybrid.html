@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI — Scanner · Hybrid (Report type × Bento rail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050B16; --bg-raise:#0A1220; --surface:#0D1526; --card:#111B2E;
+  --border:#20304A; --border-soft:#182438;
+  --text:#F0F4FA; --text-2:#C2CAD8; --muted:#8A94A8;
+  --accent:#4DA3FF; --accent-deep:#1D6FD1; --accent-ink:#04101E;
+  --amber:#FBBF24; --red:#F87171; --green:#34D399;
+  --serif:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.up{color:var(--green)} .dn{color:var(--red)} .amber{color:var(--amber)}
+a{color:inherit;text-decoration:none}
+
+/* ── top chrome ─────────────────────────────── */
+.bar{display:flex;align-items:center;gap:18px;padding:10px 26px;border-bottom:1px solid var(--border-soft);background:rgba(5,11,22,.92);backdrop-filter:blur(10px);position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+.bar .meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.mkt{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-family:var(--mono);font-size:11px}
+.mkt span{padding:4px 12px;color:var(--muted);cursor:pointer}
+.mkt span.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.bar nav{margin-left:auto;display:flex;gap:8px}
+.bar nav a{font-family:var(--mono);font-size:11px;padding:5px 12px;border:1px solid var(--border-soft);border-radius:7px;color:var(--text-2)}
+.bar nav a:hover{border-color:var(--accent);color:var(--text)}
+.idx{display:flex;gap:26px;padding:6px 26px;border-bottom:1px solid var(--border-soft);font-family:var(--mono);font-size:10.5px;color:var(--muted);overflow:hidden;white-space:nowrap;background:var(--bg)}
+.idx b{color:var(--text-2);font-weight:500}
+.health{padding:5px 26px;font-family:var(--mono);font-size:10px;color:var(--muted);border-bottom:1px solid var(--border-soft);background:rgba(52,211,153,.04)}
+.health i{color:var(--green);font-style:normal}
+
+/* ── layout ─────────────────────────────────── */
+.wrap{display:grid;grid-template-columns:286px minmax(0,1fr);gap:0;max-width:1460px;margin:0 auto}
+
+/* ── left rail (from Bento) ─────────────────── */
+.rail{border-right:1px solid var(--border-soft);padding:18px 16px 60px;position:sticky;top:47px;height:calc(100vh - 47px);overflow-y:auto;scrollbar-width:thin}
+.rail h4{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:10.5px;padding:3px 10px;border:1px solid var(--border-soft);border-radius:999px;color:var(--text-2);cursor:pointer}
+.chip.on{background:rgba(77,163,255,.14);border-color:var(--accent-deep);color:var(--accent)}
+.rail-note{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin:5px 0 2px}
+.fund-pill{margin-top:10px;font-family:var(--mono);font-size:10.5px;padding:6px 10px;border:1px dashed var(--border);border-radius:8px;color:var(--muted);display:flex;justify-content:space-between;cursor:pointer}
+.picks-head{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 10px}
+.picks-head b{font-size:13px}
+.picks-head span{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.pick{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+.pick:hover{background:var(--bg-raise)}
+.pick.on{background:var(--card);border-color:var(--accent-deep);box-shadow:0 0 0 1px rgba(77,163,255,.18), inset 3px 0 0 var(--accent)}
+.ring{position:relative;width:38px;height:38px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11.5px}
+.pick .nm{min-width:0;flex:1}
+.pick .nm b{display:block;font-size:12.5px}
+.pick .nm span{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick .chg{font-family:var(--mono);font-size:11px}
+
+/* ── main article (Report typography) ───────── */
+main{padding:0 0 90px}
+.secnav{display:flex;gap:2px;padding:9px 34px;border-bottom:1px solid var(--border-soft);position:sticky;top:47px;background:rgba(5,11,22,.94);backdrop-filter:blur(10px);z-index:40;overflow-x:auto;scrollbar-width:none}
+.secnav a{font-family:var(--mono);font-size:10.5px;padding:4px 11px;border-radius:7px;color:var(--muted);white-space:nowrap}
+.secnav a.on,.secnav a:hover{color:var(--accent);background:rgba(77,163,255,.09)}
+.article{max-width:880px;margin:0 auto;padding:34px 34px 0}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+
+/* stock meta header */
+.smeta{display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid var(--border-soft)}
+.smeta h1{font-family:var(--serif);font-size:clamp(2rem,3.6vw,2.9rem);font-weight:600;letter-spacing:-.02em;line-height:1.05;margin:8px 0 4px}
+.smeta .sub{font-size:13px;color:var(--muted)}
+.smeta .sub em{font-style:normal;color:var(--text-2)}
+.badges{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:6px;border:1px solid var(--border)}
+.badge.hi{border-color:rgba(52,211,153,.5);color:var(--green);background:rgba(52,211,153,.08)}
+.badge.ai{border-color:rgba(77,163,255,.5);color:var(--accent);background:rgba(77,163,255,.08)}
+.hstats{margin-left:auto;display:grid;grid-template-columns:repeat(3,auto);gap:10px 26px;text-align:right}
+.hstat label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.hstat b{font-family:var(--mono);font-size:16px;font-weight:700}
+.hstat small{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.trackbtn{font-family:var(--mono);font-size:11px;padding:7px 14px;border:1px solid var(--accent-deep);border-radius:8px;color:var(--accent);background:rgba(77,163,255,.07);cursor:pointer;align-self:center}
+
+/* sections */
+section{padding:36px 0 6px;border-bottom:1px solid var(--border-soft)}
+section:last-of-type{border-bottom:none}
+.stitle{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em;margin:6px 0 4px}
+.skick{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.snote{font-size:12px;color:var(--muted)}
+.prose{font-size:16.5px;line-height:1.75;color:var(--text-2);max-width:64ch}
+.prose b{color:var(--text)}
+.lede{font-family:var(--serif);font-size:20px;line-height:1.55;color:var(--text);font-weight:500}
+
+/* verdict */
+.verdict{display:grid;grid-template-columns:150px 1fr;gap:28px;align-items:start;margin-top:14px}
+.score{position:relative;width:150px;height:150px}
+.score svg{transform:rotate(-90deg)}
+.score .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score .in b{font-family:var(--mono);font-size:38px;font-weight:700;line-height:1}
+.score .in span{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;margin-top:4px}
+.vlines{margin-top:16px;display:grid;gap:7px}
+.vline{display:flex;gap:10px;font-size:13px;color:var(--text-2)}
+.vline label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);min-width:86px;padding-top:3px}
+.ddbtn{margin-top:18px;display:inline-flex;flex-direction:column;gap:2px;padding:10px 18px;border:1px solid var(--accent-deep);border-radius:10px;background:linear-gradient(135deg,rgba(77,163,255,.14),rgba(77,163,255,.04));cursor:pointer}
+.ddbtn b{font-size:13px;color:var(--accent)}
+.ddbtn span{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* rationale */
+.rat{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:18px 0}
+.col h5{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:9px}
+.col.ok h5{color:var(--green)} .col.rk h5{color:var(--red)}
+.col li{list-style:none;font-size:13.5px;color:var(--text-2);padding:7px 0 7px 18px;border-bottom:1px dashed var(--border-soft);position:relative}
+.col li::before{content:'';position:absolute;left:2px;top:14px;width:6px;height:6px;border-radius:50%}
+.col.ok li::before{background:var(--green)} .col.rk li::before{background:var(--red)}
+.mob{margin:16px 0;padding:14px 18px;border-left:3px solid var(--amber);background:rgba(251,191,36,.06);border-radius:0 10px 10px 0;font-family:var(--serif);font-size:16.5px;color:var(--text)}
+.gates{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0 18px}
+.gate{font-family:var(--mono);font-size:10.5px;padding:4px 11px;border-radius:999px;border:1px solid var(--border-soft);color:var(--text-2)}
+.gate.p{border-color:rgba(52,211,153,.4);color:var(--green)}
+.gate.f{border-color:rgba(248,113,113,.4);color:var(--red)}
+
+/* deep dive */
+.dd{margin:14px 0 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:20px 24px}
+.dd .hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.dd .hd .cache{font-family:var(--mono);font-size:9.5px;padding:2px 8px;border-radius:5px;background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.dd .hd small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.dd ul{margin:10px 0 0 18px}
+.dd li{font-size:13.5px;color:var(--text-2);margin:5px 0}
+
+/* chart */
+.chartcard{margin:16px 0 20px;border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden}
+.chart-top{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border-soft)}
+.tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-family:var(--mono);font-size:10.5px}
+.tabs span{padding:4px 12px;color:var(--muted);cursor:pointer}
+.tabs span.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.legend{margin-left:auto;display:flex;gap:14px;font-family:var(--mono);font-size:10px;color:var(--muted)}
+.legend i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.legend i::before{content:'';width:10px;height:2px;background:var(--accent)}
+.legend i.pv::before{background:var(--amber)} .legend i.dm::before{background:#7C6FF0} .legend i.dm2::before{background:#3AC0A0} .legend i.sup::before{background:#34D399} .legend i.res::before{background:#F87171}
+#candles{display:block;width:100%;height:340px}
+.istrip{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--border-soft)}
+.istrip .cell{flex:1;min-width:110px;padding:10px 16px;border-right:1px solid var(--border-soft)}
+.istrip .cell:last-child{border-right:none}
+.istrip label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.istrip b{font-family:var(--mono);font-size:13.5px}
+.istrip small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* key levels + vcp */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:16px 0 20px}
+.kcard{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:20px 22px}
+.kcard h5{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;justify-content:space-between}
+.lvl{display:flex;align-items:baseline;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--border-soft);font-size:13px}
+.lvl:last-child{border-bottom:none}
+.lvl label{color:var(--muted);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em}
+.lvl b{font-family:var(--mono);font-size:14px}
+.lvl small{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.lvl.px{background:rgba(77,163,255,.07);margin:0 -10px;padding:9px 10px;border-radius:8px;border-bottom:none}
+.vcpnum{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--accent)}
+.vcpnum small{font-size:13px;color:var(--muted);font-weight:400}
+.cbars{display:flex;align-items:flex-end;gap:10px;height:64px;margin:14px 0 6px}
+.cbar{flex:1;background:linear-gradient(180deg,rgba(77,163,255,.55),rgba(77,163,255,.12));border-radius:4px 4px 0 0;position:relative}
+.cbar span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+
+/* news */
+.senti{display:flex;height:8px;border-radius:999px;overflow:hidden;margin:14px 0 6px}
+.senti i{display:block}
+.senti-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px}
+.news{display:grid;gap:0;margin-bottom:18px}
+.news a{display:grid;grid-template-columns:64px 1fr auto;gap:14px;padding:12px 4px;border-bottom:1px dashed var(--border-soft);align-items:baseline}
+.news a:hover .h{color:var(--accent)}
+.news .d{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.news .h{font-size:13.5px;color:var(--text-2)}
+.news .s{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.news .tone{font-family:var(--mono);font-size:9px;padding:1px 7px;border-radius:5px;margin-left:8px}
+.tone.p{background:rgba(52,211,153,.1);color:var(--green)} .tone.n{background:rgba(138,148,168,.12);color:var(--muted)} .tone.g{background:rgba(248,113,113,.1);color:var(--red)}
+
+/* earnings + ownership */
+#earn{display:block;width:100%;height:200px}
+.elegend{display:flex;gap:18px;font-family:var(--mono);font-size:10px;color:var(--muted);margin:6px 0 16px}
+.elegend i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.elegend i::before{content:'';width:9px;height:9px;border-radius:2px;background:var(--accent-deep)}
+.elegend i.pat::before{background:var(--green)}
+.otable{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:13px}
+.otable th{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--border-soft)}
+.otable th:first-child,.otable td:first-child{text-align:left}
+.otable td{padding:8px;border-bottom:1px dashed var(--border-soft);text-align:right;font-family:var(--mono);font-size:12.5px}
+.otable td:first-child{font-family:var(--sans);color:var(--text-2)}
+.own-note{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.owntabs{display:flex;gap:6px;margin:16px 0 8px}
+.owntabs span{font-family:var(--mono);font-size:10px;padding:3px 10px;border:1px solid var(--border-soft);border-radius:6px;color:var(--muted);cursor:pointer}
+.owntabs span.on{color:var(--accent);border-color:var(--accent-deep)}
+#owntrend{display:block;width:100%;height:110px}
+
+/* analog / precedents / social */
+.analog{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:18px 22px;margin:14px 0 20px}
+.astat{display:grid;grid-template-columns:repeat(3,auto);gap:6px 24px;text-align:right}
+.astat label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.astat b{font-family:var(--mono);font-size:15px}
+.prec{margin:12px 0 20px}
+.prec .row{display:grid;grid-template-columns:110px 1fr auto;gap:16px;padding:12px 4px;border-bottom:1px dashed var(--border-soft);align-items:baseline;font-size:13.5px}
+.prec .row .d{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.out{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:6px}
+.out.w{background:rgba(52,211,153,.1);color:var(--green)} .out.l{background:rgba(248,113,113,.1);color:var(--red)}
+.social{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:14px 0 20px}
+.socell{border:1px solid var(--border-soft);border-radius:12px;padding:14px 16px}
+.socell label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.socell b{font-family:var(--mono);font-size:17px}
+.socell small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* plan */
+.plan{border:1px solid rgba(77,163,255,.35);border-radius:16px;background:linear-gradient(180deg,rgba(77,163,255,.08),rgba(77,163,255,.02));padding:24px 26px;margin:18px 0 22px}
+.plan .row{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:10px 0;border-bottom:1px dashed rgba(77,163,255,.18);align-items:baseline}
+.plan .row:last-child{border-bottom:none}
+.plan label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.plan b{font-family:var(--mono);font-size:15px}
+.plan .why{font-size:12.5px;color:var(--muted)}
+.disc{font-size:11px;color:var(--muted);padding:16px 0 0;line-height:1.6}
+
+/* ask ai */
+.fab{position:fixed;right:26px;bottom:24px;display:flex;align-items:center;gap:9px;padding:11px 20px;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:var(--accent-ink);font-weight:700;font-size:13.5px;box-shadow:0 10px 30px rgba(77,163,255,.35);cursor:pointer;z-index:60}
+
+@media (max-width:1060px){.wrap{grid-template-columns:1fr}.rail{display:none}.hstats{margin-left:0;text-align:left}}
+@media (max-width:760px){.verdict,.rat,.duo{grid-template-columns:1fr}.social{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ── top bar ── -->
+<header class="bar">
+  <div class="brand"><span class="dot"></span>Breakout AI</div>
+  <span class="meta">DATA 2026-07-17 · yfinance/daily</span>
+  <span class="meta">MODE <b class="amber">57 NEUTRAL</b></span>
+  <div class="mkt"><span class="on">₹ India</span><span>us US</span></div>
+  <nav><a href="#">Options</a><a href="#">Backtest</a><a href="#">Cockpit</a></nav>
+</header>
+<div class="idx">
+  <span><b>NIFTY 50</b> 26,334.3 <i class="up">+1.08%</i></span>
+  <span><b>SENSEX</b> 70,551.45 <i class="up">+1.35%</i></span>
+  <span><b>BANK NIFTY</b> 58,521.4 <i class="up">+1.63%</i></span>
+  <span><b>NIFTY IT</b> 32,206.6 <i class="up">+1.75%</i></span>
+  <span><b>MIDCAP 50</b> 17,938.85 <i class="up">+0.3%</i></span>
+  <span><b>SMALLCAP</b> 19,286.3 <i class="dn">−0.25%</i></span>
+  <span><b>INDIA VIX</b> 13.15 <i class="up">+2.1%</i></span>
+</div>
+<div class="health"><i>●</i> All feeds fresh — prices 0m · news 12m · shareholding Jun 2026 filings · 2,055 symbols scanned in 41s</div>
+
+<div class="wrap">
+
+  <!-- ── left rail: filters + picks (Bento) ── -->
+  <aside class="rail">
+    <h4>Index</h4>
+    <div class="chips"><span class="chip on">Nifty 500</span><span class="chip">Nifty 50</span><span class="chip">Midcap 150</span><span class="chip">Smallcap 250</span><span class="chip">All NSE</span></div>
+    <div class="rail-note">US mode: S&amp;P 500 · NASDAQ 100 · Russell 2000</div>
+    <h4>Setups</h4>
+    <div class="chips"><span class="chip on">VCP</span><span class="chip">Flat base</span><span class="chip">52w high</span><span class="chip">Pullback</span></div>
+    <h4>Collections</h4>
+    <div class="chips"><span class="chip on">All</span><span class="chip">High conviction</span><span class="chip">Earnings safe</span><span class="chip">My watchlist</span></div>
+    <div class="fund-pill"><span>Fundamentals filter</span><span>2 active ▾</span></div>
+
+    <div class="picks-head"><b>Today's Picks</b><span>53 of 2,055 scanned</span></div>
+    <div id="picks"></div>
+  </aside>
+
+  <!-- ── main article (Report) ── -->
+  <main>
+    <nav class="secnav">
+      <a class="on" href="#read">The Read</a><a href="#why">Why</a><a href="#dd">Deep Dive</a><a href="#chart">Chart</a><a href="#levels">Levels</a><a href="#news">News</a><a href="#earn-s">Earnings</a><a href="#own">Ownership</a><a href="#analog">Analog</a><a href="#prec">Precedents</a><a href="#social">Buzz</a><a href="#plan">Plan</a>
+    </nav>
+
+    <div class="article">
+
+      <!-- stock meta header -->
+      <div class="smeta">
+        <div>
+          <span class="eyebrow">Rank 3 / 11 · Scanner Report</span>
+          <h1>RELAXO</h1>
+          <div class="sub"><em>Relaxo Footwears</em> · Footwear · Consumer Discretionary</div>
+          <div class="badges">
+            <span class="badge hi">Conviction · High</span>
+            <span class="badge ai">AI verdict · Constructive</span>
+            <span class="badge">Setup · VCP</span>
+            <span class="badge">Readiness · Coiling</span>
+          </div>
+        </div>
+        <div class="hstats">
+          <div class="hstat"><label>Price</label><b>₹421.15</b></div>
+          <div class="hstat"><label>Day</label><b class="up">+1.2%</b></div>
+          <div class="hstat"><label>Mkt cap</label><b>₹10,480 Cr</b> <small>Mid</small></div>
+          <div class="hstat"><label>Volume</label><b>0.8×</b> <small>20d avg</small></div>
+          <div class="hstat"><label>Trend age</label><b>29 d</b></div>
+          <div class="hstat"><label>Base</label><b>12 mo</b></div>
+        </div>
+        <button class="trackbtn">☆ Track</button>
+      </div>
+
+      <!-- the read -->
+      <section id="read">
+        <span class="skick">The Read · verdict 3/11</span>
+        <h2 class="stitle" style="font-size:34px">Coiling — <em style="font-style:italic">near trigger.</em></h2>
+        <div class="verdict">
+          <div class="score">
+            <svg width="150" height="150" viewBox="0 0 150 150">
+              <circle cx="75" cy="75" r="64" fill="none" stroke="#182438" stroke-width="9"/>
+              <circle cx="75" cy="75" r="64" fill="none" stroke="#4DA3FF" stroke-width="9" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="137"/>
+            </svg>
+            <div class="in"><b>66</b><span>READINESS</span></div>
+          </div>
+          <div>
+            <p class="lede">Twelve months into a <b>−36.7% base</b>, the range has tightened to <b>0.92× baseline</b> while volume dries up. Price presses <b>1.2% under the ₹426 pivot</b> with clear air above.</p>
+            <div class="vlines">
+              <div class="vline"><label>Trend</label><span>Above rising 50DMA for 29 sessions; RS line at a 3-month high vs NIFTY 500.</span></div>
+              <div class="vline"><label>Sentiment</label><span>News tone 62% positive over 14 days; no negative catalysts flagged.</span></div>
+              <div class="vline"><label>Fundamentals</label><span>Revenue +9% YoY, PAT margin recovering to 8.4%, debt-free balance sheet.</span></div>
+              <div class="vline"><label>Pattern</label><span>Classic VCP — three contractions 21% → 9% → 4%, each on lighter volume.</span></div>
+              <div class="vline"><label>Reliability</label><span>Setup class hits follow-through in <b>68%</b> of 41 similar historical cases.</span></div>
+            </div>
+            <div class="ddbtn"><b>⇣ Run AI Deep Dive</b><span>fundamentals + filings + news synthesis · ~20s</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- rationale -->
+      <section id="why">
+        <span class="skick">Why this score</span>
+        <h2 class="stitle">Confirmations vs. risks</h2>
+        <div class="rat">
+          <div class="col ok"><h5>Confirming — 4</h5><ul>
+            <li>RS line broke to a fresh 3-month high before price did.</li>
+            <li>Three tightening contractions: 21% → 14% → 9% → 4%.</li>
+            <li>Base volume 40% below its 12-month average — supply absorbed.</li>
+            <li>Price reclaimed the 50DMA and has held it for 29 sessions.</li>
+          </ul></div>
+          <div class="col rk"><h5>Risks — 3</h5><ul>
+            <li>200DMA still overhead at ₹438 (+4.0%) — first supply zone.</li>
+            <li>Earnings in 11 days; gap risk if entry is late in the window.</li>
+            <li>Footwear sector breadth mixed — only 3 of 9 peers above 50DMA.</li>
+          </ul></div>
+        </div>
+        <div class="mob">Make-or-break: above <b>₹426</b> this is a fresh leg. Lose <b>₹408</b> and the base needs rebuilding — stand aside.</div>
+        <div class="gates">
+          <span class="gate p">✓ Liquidity</span><span class="gate p">✓ Trend</span><span class="gate p">✓ Base quality</span><span class="gate p">✓ Volume dry-up</span><span class="gate p">✓ RS rank</span><span class="gate f">✕ Earnings window</span>
+        </div>
+      </section>
+
+      <!-- deep dive -->
+      <section id="dd">
+        <span class="skick">AI Deep Dive</span>
+        <h2 class="stitle">What the model found</h2>
+        <div class="dd">
+          <div class="hd"><span class="cache">CACHED · 2h ago</span><small>claude · fundamentals + 14d news + Jun 2026 filings</small></div>
+          <p class="prose" style="font-size:14px">Demand recovery in mass-market footwear is showing up in volume growth (+11% YoY) while input costs (EVA resin) have eased ~14% from the FY25 peak — a margin tailwind the street hasn't fully re-rated. Distribution expansion into tier-3 towns continues.</p>
+          <ul>
+            <li>PAT margin 8.4% vs 6.1% a year ago; management guiding double-digit exit rate.</li>
+            <li>No pledged shares; promoter holding steady at 71.3% for 6 quarters.</li>
+            <li>Key watch: unseasonal monsoon impact on Q2 volumes, called out in the last concall.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- chart -->
+      <section id="chart">
+        <span class="skick">Price structure</span>
+        <h2 class="stitle">Twelve months, annotated</h2>
+        <div class="chartcard">
+          <div class="chart-top">
+            <div class="tabs"><span class="on">Annotated</span><span>TradingView</span></div>
+            <div class="legend"><i>Price</i><i class="dm">50DMA</i><i class="dm2">200DMA</i><i class="pv">Pivot ₹426</i><i class="sup">Support ₹408</i><i class="res">Supply ₹438</i></div>
+          </div>
+          <svg id="candles" preserveAspectRatio="none"></svg>
+          <div class="istrip">
+            <div class="cell"><label>RSI 14</label><b>58.2</b></div>
+            <div class="cell"><label>ADX</label><b>21.4</b> <small>rising</small></div>
+            <div class="cell"><label>ATR</label><b>₹9.8</b> <small>2.3%</small></div>
+            <div class="cell"><label>vs 50DMA</label><b class="up">+4.6%</b></div>
+            <div class="cell"><label>vs 200DMA</label><b class="dn">−4.0%</b></div>
+            <div class="cell"><label>Vol vs 20d</label><b>0.8×</b> <small>drying</small></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- key levels + vcp -->
+      <section id="levels">
+        <span class="skick">Structure</span>
+        <h2 class="stitle">Key levels &amp; contraction</h2>
+        <div class="duo">
+          <div class="kcard">
+            <h5>Key levels <span>ladder</span></h5>
+            <div class="lvl"><label>Resistance</label><div><b>₹426.00</b> <small>−1.2% · 4 touches · clear air above</small></div></div>
+            <div class="lvl px"><label>Price</label><div><b class="up">₹421.15</b> <small>now</small></div></div>
+            <div class="lvl"><label>Support</label><div><b>₹408.44</b> <small>−3.0% · 6 touches</small></div></div>
+            <div class="lvl"><label>Base depth</label><div><b class="dn">−36.7%</b> <small>12-month low to pivot</small></div></div>
+          </div>
+          <div class="kcard">
+            <h5>Volatility contraction <span>VCP</span></h5>
+            <div class="vcpnum">0.92× <small>coiling (squeeze)</small></div>
+            <div class="cbars">
+              <div class="cbar" style="height:100%"><span>21%</span></div>
+              <div class="cbar" style="height:67%"><span>14%</span></div>
+              <div class="cbar" style="height:43%"><span>9%</span></div>
+              <div class="cbar" style="height:19%"><span>4%</span></div>
+            </div>
+            <p class="snote">Range is 8% tighter than the stock's own baseline. Below 1.0× = coiling — energy building, not fading.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- news -->
+      <section id="news">
+        <span class="skick">News &amp; sentiment · as of 12m ago</span>
+        <h2 class="stitle">What the tape is reading</h2>
+        <div class="senti"><i style="width:62%;background:var(--green)"></i><i style="width:28%;background:#5A6478"></i><i style="width:10%;background:var(--red)"></i></div>
+        <div class="senti-lbl"><span>62% positive</span><span>28% neutral</span><span>10% negative</span></div>
+        <div class="news">
+          <a href="#"><span class="d">Jul 16</span><span class="h">Relaxo expands tier-3 distribution; adds 1,400 outlets in June quarter<span class="tone p">POS</span></span><span class="s">ET Markets</span></a>
+          <a href="#"><span class="d">Jul 14</span><span class="h">EVA resin prices ease 14% from FY25 peak — margin tailwind for footwear makers<span class="tone p">POS</span></span><span class="s">Moneycontrol</span></a>
+          <a href="#"><span class="d">Jul 09</span><span class="h">Footwear demand steady in June; premiumisation slower than expected<span class="tone n">NEU</span></span><span class="s">Business Standard</span></a>
+          <a href="#"><span class="d">Jul 02</span><span class="h">Brokerage flags unseasonal monsoon as a near-term volume risk<span class="tone g">NEG</span></span><span class="s">Reuters</span></a>
+        </div>
+      </section>
+
+      <!-- earnings -->
+      <section id="earn-s">
+        <span class="skick">Earnings · source: screener quarterly</span>
+        <h2 class="stitle">Six quarters of delivery</h2>
+        <svg id="earn" preserveAspectRatio="none"></svg>
+        <div class="elegend"><i>Revenue (₹ Cr)</i><i class="pat">PAT (₹ Cr)</i><span style="margin-left:auto">Next result: <b class="amber">Jul 28 — in 11 days</b></span></div>
+      </section>
+
+      <!-- ownership -->
+      <section id="own">
+        <span class="skick">Ownership · Jun 2026 filings</span>
+        <h2 class="stitle">Who's accumulating</h2>
+        <table class="otable">
+          <tr><th>Holder</th><th>Holding</th><th>QoQ</th><th>4-qtr trend</th></tr>
+          <tr><td>Promoter</td><td>71.3%</td><td class="num">0.0</td><td>flat — steady 6 quarters</td></tr>
+          <tr><td>FII</td><td>7.9%</td><td class="up">+0.4</td><td>rising 3 straight quarters</td></tr>
+          <tr><td>DII</td><td>12.6%</td><td class="up">+0.7</td><td>rising — MF adds since Dec</td></tr>
+          <tr><td>Public</td><td>8.2%</td><td class="dn">−1.1</td><td>falling — float tightening</td></tr>
+        </table>
+        <div class="owntabs"><span class="on">FII</span><span>DII</span><span>Promoter</span></div>
+        <svg id="owntrend" preserveAspectRatio="none"></svg>
+        <p class="own-note">Rising FII + DII while public float shrinks = accumulation behind the setup.</p>
+      </section>
+
+      <!-- analog -->
+      <section id="analog">
+        <span class="skick">One similar-looking day in the past · for reference</span>
+        <h2 class="stitle">Closest analog</h2>
+        <div class="analog">
+          <div>
+            <b style="font-family:var(--mono);font-size:14px">BATA India · 14 Mar 2024</b>
+            <p class="snote" style="margin-top:4px">0.91 similarity — same VCP depth, dry-up and RS profile at the pivot. Educational reference only, not a prediction.</p>
+          </div>
+          <div class="astat">
+            <div><label>Next 20d peak</label><b class="up">+9.4%</b></div>
+            <div><label>Max drawdown</label><b class="dn">−2.1%</b></div>
+            <div><label>Followed through</label><b>Yes</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- precedents -->
+      <section id="prec">
+        <span class="skick">Historical precedents · this stock, this setup</span>
+        <h2 class="stitle">3 prior bases — 2 worked</h2>
+        <div class="prec">
+          <div class="row"><span class="d">Aug 2021</span><span>9-month base, broke ₹1,190 pivot on 2.1× volume</span><span class="out w">+23% / 6 wk</span></div>
+          <div class="row"><span class="d">Jan 2023</span><span>Shallow 4-month base, broke on weak volume — fell back in</span><span class="out l">−5% / failed</span></div>
+          <div class="row"><span class="d">Nov 2019</span><span>7-month base with dry-up, clean trigger and follow-through</span><span class="out w">+14% / 4 wk</span></div>
+        </div>
+      </section>
+
+      <!-- social -->
+      <section id="social">
+        <span class="skick">Social buzz · 7 days</span>
+        <h2 class="stitle">Quiet, mildly positive</h2>
+        <div class="social">
+          <div class="socell"><label>Mentions</label><b>42</b> <small class="up">+18% wk</small></div>
+          <div class="socell"><label>Tone</label><b>Mildly +</b> <small>no hype spike</small></div>
+          <div class="socell"><label>Top thread</label><b style="font-size:12px;font-family:var(--sans);font-weight:600">"Relaxo margin story back?"</b> <small>r/IndianStreetBets</small></div>
+        </div>
+      </section>
+
+      <!-- plan -->
+      <section id="plan">
+        <span class="skick">What to watch for · if / then</span>
+        <h2 class="stitle">The plan, in one card</h2>
+        <div class="plan">
+          <div class="row"><label>Trigger</label><div><b class="up">Close &gt; ₹426.00</b> on ≥1.5× avg volume <div class="why">Not before — 4 prior touches failed intraday.</div></div></div>
+          <div class="row"><label>Suggested entry</label><div><b>₹426.60+</b> <div class="why">Above the pivot with the day's range confirming.</div></div></div>
+          <div class="row"><label>Risk cutoff</label><div><b class="dn">₹408.44 (−4.3%)</b> <div class="why">Under the last contraction low — setup invalid below.</div></div></div>
+          <div class="row"><label>First supply</label><div><b>₹438 (200DMA)</b> <div class="why">Expect a fight here; trend age resets above it.</div></div></div>
+          <div class="row"><label>Skip if</label><div><b>No volume on the break</b> <div class="why">Or if the trigger lands inside the Jul 28 earnings window.</div></div></div>
+        </div>
+        <p class="disc">⚠ Educational content only, not investment advice. BreakoutAI surfaces historical patterns; markets can and do behave differently. Always use a hard stop-loss and size positions so that a full stop costs ≤1% of capital. Data: yfinance daily + public filings; may be delayed or contain errors.</p>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="fab">✦ Ask AI</div>
+
+<script>
+/* ── picks rail ── */
+const picks=[
+  ["KFINTECH","KFin Technologies",71,"+2.4"],["BEPL","Bhansali Eng. Polymers",68,"+1.9"],
+  ["RELAXO","Relaxo Footwears",66,"+1.2"],["ASTRAZEN","AstraZeneca Pharma",64,"-0.4"],
+  ["GRAVITA","Gravita India",62,"+1.8"],["POLYMED","Poly Medicure",61,"+2.1"],
+  ["JBCHEPHARM","JB Chemicals",59,"-1.1"]];
+document.getElementById('picks').innerHTML=picks.map(function(p,i){
+  var off=100.5-(100.5*p[2]/100), up=p[3][0]!=='-';
+  return '<div class="pick'+(p[0]==='RELAXO'?' on':'')+'">'
+    +'<div class="ring"><svg width="38" height="38" viewBox="0 0 38 38"><circle cx="19" cy="19" r="16" fill="none" stroke="#182438" stroke-width="3"/><circle cx="19" cy="19" r="16" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="'+off.toFixed(1)+'"/></svg><b>'+p[2]+'</b></div>'
+    +'<div class="nm"><b>'+p[0]+'</b><span>'+p[1]+'</span></div>'
+    +'<span class="chg '+(up?'up':'dn')+'">'+p[3]+'%</span></div>';
+}).join('');
+
+/* ── candle chart (seeded, base + tighten) ── */
+(function(){
+  var svg=document.getElementById('candles'),W=880,H=340,n=120,seed=7;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  function rnd(){seed=(seed*1664525+1013904223)%2147483646;return seed/2147483646}
+  var px=560,pts=[];
+  for(var i=0;i<n;i++){
+    var phase=i/n, drift=phase<0.35?-2.2:(phase<0.8?-0.15:0.55);
+    var vol=phase<0.35?9:(phase<0.65?5.5:(phase<0.9?3.2:1.8));
+    var o=px, c=px+drift+(rnd()-0.5)*vol; if(c<340)c=340+rnd()*6;
+    var h=Math.max(o,c)+rnd()*vol*0.6, l=Math.min(o,c)-rnd()*vol*0.6;
+    px=c; pts.push([o,c,h,l]);
+  }
+  var mn=Math.min.apply(0,pts.map(function(p){return p[3]}))-8;
+  var mx=Math.max.apply(0,pts.map(function(p){return p[2]}))+8;
+  function Y(v){return 14+(H-64)*(1-(v-mn)/(mx-mn))}
+  var cw=W/n, s='';
+  /* volume */
+  pts.forEach(function(p,i){var vh=6+(Math.abs(p[0]-p[1])*3+((i*37)%13));s+='<rect x="'+(i*cw+1).toFixed(1)+'" y="'+(H-vh)+'" width="'+(cw-2).toFixed(1)+'" height="'+vh+'" fill="rgba(77,163,255,.10)"/>'});
+  /* MAs */
+  function ma(w){var d='';for(var i=w;i<n;i++){var a=0;for(var j=i-w;j<i;j++)a+=pts[j][1];a/=w;d+=(i===w?'M':'L')+(i*cw).toFixed(1)+' '+Y(a).toFixed(1)+' '}return d}
+  s+='<path d="'+ma(10)+'" fill="none" stroke="#7C6FF0" stroke-width="1.4" opacity=".85"/>';
+  s+='<path d="'+ma(40)+'" fill="none" stroke="#3AC0A0" stroke-width="1.4" opacity=".7"/>';
+  /* pivot = resistance */
+  var pvv=Math.max.apply(0,pts.slice(70).map(function(p){return p[2]}))-2;
+  var pv=Y(pvv);
+  s+='<line x1="0" x2="'+W+'" y1="'+pv+'" y2="'+pv+'" stroke="#FBBF24" stroke-width="1" stroke-dasharray="5 5" opacity=".8"/>';
+  s+='<text x="'+(W-8)+'" y="'+(pv-6)+'" text-anchor="end" fill="#FBBF24" font-family="JetBrains Mono" font-size="10">PIVOT / RESISTANCE ₹426.00 · 4 touches</text>';
+  /* support (risk cutoff, −4.3%) */
+  var sp=Y(pvv*0.957);
+  s+='<line x1="0" x2="'+W+'" y1="'+sp+'" y2="'+sp+'" stroke="#34D399" stroke-width="1" stroke-dasharray="5 5" opacity=".7"/>';
+  s+='<text x="'+(W-8)+'" y="'+(sp+13)+'" text-anchor="end" fill="#34D399" font-family="JetBrains Mono" font-size="10">SUPPORT ₹408.44 · 6 touches</text>';
+  /* overhead supply (200DMA) */
+  var rs=Y(pvv*1.028);
+  s+='<line x1="0" x2="'+W+'" y1="'+rs+'" y2="'+rs+'" stroke="#F87171" stroke-width="1" stroke-dasharray="2 5" opacity=".65"/>';
+  s+='<text x="'+(W-8)+'" y="'+(rs-5)+'" text-anchor="end" fill="#F87171" font-family="JetBrains Mono" font-size="10">SUPPLY ₹438 · 200DMA overhead</text>';
+  /* base low = major support */
+  var lo=Y(mn+8);
+  s+='<line x1="'+(W*0.05)+'" x2="'+W+'" y1="'+lo+'" y2="'+lo+'" stroke="#8A94A8" stroke-width="1" stroke-dasharray="2 6" opacity=".45"/>';
+  s+='<text x="'+(W-8)+'" y="'+(lo-5)+'" text-anchor="end" fill="#8A94A8" font-family="JetBrains Mono" font-size="10">BASE LOW ₹340 · major support</text>';
+  /* candles */
+  pts.forEach(function(p,i){
+    var up=p[1]>=p[0],col=up?'#34D399':'#F87171',x=i*cw+cw/2;
+    s+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+Y(p[2]).toFixed(1)+'" y2="'+Y(p[3]).toFixed(1)+'" stroke="'+col+'" stroke-width="1"/>';
+    s+='<rect x="'+(i*cw+1.2).toFixed(1)+'" y="'+Math.min(Y(p[0]),Y(p[1])).toFixed(1)+'" width="'+(cw-2.4).toFixed(1)+'" height="'+Math.max(1.5,Math.abs(Y(p[0])-Y(p[1]))).toFixed(1)+'" fill="'+col+'" rx="1"/>';
+  });
+  /* annotations */
+  s+='<text x="'+(W*0.16)+'" y="'+(Y(mx)-(-16))+'" fill="#8A94A8" font-family="JetBrains Mono" font-size="10">12-mo base · −36.7% deep</text>';
+  s+='<path d="M'+(W*0.58)+' 60 Q '+(W*0.72)+' 40 '+(W*0.86)+' '+(pv+16)+'" fill="none" stroke="#4DA3FF" stroke-width="1" stroke-dasharray="3 4" opacity=".6"/>';
+  s+='<text x="'+(W*0.60)+'" y="52" fill="#4DA3FF" font-family="JetBrains Mono" font-size="10">contractions tighten → 4%</text>';
+  svg.innerHTML=s;
+})();
+
+/* ── earnings bars ── */
+(function(){
+  var svg=document.getElementById('earn'),W=880,H=200;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  var q=[["Q1 FY25",742,58],["Q2",768,61],["Q3",781,64],["Q4",760,66],["Q1 FY26",804,74],["Q2",832,92]];
+  var s='',bw=W/q.length;
+  q.forEach(function(d,i){
+    var rh=(d[1]/900)*(H-52), ph=(d[2]/900)*(H-52)*4;
+    s+='<rect x="'+(i*bw+bw*0.18)+'" y="'+(H-30-rh)+'" width="'+bw*0.3+'" height="'+rh+'" fill="#1D6FD1" rx="3" opacity=".85"/>';
+    s+='<rect x="'+(i*bw+bw*0.53)+'" y="'+(H-30-ph)+'" width="'+bw*0.18+'" height="'+ph+'" fill="#34D399" rx="3" opacity=".9"/>';
+    s+='<text x="'+(i*bw+bw/2)+'" y="'+(H-12)+'" text-anchor="middle" fill="#8A94A8" font-family="JetBrains Mono" font-size="9.5">'+d[0]+'</text>';
+    s+='<text x="'+(i*bw+bw*0.33)+'" y="'+(H-36-rh)+'" text-anchor="middle" fill="#C2CAD8" font-family="JetBrains Mono" font-size="9.5">'+d[1]+'</text>';
+    s+='<text x="'+(i*bw+bw*0.62)+'" y="'+(H-36-ph)+'" text-anchor="middle" fill="#34D399" font-family="JetBrains Mono" font-size="9.5">'+d[2]+'</text>';
+  });
+  svg.innerHTML=s;
+})();
+
+/* ── ownership trend (FII) ── */
+(function(){
+  var svg=document.getElementById('owntrend'),W=880,H=110;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  var q=[["Jun 25",6.8],["Sep 25",6.9],["Dec 25",7.1],["Mar 26",7.5],["Jun 26",7.9]];
+  var s='',bw=W/q.length;
+  q.forEach(function(d,i){
+    var h=(d[1]-6.2)/2*(H-42);
+    s+='<rect x="'+(i*bw+bw*0.3)+'" y="'+(H-24-h)+'" width="'+bw*0.4+'" height="'+h+'" fill="rgba(77,163,255,.5)" rx="3"/>';
+    s+='<text x="'+(i*bw+bw/2)+'" y="'+(H-8)+'" text-anchor="middle" fill="#8A94A8" font-family="JetBrains Mono" font-size="9.5">'+d[0]+'</text>';
+    s+='<text x="'+(i*bw+bw/2)+'" y="'+(H-30-h)+'" text-anchor="middle" fill="#4DA3FF" font-family="JetBrains Mono" font-size="9.5">'+d[1]+'%</text>';
+  });
+  svg.innerHTML=s;
+})();
+
+/* ── secnav active state ── */
+var links=document.querySelectorAll('.secnav a');
+var obs=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id)})}})},{rootMargin:'-30% 0px -60% 0px'});
+document.querySelectorAll('main section').forEach(function(s){obs.observe(s)});
+</script>
+</body>
+</html>

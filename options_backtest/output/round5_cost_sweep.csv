@@ -1,0 +1,9 @@
+strategy,trades,win_rate_pct,total_pnl_rs,total_return_pct,cagr_pct,max_drawdown_pct,avg_win_rs,avg_loss_rs,profit_factor,sharpe_like,period_days,round_trip_cost
+MeanReversion-Expiry,18,88.9,19946.0,19.95,25.7,-2.95,1477.0,-1843.0,6.41,3.11,290,150
+MeanReversion-Expiry,18,77.8,17246.0,17.25,22.2,-3.13,1531.0,-1046.0,5.12,2.69,290,300
+MeanReversion-Expiry,18,61.1,13646.0,13.65,17.5,-3.38,1721.0,-754.0,3.58,2.13,290,500
+MeanReversion-Expiry,18,50.0,9146.0,9.15,11.7,-3.71,1825.0,-808.0,2.26,1.43,290,750
+FlowExpiry-pcr-Wide,21,95.2,14606.0,14.61,16.4,-0.08,734.0,-79.0,186.48,4.01,328,150
+FlowExpiry-pcr-Wide,21,71.4,11456.0,11.46,12.8,-0.23,794.0,-77.0,25.84,3.14,328,300
+FlowExpiry-pcr-Wide,21,47.6,7256.0,7.26,8.1,-1.5,942.0,-197.0,4.35,1.99,328,500
+FlowExpiry-pcr-Wide,21,28.6,2006.0,2.01,2.2,-5.02,1257.0,-369.0,1.36,0.55,328,750

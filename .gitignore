@@ -89,3 +89,6 @@ dhan_ironcondor/master_sample.csv
 # fetch_log.txt (small, per-day fetch audit trail) and everything under output/ ARE
 # committed as the source-of-record results.
 options_backtest/data/nifty_fo_daily.csv
+
+.vercel
+.env*
