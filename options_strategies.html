@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakoutAI | Options Strategies</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: { extend: { colors: {
+            darkBg: '#0b1120', cardBg: '#1e293b', borderCl: '#334155',
+        } } }
+    }
+</script>
+<style>
+    body { -webkit-font-smoothing: antialiased; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .num { font-variant-numeric: tabular-nums; }
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+    .clickable { cursor: pointer; transition: border-color .15s, transform .15s; }
+    .clickable:hover { border-color: #7c6df2; transform: translateY(-1px); }
+</style>
+</head>
+<body class="bg-darkBg text-slate-200 min-h-screen">
+
+<!-- Header -->
+<header class="sticky top-0 z-50 border-b border-borderCl bg-darkBg/95 backdrop-blur-sm">
+    <div class="px-4 sm:px-6 py-3 max-w-[1500px] mx-auto flex flex-wrap items-center gap-3">
+        <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2 shrink-0">
+            <span class="text-purple-500 text-2xl">🧪</span>
+            Options<span class="text-purple-400">Strategies</span>
+        </h1>
+        <span class="text-[11px] text-slate-500 hidden sm:inline">what we backtested, what worked, and what each strategy says today</span>
+        <div class="ml-auto flex items-center gap-2">
+            <a href="combined_breakout_scanner_platform.html" class="px-2.5 py-1 text-xs font-semibold text-slate-300 bg-slate-800 border border-borderCl rounded-md hover:bg-slate-700 transition-colors">📈 Scanner</a>
+            <a href="options_assessor.html" class="px-2.5 py-1 text-xs font-semibold text-purple-300 bg-purple-900/30 border border-purple-500/30 rounded-md hover:bg-purple-900/50 transition-colors">⚡ Assessor</a>
+            <a href="options_platform.html" class="px-2.5 py-1 text-xs font-semibold text-purple-300 bg-purple-900/30 border border-purple-500/30 rounded-md hover:bg-purple-900/50 transition-colors">🎛️ Cockpit</a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-[1500px] mx-auto px-4 sm:px-6 py-6 space-y-8">
+
+    <!-- Honesty strip -->
+    <div class="text-[12px] text-amber-200/90 bg-amber-900/20 border border-amber-500/30 rounded-lg px-4 py-2.5 leading-relaxed">
+        <b>Read this first:</b> every number below comes from our own NIFTY end-of-day backtests
+        (₹1,00,000 notional basis). We tested <span id="totalCount">…</span> strategy variants and
+        <b>most lost money</b> — only the four cards below survived. Past performance ≠ future returns;
+        expiry-week option selling can lose multiples of the credit received. This is research, not advice.
+    </div>
+
+    <!-- ═══ LIVE: what would each strategy do today ═══ -->
+    <section>
+        <div class="flex flex-wrap items-center gap-3 mb-2">
+            <h2 class="text-base font-bold text-white">If you entered today</h2>
+            <div id="symTabs" class="flex gap-1.5"></div>
+            <div id="liveMeta" class="ml-auto text-[11px] text-slate-400 num"></div>
+        </div>
+
+        <details class="mb-3 bg-slate-900/60 border border-borderCl rounded-lg text-[12px]">
+            <summary class="px-3 py-2 text-slate-300 font-semibold select-none">ⓘ Why is max profit tiny but max loss huge? <span class="text-slate-500 font-normal">(tap to expand — important)</span></summary>
+            <div class="px-3 pb-3 text-slate-400 leading-relaxed space-y-1.5">
+                <p>All four strategies <b>sell option premium with a hedge</b> — the market equivalent of selling insurance.
+                You collect a small credit that you keep <i>most</i> weeks, and occasionally pay out a lot in a bad week.
+                Example: sell the 23,900 PE at 12.25, buy the 23,700 PE at 3.90 → you pocket 8.35 points (× lot = the max profit).
+                The strikes are 200 points apart, so the worst case is 200 − 8.35 points against you. That asymmetry is
+                structural, not a bug.</p>
+                <p>Two things make it survivable: <b>① win rate</b> — these setups expired worthless 78–95% of the time in our
+                backtest (shown on each card), and <b>② the stop-loss</b> — most variants exit at a fixed multiple of the credit,
+                so the <i>typical</i> loss is close to the stop, not the theoretical max. Max loss only happens if price gaps
+                straight through the stop overnight. Judge each card by <b>win rate × typical win vs typical loss</b>, not by the
+                scary max-loss number alone — but never sell a spread whose max loss you can't afford.</p>
+            </div>
+        </details>
+
+        <div id="liveStatus" class="text-sm text-slate-400 py-6 text-center">Loading live option chain…</div>
+        <div id="liveGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 hidden"></div>
+        <p class="text-[11px] text-slate-500 mt-2">
+            Suggestions rebuild each strategy's exact backtest rules on the live Dhan option chain for the nearest expiry.
+            All four were tested entering <b>2 trading days before expiry</b> — outside that window the odds shown don't apply.
+            <b>Click any card</b> for the payoff chart.
+        </p>
+    </section>
+
+    <!-- ═══ The four that survived ═══ -->
+    <section>
+        <h2 class="text-base font-bold text-white mb-1">The four that survived the backtest</h2>
+        <p class="text-[12px] text-slate-400 mb-3"><span id="curatedSub"></span> <b>Click a card</b> for the equity curve and trade-by-trade P&amp;L.</p>
+        <div id="curatedGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+    </section>
+
+    <!-- ═══ Graveyard ═══ -->
+    <section>
+        <h2 class="text-base font-bold text-white mb-1">The graveyard <span class="text-slate-500 font-normal text-sm">— everything else we tried</span></h2>
+        <p class="text-[12px] text-slate-400 mb-3">Same engine, same data, worst first. Shown so you know the four winners weren't cherry-picked from a sea of hidden losers — the losers are right here. Click a row to inspect it.</p>
+        <div class="overflow-x-auto rounded-xl border border-borderCl">
+            <table class="w-full text-[12px]">
+                <thead class="bg-slate-800/80 text-slate-400 text-left">
+                    <tr>
+                        <th class="px-3 py-2 font-semibold">Strategy</th>
+                        <th class="px-3 py-2 font-semibold">Family</th>
+                        <th class="px-3 py-2 font-semibold text-right">Trades</th>
+                        <th class="px-3 py-2 font-semibold text-right">Win %</th>
+                        <th class="px-3 py-2 font-semibold text-right">Total return</th>
+                        <th class="px-3 py-2 font-semibold text-right">Max DD</th>
+                        <th class="px-3 py-2 font-semibold text-right">Profit factor</th>
+                    </tr>
+                </thead>
+                <tbody id="graveBody" class="divide-y divide-slate-800"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer class="text-[11px] text-slate-600 pb-8">
+        Backtest data: NSE F&amp;O bhavcopy, NIFTY weekly options. Backtest lot size 75 (contract size at the time of the data);
+        live cards use the current lot size from the exchange. Regenerate stats with
+        <code class="text-slate-500">python options_backtest/scripts/export_web_json.py</code>.
+        <span id="genDate"></span>
+    </footer>
+</main>
+
+<!-- ═══ Detail modal ═══ -->
+<div id="modalWrap" class="fixed inset-0 z-[100] hidden">
+    <div class="absolute inset-0 bg-black/75" data-close></div>
+    <div class="relative max-w-3xl mx-auto mt-8 mb-8 mx-3 sm:mx-auto bg-cardBg border border-borderCl rounded-2xl shadow-2xl max-h-[88vh] overflow-y-auto">
+        <button data-close class="absolute top-3 right-3 w-7 h-7 rounded-md bg-slate-800 text-slate-400 hover:text-white text-sm z-10">✕</button>
+        <div id="modalBody" class="p-5"></div>
+    </div>
+</div>
+
+<script>
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const fmt = (v, d=1) => (v === null || v === undefined || v === '' || Number.isNaN(+v)) ? '—' : (+v).toFixed(d);
+const rs = v => (v === null || v === undefined || Number.isNaN(+v)) ? '—' : '₹' + Math.round(+v).toLocaleString('en-IN');
+const num = v => (v === null || v === undefined) ? '—' : (+v).toLocaleString('en-IN');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const FAMILY = { credit_spread: 'Credit spread', iron_condor: 'Iron condor', flow_expiry: 'Flow-timed spread' };
+
+/* ---------- plain-English explainers ---------- */
+const FAMILY_INFO = {
+    credit_spread: `You <b>sell</b> an option near the market price and <b>buy</b> a cheaper one further away as insurance.
+        You keep the credit if price stays on the right side of the sold strike until exit. Wins are small and frequent;
+        the rare loss is bigger — capped by the bought option. Works best when the market drifts or does nothing; hurts on sharp moves against you.`,
+    iron_condor: `A call credit spread <b>and</b> a put credit spread at the same time — you collect two credits and win when
+        the market stays inside a range. No direction call needed. Loses on a big move either way, so it's a bet on calm.`,
+    flow_expiry: `A credit spread that only trades when option <b>open-interest flow</b> is at an extreme (crowd panic or
+        complacency), and sits in cash otherwise. Fewer trades, but each one has the crowd-positioning wind at its back.
+        That selectivity is why it often says "no trade today".`,
+};
+const STRAT_INFO = {
+    'IC-1pct-manage50': {
+        what: `Two days before weekly expiry, sell a call spread and a put spread each about <b>1% away</b> from the NIFTY price
+            (an iron condor). You win if NIFTY stays inside that ±1% band-ish range into expiry.`,
+        rules: `Entry: 2 trading days pre-expiry · Take profit: buy back at <b>50% of credit</b> · Stop: exit if the condor costs <b>2× credit</b> to close.`,
+        wins: `Quiet expiry weeks — which is most of them.`,
+        loses: `Any fast move >~1% in either direction (events, gap opens, expiry-day squeezes).`,
+    },
+    'Momentum-Expiry-HoldToSettle': {
+        what: `Looks at NIFTY's <b>3-day return</b>. If it's up, sell a put spread below the market (bet: trend won't fully reverse
+            in 2 days). If it's down, sell a call spread above. Rides short-term momentum with defined risk.`,
+        rules: `Entry: 2 trading days pre-expiry · <b>No early exit</b> — held to settlement, win or lose.`,
+        wins: `When the last few days' direction persists or the market just chops sideways.`,
+        loses: `Sharp reversals against the recent trend — and because there's no stop, it eats the full move up to max loss.`,
+    },
+    'MeanReversion-Expiry': {
+        what: `The opposite bet: <b>fade yesterday's move</b>. After a down day it sells a put spread (bet: no follow-through crash);
+            after an up day it sells a call spread. Classic "markets overreact day-to-day".`,
+        rules: `Entry: 2 trading days pre-expiry · Take profit: <b>60% of credit</b> · Stop: <b>1.5× credit</b>, checked end-of-day.`,
+        wins: `Choppy, headline-driven markets that snap back.`,
+        loses: `Real trends — when a down day is the start of something, not a blip.`,
+    },
+    'FlowExpiry-pcr-Medium': {
+        what: `Watches the <b>put/call open-interest ratio</b> (PCR). Above 1.3 = crowd loaded on puts (fear extreme) → sell a put
+            spread, contrarian-bullish. Below 0.7 = complacency → sell a call spread. Between? <b>It refuses to trade.</b>`,
+        rules: `Entry: 2 trading days pre-expiry, only at PCR extremes · Take profit: 60% of credit · Stop: 1.5× credit, EOD checks.`,
+        wins: `When positioning is one-sided and unwinds — its 95% backtest win rate comes from only picking those spots (21 trades, not 200).`,
+        loses: `When the extreme gets more extreme (real crashes keep crashing). Rare, but that's the tail.`,
+    },
+};
+
+/* ═══════════ SVG chart builders (no libraries) ═══════════ */
+
+function sparkSvg(pts, w=220, h=44) {
+    if (!pts || pts.length < 2) return '';
+    const min = Math.min(...pts, 0), max = Math.max(...pts, 0), span = (max - min) || 1;
+    const x = i => (i / (pts.length - 1)) * (w - 2) + 1;
+    const y = v => h - 3 - ((v - min) / span) * (h - 6);
+    const line = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const up = pts[pts.length - 1] >= 0;
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full h-11" preserveAspectRatio="none">
+        <line x1="1" y1="${y(0).toFixed(1)}" x2="${w-1}" y2="${y(0).toFixed(1)}" stroke="#334155" stroke-width="1" stroke-dasharray="3 3"/>
+        <polyline points="${line}" fill="none" stroke="${up ? '#34d399' : '#f87171'}" stroke-width="1.5"/>
+    </svg>`;
+}
+
+/* Payoff-at-expiry diagram for a set of legs */
+function payoffSvg(legs, lot, spot, breakevens, w=640, h=280) {
+    const P = { l: 58, r: 14, t: 14, b: 34 };
+    const ks = legs.map(l => +l.strike);
+    const minK = Math.min(...ks), maxK = Math.max(...ks);
+    const span = Math.max(maxK - minK, spot * 0.01);
+    const lo = Math.min(minK, spot) - span * 0.9, hi = Math.max(maxK, spot) + span * 0.9;
+    const N = 240;
+    const pnlAt = S => lot * legs.reduce((a, l) => {
+        const intr = l.type === 'CE' ? Math.max(S - l.strike, 0) : Math.max(l.strike - S, 0);
+        return a + (l.action === 'SELL' ? 1 : -1) * (l.ltp - intr);
+    }, 0);
+    const xs = [], ys = [];
+    for (let i = 0; i <= N; i++) { const S = lo + (hi - lo) * i / N; xs.push(S); ys.push(pnlAt(S)); }
+    let yMin = Math.min(...ys, 0), yMax = Math.max(...ys, 0);
+    const pad = (yMax - yMin) * 0.12 || 1; yMin -= pad; yMax += pad;
+    const X = S => P.l + (S - lo) / (hi - lo) * (w - P.l - P.r);
+    const Y = v => P.t + (yMax - v) / (yMax - yMin) * (h - P.t - P.b);
+    const y0 = Y(0);
+
+    /* green/red filled regions split at zero-crossings */
+    let regions = '', run = [], runSign = Math.sign(ys[0]) || 1;
+    const flush = () => {
+        if (run.length < 2) { run = []; return; }
+        const fill = runSign >= 0 ? '#34d399' : '#f87171';
+        const pts = run.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+        regions += `<polygon points="${pts} ${run[run.length-1][0].toFixed(1)},${y0.toFixed(1)} ${run[0][0].toFixed(1)},${y0.toFixed(1)}" fill="${fill}" fill-opacity="0.14"/>`;
+        run = [];
+    };
+    for (let i = 0; i <= N; i++) {
+        const s = Math.sign(ys[i]) || runSign;
+        if (s !== runSign && i > 0) {
+            const f = ys[i-1] / (ys[i-1] - ys[i]);
+            const xc = X(xs[i-1] + (xs[i] - xs[i-1]) * f);
+            run.push([xc, y0]); flush(); runSign = s; run.push([xc, y0]);
+        }
+        run.push([X(xs[i]), Y(ys[i])]);
+    }
+    flush();
+
+    const line = xs.map((S, i) => `${X(S).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join(' ');
+    const beMarks = (breakevens || []).map(b =>
+        `<line x1="${X(+b).toFixed(1)}" y1="${P.t}" x2="${X(+b).toFixed(1)}" y2="${h-P.b}" stroke="#64748b" stroke-dasharray="4 3"/>
+         <text x="${X(+b).toFixed(1)}" y="${h-P.b+24}" fill="#94a3b8" font-size="10" text-anchor="middle">BE ${num(Math.round(b))}</text>`).join('');
+    const strikeTicks = ks.map(k =>
+        `<line x1="${X(k).toFixed(1)}" y1="${h-P.b}" x2="${X(k).toFixed(1)}" y2="${h-P.b+4}" stroke="#64748b"/>`).join('');
+
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full">
+        ${regions}
+        <line x1="${P.l}" y1="${y0.toFixed(1)}" x2="${w-P.r}" y2="${y0.toFixed(1)}" stroke="#475569" stroke-width="1"/>
+        <polyline points="${line}" fill="none" stroke="#e2e8f0" stroke-width="1.8"/>
+        <line x1="${X(spot).toFixed(1)}" y1="${P.t}" x2="${X(spot).toFixed(1)}" y2="${h-P.b}" stroke="#a78bfa" stroke-dasharray="5 4" stroke-width="1.3"/>
+        <text x="${X(spot).toFixed(1)}" y="${P.t+10}" fill="#a78bfa" font-size="10" text-anchor="middle">spot ${num(Math.round(spot))}</text>
+        ${beMarks}${strikeTicks}
+        <text x="${P.l-6}" y="${Y(yMax-pad).toFixed(1)}" fill="#34d399" font-size="10" text-anchor="end">+${rs(Math.max(...ys)).slice(1)}</text>
+        <text x="${P.l-6}" y="${Y(yMin+pad).toFixed(1)}" fill="#f87171" font-size="10" text-anchor="end">−${rs(Math.abs(Math.min(...ys))).slice(1)}</text>
+        <text x="${P.l-6}" y="${(y0+3).toFixed(1)}" fill="#64748b" font-size="10" text-anchor="end">0</text>
+        <text x="${P.l}" y="${h-P.b+13}" fill="#94a3b8" font-size="10">${num(Math.round(lo))}</text>
+        <text x="${w-P.r}" y="${h-P.b+13}" fill="#94a3b8" font-size="10" text-anchor="end">${num(Math.round(hi))}</text>
+        <text x="${(w/2).toFixed(0)}" y="${h-2}" fill="#64748b" font-size="10" text-anchor="middle">NIFTY at expiry → &nbsp; (₹ P&amp;L per lot)</text>
+    </svg>`;
+}
+
+/* Equity curve with axes */
+function equitySvg(pts, w=640, h=220) {
+    if (!pts || pts.length < 2) return '<div class="text-[11px] text-slate-500">No equity series exported for this variant.</div>';
+    const P = { l: 62, r: 12, t: 12, b: 26 };
+    let yMin = Math.min(...pts, 0), yMax = Math.max(...pts, 0);
+    const pad = (yMax - yMin) * 0.1 || 1; yMin -= pad; yMax += pad;
+    const X = i => P.l + i / (pts.length - 1) * (w - P.l - P.r);
+    const Y = v => P.t + (yMax - v) / (yMax - yMin) * (h - P.t - P.b);
+    const line = pts.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    const last = pts[pts.length - 1], up = last >= 0;
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full">
+        <line x1="${P.l}" y1="${Y(0).toFixed(1)}" x2="${w-P.r}" y2="${Y(0).toFixed(1)}" stroke="#475569" stroke-dasharray="3 3"/>
+        <polyline points="${line}" fill="none" stroke="${up ? '#34d399' : '#f87171'}" stroke-width="1.8"/>
+        <text x="${P.l-6}" y="${Y(yMax-pad).toFixed(1)}" fill="#94a3b8" font-size="10" text-anchor="end">${num(Math.round(yMax))}</text>
+        <text x="${P.l-6}" y="${Y(yMin+pad).toFixed(1)}" fill="#94a3b8" font-size="10" text-anchor="end">${num(Math.round(yMin))}</text>
+        <text x="${P.l-6}" y="${(Y(0)+3).toFixed(1)}" fill="#64748b" font-size="10" text-anchor="end">0</text>
+        <text x="${w-P.r}" y="${(Y(last)-5).toFixed(1)}" fill="${up ? '#34d399' : '#f87171'}" font-size="10" text-anchor="end" font-weight="bold">${num(Math.round(last))}</text>
+        <text x="${(w/2).toFixed(0)}" y="${h-2}" fill="#64748b" font-size="10" text-anchor="middle">trade # → &nbsp; cumulative P&amp;L (₹1,00,000 basis)</text>
+    </svg>`;
+}
+
+/* Per-trade PnL bars (diff of cumulative curve) */
+function barsSvg(pts, w=640, h=150) {
+    if (!pts || pts.length < 2) return '';
+    const diffs = []; for (let i = 1; i < pts.length; i++) diffs.push(pts[i] - pts[i-1]);
+    const P = { l: 62, r: 12, t: 8, b: 22 };
+    let yMin = Math.min(...diffs, 0), yMax = Math.max(...diffs, 0);
+    const pad = (yMax - yMin) * 0.1 || 1; yMin -= pad; yMax += pad;
+    const bw = Math.max((w - P.l - P.r) / diffs.length - 1, 1);
+    const X = i => P.l + i / diffs.length * (w - P.l - P.r);
+    const Y = v => P.t + (yMax - v) / (yMax - yMin) * (h - P.t - P.b);
+    const y0 = Y(0);
+    const bars = diffs.map((d, i) =>
+        `<rect x="${X(i).toFixed(1)}" y="${Math.min(Y(d), y0).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(Math.abs(Y(d) - y0), 0.7).toFixed(1)}" fill="${d >= 0 ? '#34d399' : '#f87171'}" fill-opacity="0.85"/>`).join('');
+    return `<svg viewBox="0 0 ${w} ${h}" class="w-full">
+        ${bars}
+        <line x1="${P.l}" y1="${y0.toFixed(1)}" x2="${w-P.r}" y2="${y0.toFixed(1)}" stroke="#475569"/>
+        <text x="${P.l-6}" y="${Y(yMax-pad).toFixed(1)}" fill="#94a3b8" font-size="10" text-anchor="end">${num(Math.round(yMax))}</text>
+        <text x="${P.l-6}" y="${Y(yMin+pad).toFixed(1)}" fill="#94a3b8" font-size="10" text-anchor="end">${num(Math.round(yMin))}</text>
+        <text x="${(w/2).toFixed(0)}" y="${h-2}" fill="#64748b" font-size="10" text-anchor="middle">each bar = one trade's P&amp;L (₹)</text>
+    </svg>`;
+}
+
+/* ═══════════ state ═══════════ */
+let BT = {};            // name -> strategy record from static JSON
+let BT_META = null;
+let LIVE = null;        // last live payload
+let currentSym = 'NIFTY';
+
+/* ═══════════ modal ═══════════ */
+const modalWrap = document.getElementById('modalWrap');
+const modalBody = document.getElementById('modalBody');
+function openModal(html) { modalBody.innerHTML = html; modalWrap.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeModal() { modalWrap.classList.add('hidden'); document.body.style.overflow = ''; }
+modalWrap.addEventListener('click', e => { if (e.target.dataset.close !== undefined) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function infoBlock(name, family) {
+    const i = STRAT_INFO[name];
+    const fam = FAMILY_INFO[family] || '';
+    if (!i) return `<div class="text-[12px] text-slate-400 leading-relaxed space-y-1.5">
+        <p>${fam}</p>
+        <p class="text-slate-500">This is a parameter variant we tested (${esc(name)}); the name encodes its wing width / stop / entry tweak. It didn't make the cut.</p></div>`;
+    return `<div class="text-[12px] text-slate-400 leading-relaxed space-y-1.5">
+        <p><b class="text-slate-300">What it does:</b> ${i.what}</p>
+        <p><b class="text-slate-300">Rules:</b> ${i.rules}</p>
+        <p><b class="text-emerald-400">Wins when:</b> ${i.wins}</p>
+        <p><b class="text-red-400">Loses when:</b> ${i.loses}</p>
+        <p class="text-slate-500 border-t border-slate-800 pt-1.5">${fam}</p></div>`;
+}
+
+function statsGrid(st) {
+    const cells = [
+        ['Total return', fmt(st.total_return_pct) + '%', +st.total_return_pct >= 0 ? 'text-emerald-400' : 'text-red-400'],
+        ['CAGR', fmt(st.cagr_pct) + '%', 'text-slate-200'],
+        ['Win rate', fmt(st.win_rate_pct) + '%', 'text-slate-200'],
+        ['Trades', st.trades, 'text-slate-200'],
+        ['Avg win', rs(st.avg_win_rs), 'text-emerald-400'],
+        ['Avg loss', rs(st.avg_loss_rs), 'text-red-400'],
+        ['Profit factor', fmt(st.profit_factor, 2), 'text-slate-200'],
+        ['Max drawdown', fmt(st.max_drawdown_pct) + '%', 'text-amber-300'],
+    ];
+    return `<div class="grid grid-cols-4 gap-2 text-[11px] num">` + cells.map(c =>
+        `<div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">${c[0]}</div><div class="font-bold ${c[2]}">${c[1]}</div></div>`).join('') + `</div>`;
+}
+
+function openStratModal(name) {
+    const s = BT[name]; if (!s) return;
+    const st = s.stats;
+    /* expectancy line — the honest "is this worth it" number */
+    const wr = +st.win_rate_pct / 100;
+    const expct = wr * +st.avg_win_rs + (1 - wr) * +st.avg_loss_rs;
+    openModal(`
+        <div class="flex items-center gap-2 mb-1 pr-8">
+            <h3 class="font-bold text-white text-base">${esc(name)}</h3>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-500/30">${FAMILY[s.family] || esc(s.family)}</span>
+            ${s.curated ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-500/30">SURVIVOR</span>' : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-borderCl">GRAVEYARD</span>'}
+        </div>
+        <div class="mb-3">${infoBlock(name, s.family)}</div>
+        ${statsGrid(st)}
+        <div class="text-[11px] num mt-2 mb-4 px-2 py-1.5 rounded-lg ${expct >= 0 ? 'bg-emerald-900/20 text-emerald-300' : 'bg-red-900/20 text-red-300'}">
+            Expectancy ≈ <b>${rs(expct)}</b> per trade &nbsp;(= ${fmt(st.win_rate_pct)}% × ${rs(st.avg_win_rs)} wins &nbsp;+&nbsp; ${fmt(100 - st.win_rate_pct)}% × ${rs(st.avg_loss_rs)} losses)
+        </div>
+        <div class="text-[11px] font-semibold text-slate-400 mb-1">Equity curve</div>
+        ${equitySvg(s.sparkline)}
+        <div class="text-[11px] font-semibold text-slate-400 mb-1 mt-3">Trade-by-trade</div>
+        ${barsSvg(s.sparkline)}
+        ${st.notes ? `<div class="text-[11px] text-slate-500 mt-3">${esc(st.notes)}</div>` : ''}
+    `);
+}
+
+function openLiveModal(idx) {
+    if (!LIVE) return;
+    const s = LIVE.suggestions[idx]; if (!s) return;
+    const bt = BT[s.name];
+    let chart = '', plan = '';
+    if (s.status === 'trade') {
+        chart = `<div class="text-[11px] font-semibold text-slate-400 mb-1 mt-3">P&amp;L at expiry — where does ${esc(LIVE.symbol)} need to close?</div>
+                 ${payoffSvg(s.legs, s.lot_size || LIVE.lot_size, LIVE.spot, s.breakevens)}`;
+        const tgt = s.target_exit_points !== null ? rs(s.target_exit_points * (s.lot_size || LIVE.lot_size)) : null;
+        const stp = s.stop_loss_points !== null ? rs(s.stop_loss_points * (s.lot_size || LIVE.lot_size)) : null;
+        plan = tgt || stp ? `
+            <div class="grid grid-cols-3 gap-2 text-[11px] num mt-2">
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Planned exit (target)</div><div class="font-bold text-emerald-400">${tgt ? '+' + tgt : '—'}</div></div>
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Planned exit (stop)</div><div class="font-bold text-red-400">${stp ? '−' + stp : '—'}</div></div>
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Worst case (gap past stop)</div><div class="font-bold text-red-400">−${rs(s.max_loss_per_lot_rs).slice(1)}</div></div>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1.5">The stop means a normal losing week costs ~the stop amount, <b>not</b> the worst case. Worst case needs price to gap through the stop before you can exit.</div>`
+        : `<div class="text-[11px] text-amber-300/90 mt-2">⚠ This variant has <b>no stop-loss</b> — it holds to settlement, so a loss can run to the full max loss.</div>`;
+    }
+    openModal(`
+        <div class="flex items-center gap-2 mb-1 pr-8 flex-wrap">
+            <h3 class="font-bold text-white text-base">${esc(s.name)}</h3>
+            ${DIR_BADGE[s.direction] || ''}
+        </div>
+        <div class="mb-3">${infoBlock(s.name, s.kind || (bt && bt.family))}</div>
+        ${bt ? `<div class="text-[11px] num mb-2 px-2 py-1.5 rounded-lg bg-slate-900/60 text-slate-300">📊 In the backtest this setup won <b>${fmt(bt.stats.win_rate_pct)}%</b> of ${bt.stats.trades} trades · profit factor <b>${fmt(bt.stats.profit_factor, 2)}</b> · max drawdown <b>${fmt(bt.stats.max_drawdown_pct)}%</b></div>` : ''}
+        ${s.status === 'trade' ? `
+            <table class="w-full text-[12px] mb-1"><tbody>${s.legs.map(legRow).join('')}</tbody></table>
+            <div class="grid grid-cols-3 gap-2 text-[11px] num">
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Max profit / lot</div><div class="font-bold text-emerald-400">${rs(s.credit_per_lot_rs)}</div></div>
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Max loss / lot</div><div class="font-bold text-red-400">${rs(s.max_loss_per_lot_rs)}</div></div>
+                <div class="bg-slate-900/60 rounded-lg px-2 py-1.5"><div class="text-slate-500">Breakeven${s.breakevens.length > 1 ? 's' : ''}</div><div class="font-bold text-slate-200">${s.breakevens.map(b => num(Math.round(b))).join(' / ')}</div></div>
+            </div>
+            ${plan}${chart}`
+        : `<div class="text-[13px] text-slate-300 bg-slate-900/60 rounded-lg px-3 py-4">${esc(s.why)}</div>
+           <div class="text-[11px] text-slate-500 mt-2">Sitting out <i>is</i> the strategy here — its backtest edge only exists in the conditions it waits for.</div>`}
+        <div class="text-[10px] text-slate-500 mt-3">${esc(s.exit_note)}</div>
+    `);
+}
+
+/* ═══════════ curated cards + graveyard ═══════════ */
+async function loadBacktest() {
+    const base = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) ? 'data/' : 'https://raw.githubusercontent.com/Bhavanmehta/BreakoutAI/main/data/';
+    const resp = await fetch(base + 'options_strategies.json');
+    const data = await resp.json();
+    BT_META = data;
+    data.strategies.forEach(s => { BT[s.name] = s; });
+    document.getElementById('genDate').textContent = `Exported ${data.generated}.`;
+    document.getElementById('totalCount').textContent = data.strategies.length;
+    document.getElementById('curatedSub').textContent =
+        `Profitable after costs on ₹${(+data.basis_rs).toLocaleString('en-IN')} notional. Win rate alone is meaningless for option selling — always read it next to avg win vs avg loss and max drawdown.`;
+
+    const curated = data.strategies.filter(s => s.curated);
+    const losers = data.strategies.filter(s => !s.curated);
+
+    document.getElementById('curatedGrid').innerHTML = curated.map(s => {
+        const st = s.stats;
+        const ret = +st.total_return_pct;
+        const rr = Math.abs(+st.avg_win_rs / +st.avg_loss_rs);
+        return `<div class="clickable bg-cardBg border border-borderCl rounded-xl p-4 flex flex-col gap-3" data-strat="${esc(s.name)}">
+            <div>
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-bold text-white text-sm leading-tight">${esc(s.name)}</h3>
+                    <span class="flex items-center gap-1">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-500/30 whitespace-nowrap">${FAMILY[s.family] || esc(s.family)}</span>
+                        <span class="text-slate-500 hover:text-purple-300 text-xs" title="What is this strategy?">ⓘ</span>
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1 leading-snug">${esc(st.notes)}</p>
+            </div>
+            ${sparkSvg(s.sparkline)}
+            <div class="grid grid-cols-3 gap-x-2 gap-y-2 text-[11px] num">
+                <div><div class="text-slate-500">Return</div><div class="font-bold ${ret >= 0 ? 'text-emerald-400' : 'text-red-400'}">${fmt(ret)}%</div></div>
+                <div><div class="text-slate-500">Win rate</div><div class="font-bold text-slate-200">${fmt(st.win_rate_pct)}%</div></div>
+                <div><div class="text-slate-500">Trades</div><div class="font-bold text-slate-200">${st.trades}</div></div>
+                <div><div class="text-slate-500">Avg win/loss</div><div class="font-bold text-slate-200">${fmt(rr, 2)}×</div></div>
+                <div><div class="text-slate-500">Max DD</div><div class="font-bold text-amber-300">${fmt(st.max_drawdown_pct)}%</div></div>
+                <div><div class="text-slate-500">Profit factor</div><div class="font-bold text-slate-200">${fmt(st.profit_factor, 2)}</div></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('graveBody').innerHTML = losers.map(s => {
+        const st = s.stats, ret = +st.total_return_pct;
+        return `<tr class="hover:bg-slate-800/40 cursor-pointer" data-strat="${esc(s.name)}">
+            <td class="px-3 py-1.5 text-slate-300">${esc(s.name)} <span class="text-slate-600">ⓘ</span></td>
+            <td class="px-3 py-1.5 text-slate-500">${FAMILY[s.family] || esc(s.family)}</td>
+            <td class="px-3 py-1.5 text-right num text-slate-400">${st.trades}</td>
+            <td class="px-3 py-1.5 text-right num text-slate-400">${fmt(st.win_rate_pct)}%</td>
+            <td class="px-3 py-1.5 text-right num font-semibold ${ret >= 0 ? 'text-emerald-400' : 'text-red-400'}">${fmt(ret)}%</td>
+            <td class="px-3 py-1.5 text-right num text-amber-300/80">${fmt(st.max_drawdown_pct)}%</td>
+            <td class="px-3 py-1.5 text-right num text-slate-400">${fmt(st.profit_factor, 2)}</td>
+        </tr>`;
+    }).join('');
+}
+
+/* ═══════════ live suggestions ═══════════ */
+const DIR_BADGE = {
+    bull:  '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-500/30">BULLISH · sell put spread</span>',
+    bear:  '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-900/40 text-red-300 border border-red-500/30">BEARISH · sell call spread</span>',
+    both:  '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 border border-sky-500/30">NEUTRAL · iron condor</span>',
+    skip:  '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-borderCl">NO TRADE TODAY</span>',
+};
+
+function legRow(l) {
+    const sell = l.action === 'SELL';
+    return `<tr>
+        <td class="py-0.5 pr-2 font-bold ${sell ? 'text-red-300' : 'text-emerald-300'}">${l.action}</td>
+        <td class="py-0.5 pr-2 num text-slate-200">${num(+l.strike)} ${l.type}</td>
+        <td class="py-0.5 text-right num text-slate-400">@ ${fmt(l.ltp, 2)}</td>
+    </tr>`;
+}
+
+function suggestionCard(s, idx) {
+    const bt = BT[s.name];
+    const btChip = bt ? `<div class="text-[10px] num text-slate-400 bg-slate-900/60 rounded px-1.5 py-1">📊 backtest: won <b class="text-slate-200">${fmt(bt.stats.win_rate_pct)}%</b> of ${bt.stats.trades} trades · PF <b class="text-slate-200">${fmt(bt.stats.profit_factor, 2)}</b></div>` : '';
+    let body;
+    if (s.status !== 'trade') {
+        body = `<div class="flex-1 flex items-center justify-center text-center text-[12px] text-slate-400 px-2 py-6 leading-relaxed">${esc(s.why)}</div>`;
+    } else {
+        const lot = s.lot_size || (LIVE && LIVE.lot_size);
+        const tgt = s.target_exit_points !== null ? rs(s.target_exit_points * lot) : null;
+        const stp = s.stop_loss_points !== null ? rs(s.stop_loss_points * lot) : null;
+        const width = s.credit_points + s.max_loss_points;
+        const thin = width > 0 && (s.credit_points / width) < 0.05;
+        body = `
+        <table class="w-full text-[12px]"><tbody>${s.legs.map(legRow).join('')}</tbody></table>
+        <div class="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] num mt-1">
+            <div><div class="text-slate-500">Max profit / lot</div><div class="font-bold text-emerald-400">${rs(s.credit_per_lot_rs)}</div></div>
+            <div><div class="text-slate-500">Max loss / lot <span title="Only if price gaps past the stop">*</span></div><div class="font-bold text-red-400">${rs(s.max_loss_per_lot_rs)}</div></div>
+            <div><div class="text-slate-500">Planned exit</div><div class="font-bold text-slate-200">${tgt && stp ? `<span class="text-emerald-400">+${tgt}</span> / <span class="text-red-400">−${stp}</span>` : 'held to settlement'}</div></div>
+            <div><div class="text-slate-500">Breakeven${s.breakevens.length > 1 ? 's' : ''}</div><div class="font-bold text-slate-200">${s.breakevens.map(b => num(Math.round(b))).join(' / ')}</div></div>
+        </div>
+        ${thin ? '<div class="text-[10px] text-amber-300/90 bg-amber-900/20 rounded px-1.5 py-1">⚠ Credit is unusually thin today (&lt;5% of spread width) — the backtest averaged richer premiums; skipping is reasonable.</div>' : ''}
+        <div class="text-[11px] text-slate-400 border-t border-slate-800 pt-1.5">${esc(s.why)}</div>`;
+    }
+    return `<div class="clickable bg-cardBg border border-borderCl rounded-xl p-4 flex flex-col gap-2" data-live-idx="${idx}">
+        <div class="flex items-start justify-between gap-2">
+            <h3 class="font-bold text-white text-sm leading-tight">${esc(s.name)}</h3>
+            <span class="flex items-center gap-1 shrink-0">${DIR_BADGE[s.direction] || ''}<span class="text-slate-500 hover:text-purple-300 text-xs" title="What is this strategy?">ⓘ</span></span>
+        </div>
+        ${btChip}
+        ${body}
+        <div class="text-[10px] text-slate-500 leading-snug">${esc(s.exit_note)}</div>
+    </div>`;
+}
+
+async function loadLive(sym) {
+    currentSym = sym;
+    renderTabs();
+    const status = document.getElementById('liveStatus');
+    const grid = document.getElementById('liveGrid');
+    status.classList.remove('hidden'); grid.classList.add('hidden');
+    status.textContent = `Loading ${sym} option chain…`;
+    try {
+        const resp = await fetch(`/api/options_strategies?symbol=${encodeURIComponent(sym)}`);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        LIVE = data;
+
+        const bits = [
+            `Spot <b class="text-slate-200">${num(+data.spot)}</b>`,
+            `Expiry <b class="text-slate-200">${esc(data.expiry)}</b> (${data.days_to_expiry}d)`,
+            data.pcr !== null ? `PCR <b class="text-slate-200">${fmt(data.pcr, 2)}</b>` : '',
+            `Lot <b class="text-slate-200">${data.lot_size ?? '—'}</b>`,
+            data.in_entry_window
+                ? '<span class="text-emerald-400 font-bold">● in entry window</span>'
+                : '<span class="text-amber-400 font-bold">● outside entry window</span>',
+            data.source !== 'live' ? '<span class="text-amber-400 font-bold">DEMO DATA</span>' : '',
+            !data.backtested_on ? '<span class="text-amber-400">params tuned on NIFTY</span>' : '',
+        ].filter(Boolean);
+        document.getElementById('liveMeta').innerHTML = bits.join(' &nbsp;·&nbsp; ');
+
+        grid.innerHTML = data.suggestions.map(suggestionCard).join('');
+        status.classList.add('hidden'); grid.classList.remove('hidden');
+    } catch (err) {
+        LIVE = null;
+        document.getElementById('liveMeta').textContent = '';
+        status.innerHTML = IS_LOCAL
+            ? `⚠️ ${esc(err.message)} — is <code>python scripts/dev_server.py</code> running with Dhan creds in backend/.env?`
+            : `⚠️ ${esc(err.message)}`;
+    }
+}
+
+function renderTabs() {
+    document.getElementById('symTabs').innerHTML = ['NIFTY', 'BANKNIFTY', 'SENSEX'].map(s =>
+        `<button data-sym="${s}" class="px-2 py-0.5 text-[11px] font-semibold rounded border transition-colors ${
+            s === currentSym ? 'bg-purple-900/40 text-purple-200 border-purple-500/40'
+                             : 'bg-slate-800 text-slate-400 border-borderCl hover:text-slate-200'}">${s}</button>`
+    ).join('');
+}
+
+/* ═══════════ click delegation ═══════════ */
+document.addEventListener('click', e => {
+    const tab = e.target.closest('[data-sym]');
+    if (tab) { loadLive(tab.dataset.sym); return; }
+    const live = e.target.closest('[data-live-idx]');
+    if (live) { openLiveModal(+live.dataset.liveIdx); return; }
+    const strat = e.target.closest('[data-strat]');
+    if (strat) { openStratModal(strat.dataset.strat); return; }
+});
+
+/* backtest stats must load first so live cards can show win-rate chips */
+loadBacktest()
+    .catch(e => { document.getElementById('curatedSub').textContent = '⚠️ could not load data/options_strategies.json — ' + e.message; })
+    .finally(() => loadLive('NIFTY'));
+</script>
+</body>
+</html>
