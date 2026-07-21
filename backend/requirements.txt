@@ -1,7 +1,11 @@
 pandas>=2.0
 numpy>=1.24
 duckdb>=1.0
-yfinance>=0.2.40
+yfinance>=0.2.50        # floor picked for curl_cffi-backed session/impersonation support
+curl_cffi>=0.15          # browser TLS (JA3/JA4) impersonation for yfinance sessions - without
+                          # this, requests from shared CI/datacenter IPs are far more likely to
+                          # be rate-limited/blocked by Yahoo. yfinance uses this automatically
+                          # via new_session() when no custom `session=` is passed (see get_prices.py).
 jugaad-data>=0.33
 requests>=2.31
 vaderSentiment>=3.3    # local news/social sentiment scoring (sentiment.py)

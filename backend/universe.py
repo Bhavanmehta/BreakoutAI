@@ -188,17 +188,33 @@ _EQUITY_ISIN_PREFIX = "INE"
 
 def _fetch_latest_bhavcopy() -> pd.DataFrame | None:
     """Walk backward from today to find the most recent trading day's bhavcopy
-    (today/weekends/holidays won't have one)."""
+    (today/weekends/holidays won't have one).
+
+    Each date gets a few retries with backoff before moving on. NSE's edge/WAF
+    quite often blocks CI (datacenter) source IPs with a *transient* 401/403 or
+    a timeout rather than a hard, permanent block -- retrying the SAME date a
+    couple of times recovers far more often than immediately giving up and
+    walking back to an older (stale) trading day. The last exception is logged
+    (previously swallowed silently) so a bad day is diagnosable from the run
+    log instead of just showing up as "bhavcopy fetch failed"."""
     from jugaad_data.nse import bhavcopy_raw
+    last_err: Exception | None = None
     for delta in range(settings.UNIVERSE_LOOKBACK_DAYS):
         d = date.today() - timedelta(days=delta)
-        try:
-            raw = bhavcopy_raw(d)
-            df = pd.read_csv(io.StringIO(raw))
-            if len(df):
-                return df
-        except Exception:
-            continue
+        for attempt in range(3):
+            try:
+                raw = bhavcopy_raw(d)
+                df = pd.read_csv(io.StringIO(raw))
+                if len(df):
+                    return df
+                break  # empty response for this date -- try an older date, not a retry
+            except Exception as e:
+                last_err = e
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+    if last_err is not None:
+        print(f"  [universe] bhavcopy fetch failed after retries -- last error: "
+              f"{type(last_err).__name__}: {last_err}")
     return None
 
 

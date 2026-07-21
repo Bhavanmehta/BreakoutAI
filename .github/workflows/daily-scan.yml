@@ -43,7 +43,7 @@ jobs:
           PREV="$(mktemp -d)"
           if git clone --depth 1 --branch data "$REPO_URL" "$PREV/d" 2>/dev/null; then
             mkdir -p data
-            # Two kinds of gitignored, branch-resident data must be pulled back into data/
+            # Three kinds of gitignored, branch-resident data must be pulled back into data/
             # before run_scan.py, or a fresh CI checkout silently loses them:
             #   (a) append-only ledgers — loaded, appended to, and rewritten each run;
             #   (b) slow-changing reference enrichments (fundamentals/sectors/holdings/
@@ -53,8 +53,14 @@ jobs:
             #       stock ships fundamentals: null / sector: "" and the site's fundamentals,
             #       collection and sector filters all match nothing. (They persist on the
             #       branch via the publish step's clone-forward; this is the read side.)
+            #   (c) breakouts.json — universe.py's _universe_from_last_scan() reads this as
+            #       the graceful-degradation fallback when today's bhavcopy/discovery fetch
+            #       fails (NSE/exchange blocking CI IPs etc). Without restoring it here, that
+            #       fallback path can never find a prior scan and drops straight to the tiny
+            #       hardcoded FALLBACK_WATCHLIST instead of reusing ~yesterday's universe.
             for f in performance.json track_record.json predictions_log.jsonl \
-                     fundamentals.json sectors.json holdings.json earnings.json; do
+                     fundamentals.json sectors.json holdings.json earnings.json \
+                     breakouts.json; do
               [ -f "$PREV/d/$f" ] && cp "$PREV/d/$f" "data/$f" || true
             done
           fi
