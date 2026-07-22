@@ -92,3 +92,9 @@ options_backtest/data/nifty_fo_daily.csv
 
 .vercel
 .env*
+
+# Dhan price-source caches (backend/): local, regenerable — never commit. The
+# token cache holds a LIVE access token (credential); the scrip map is rebuilt
+# from Dhan's scrip-master download by dhan_scrip.py.
+backend/.dhan_token_cache.json
+backend/.dhan_scrip_map.json

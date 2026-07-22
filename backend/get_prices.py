@@ -1,9 +1,12 @@
 """
 Data sourcing: daily prices + corporate-action events.
 
-Two price sources are supported:
+Three price sources are supported:
+  * dhan      -> India cash equities via Dhan's historical API. Already split/bonus
+                 back-adjusted (verified against split ex-dates), and rate-limit-free,
+                 so it is the default for India. See dhan_scrip.py / dhan_token.py.
   * yfinance  -> prices come already adjusted for splits/bonuses. Works from any
-                 network (including GitHub's servers). This is the default.
+                 network (including GitHub's servers). Default for US.
   * jugaad    -> raw NSE prices (whole-market friendly) that we adjust ourselves
                  using the corporate-action list from NSE. See adjust_for_splits.py.
 
@@ -208,15 +211,78 @@ def fetch_prices_jugaad(symbol: str, years: int = settings.HISTORY_YEARS) -> pd.
 
 
 # ---------------------------------------------------------------------------
+# Dhan (adjusted, rate-limit-free) — India cash equities
+# ---------------------------------------------------------------------------
+# Memoized client, reused across the whole-market loop. None = untried,
+# False = unavailable this run (mint/import failed — don't retry per symbol).
+_DHAN_CLIENT: object | None = None
+
+
+def _dhan_client():
+    global _DHAN_CLIENT
+    if _DHAN_CLIENT is None:
+        try:
+            from dhan_token import get_access_token, make_client
+            _DHAN_CLIENT = make_client(get_access_token())
+        except Exception as e:
+            print(f"    [dhan] client unavailable — disabling Dhan for this run: {e}")
+            _DHAN_CLIENT = False
+    return _DHAN_CLIENT or None
+
+
+def fetch_prices_dhan(symbol: str, years: int = settings.HISTORY_YEARS) -> pd.DataFrame | None:
+    """Daily OHLCV from Dhan for one NSE symbol.
+
+    Dhan history is already split/bonus back-adjusted, so — unlike jugaad — no
+    manual corporate-action correction is applied here.
+    """
+    client = _dhan_client()
+    if client is None:
+        return None
+    from dhan_scrip import resolve_security_id
+    sec = resolve_security_id(symbol)
+    if not sec:
+        return None
+
+    from_date = (date.today() - timedelta(days=int(years * 365.25) + 5)).isoformat()
+    to_date = date.today().isoformat()
+    resp = client.historical_daily_data(
+        security_id=str(sec), exchange_segment="NSE_EQ",
+        instrument_type="EQUITY", from_date=from_date, to_date=to_date,
+    )
+    data = (resp or {}).get("data") or {}
+    ts = data.get("timestamp") or []
+    if len(ts) == 0:
+        return None
+    df = pd.DataFrame({
+        "date": ts,
+        "open": data.get("open"), "high": data.get("high"),
+        "low": data.get("low"), "close": data.get("close"),
+        "volume": data.get("volume"),
+    })
+    # Dhan timestamps are epoch seconds; convert to naive IST calendar dates to
+    # match the other sources' tz-naive normalized dates.
+    df["date"] = (pd.to_datetime(df["date"], unit="s", utc=True)
+                  .dt.tz_convert("Asia/Kolkata").dt.tz_localize(None).dt.normalize())
+    df["symbol"] = symbol
+    keep = ["date", "open", "high", "low", "close", "volume", "symbol"]
+    return df[keep].sort_values("date").reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
 # Unified entry point with graceful fallback
 # ---------------------------------------------------------------------------
 def get_prices(symbol: str, years: int = settings.HISTORY_YEARS,
                source: str = settings.PRICE_SOURCE) -> pd.DataFrame | None:
-    """Fetch adjusted daily OHLCV for one symbol. Falls back to the other
-    source if the primary one returns nothing."""
-    primary, fallback = (fetch_prices_yfinance, fetch_prices_jugaad) \
-        if source == "yfinance" else (fetch_prices_jugaad, fetch_prices_yfinance)
-    for fn in (primary, fallback):
+    """Fetch adjusted daily OHLCV for one symbol, trying sources in order and
+    falling back to the next if one returns nothing."""
+    if source == "dhan":
+        chain = (fetch_prices_dhan, fetch_prices_yfinance, fetch_prices_jugaad)
+    elif source == "yfinance":
+        chain = (fetch_prices_yfinance, fetch_prices_jugaad)
+    else:
+        chain = (fetch_prices_jugaad, fetch_prices_yfinance)
+    for fn in chain:
         try:
             df = fn(symbol, years)
             if df is not None and len(df) > 0:

@@ -143,9 +143,13 @@ if MARKET == "US":
 HISTORY_YEARS = 3
 
 # Primary price source for the daily scan.
-#   "yfinance" -> already split/bonus-adjusted, works from anywhere (incl. CI). Best default.
+#   "dhan"     -> India cash equities via Dhan's historical API. Already split/bonus
+#                 back-adjusted and rate-limit-free (no yfinance 429s). Default for IN.
+#   "yfinance" -> already split/bonus-adjusted, works from anywhere (incl. CI). Default for US.
 #   "jugaad"   -> raw NSE data + our own split/bonus adjustment (the full-market path).
-PRICE_SOURCE = "yfinance"
+# NOTE: "dhan" runs the per-symbol get_prices path (Dhan -> yfinance -> jugaad fallback),
+# not the batched yfinance path, so a rate-limit stall can't silently drop the universe.
+PRICE_SOURCE = "yfinance" if MARKET == "US" else "dhan"
 
 # --- Pattern / breakout thresholds ------------------------------------------
 # A breakout = close above the prior-N-day high, on a volume surge, WHILE the stock
