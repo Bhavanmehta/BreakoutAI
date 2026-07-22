@@ -187,7 +187,11 @@ def _money(spread_sides: list[dict], lot: int | None, sl_mult, target_frac) -> d
         "max_loss_points": round(max_loss, 2),
         "reward_risk": round(credit / max_loss, 2) if max_loss > 0 else None,
         "target_exit_points": round(credit * target_frac, 2) if target_frac else None,
-        "stop_loss_points": round(credit * sl_mult, 2) if sl_mult else None,
+        # sl_mult means "exit when debit-to-close = sl_mult x credit received".
+        # Net loss at that point is (sl_mult - 1) x credit, NOT sl_mult x credit,
+        # since the credit already collected offsets part of the buy-back cost.
+        # Clamp to max_loss since a defined-risk spread can never lose more than that.
+        "stop_loss_points": round(min(credit * (sl_mult - 1), max_loss), 2) if sl_mult else None,
     }
     if lot:
         out["lot_size"] = lot
