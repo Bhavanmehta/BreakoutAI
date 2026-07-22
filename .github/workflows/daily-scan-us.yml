@@ -19,6 +19,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 90     # fetch budget below is 60 min; +install/publish stays well under this
     env:
       BREAKOUTAI_MARKET: US
     steps:
@@ -62,6 +63,13 @@ jobs:
 
       - name: Run the pipeline
         working-directory: backend
+        env:
+          # US universe is ~4260 names and yfinance batches at ~0.59s/symbol, so a
+          # full scan needs ~42 min. The default 25-min budget cut it off early at
+          # 2575/4260 (run #29873833707, 2026-07-21). 60 min covers the whole
+          # universe with headroom for backoff/retry variance -- and since the
+          # budget is a *cap*, a clean day still finishes in ~42 min and exits.
+          FETCH_BUDGET_SEC: "3600"
         run: python run_scan.py
 
       - name: Fetch social buzz (ApeWisdom + Google Trends -- no credentials needed for US)
