@@ -11,3 +11,9 @@ requests>=2.31
 vaderSentiment>=3.3    # local news/social sentiment scoring (sentiment.py)
 pytrends>=4.9           # Google Trends search-interest score (fetch_social.py)
 finvizfinance>=1.3.0    # US universe discovery (S&P 500/Nasdaq 100/Russell 2000 screener, universe.py)
+pyotp                   # India: turns DHAN_TOTP_SECRET into a 6-digit TOTP to auto-mint the Dhan
+                        # access token each run (dhan_token.py). Without it the mint raises
+                        # "No module named 'pyotp'", Dhan is disabled, and India silently falls
+                        # back to rate-limited yfinance/jugaad prices for the whole ~2060 universe.
+dhanhq>=2.0             # India: Dhan SDK used to mint the access token (DhanLogin) and fetch
+                        # PRICE_SOURCE=dhan prices (dhan_token.py / get_prices.py fetch_prices_dhan).
