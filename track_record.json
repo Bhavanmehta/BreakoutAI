@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-07-24T12:22:25+00:00",
+  "horizon_days": 10,
+  "stop_loss_fraction": 0.94,
+  "stop_model": "stop = resistance x 0.94 (~6% below the trigger)",
+  "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",
+  "actionable_evaluated": 492,
+  "followed_through": 189,
+  "hit_rate": 0.384,
+  "pending": 464,
+  "live_calls_logged": 23738,
+  "note": "Includes a walk-forward simulation of recent history (source=simulated); live daily calls accumulate from now on.",
+  "recent": [
+    {
+      "date": "2026-07-10",
+      "symbol": "ICICIBANK",
+      "price": 1401.2,
+      "score": "high",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "ADANIENT",
+      "price": 3157.3,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "IKIO",
+      "price": 210.75,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "LAURUSLABS",
+      "price": 1537.8,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "DIXON",
+      "price": 13421.0,
+      "score": "medium",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "INDIANB",
+      "price": 870.7,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "GMRAIRPORT",
+      "price": 112.51,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "EIEL",
+      "price": 244.49,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "ABCAPITAL",
+      "price": 408.3,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "WABAG",
+      "price": 2221.2,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "ANANTRAJ",
+      "price": 585.85,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "GODREJPROP",
+      "price": 2133.0,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "RBLBANK",
+      "price": 380.65,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "AUBANK",
+      "price": 1072.1,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "MANAPPURAM",
+      "price": 341.3,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "HDFCAMC",
+      "price": 2761.2,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "DENTA",
+      "price": 353.05,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "CARTRADE",
+      "price": 2809.9,
+      "score": "high",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "MOTILALOFS",
+      "price": 979.35,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-10",
+      "symbol": "GAIL",
+      "price": 173.73,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    }
+  ]
+}

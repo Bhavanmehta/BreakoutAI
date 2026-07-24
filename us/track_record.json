@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-07-23T23:17:28+00:00",
+  "horizon_days": 10,
+  "stop_loss_fraction": 0.94,
+  "stop_model": "stop = 1.5x the 10-day ATR below the trigger, clamped 4-12% of price",
+  "criterion": "hit +1R (risk-defined target) before the stop, within 10 trading days",
+  "actionable_evaluated": 10138,
+  "followed_through": 4398,
+  "hit_rate": 0.434,
+  "pending": 1665,
+  "live_calls_logged": 44033,
+  "note": "Includes a walk-forward simulation of recent history (source=simulated); live daily calls accumulate from now on.",
+  "recent": [
+    {
+      "date": "2026-07-09",
+      "symbol": "ABNB",
+      "price": 146.89,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "ANET",
+      "price": 184.69,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "BAC",
+      "price": 59.25,
+      "score": "high",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "CNC",
+      "price": 67.6,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "CRL",
+      "price": 233.6,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "EBAY",
+      "price": 117.33,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "EXPE",
+      "price": 267.78,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "FTNT",
+      "price": 163.73,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "GILD",
+      "price": 134.84,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "GWW",
+      "price": 1364.86,
+      "score": "medium",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "IBKR",
+      "price": 95.28,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "IQV",
+      "price": 208.97,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "JPM",
+      "price": 335.47,
+      "score": "high",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "KEY",
+      "price": 23.1,
+      "score": "high",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "LYV",
+      "price": 182.58,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "MNST",
+      "price": 96.55,
+      "score": "medium",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "MTB",
+      "price": 237.94,
+      "score": "high",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "OMC",
+      "price": 80.83,
+      "score": "medium",
+      "source": "live",
+      "worked": true
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "PNC",
+      "price": 250.91,
+      "score": "medium",
+      "source": "live",
+      "worked": false
+    },
+    {
+      "date": "2026-07-09",
+      "symbol": "PRU",
+      "price": 115.0,
+      "score": "medium",
+      "source": "live",
+      "worked": true
+    }
+  ]
+}
